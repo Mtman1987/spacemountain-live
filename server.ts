@@ -135,7 +135,7 @@ async function startServer() {
     const spmtUrl = 'https://spmt.live/api/oauth/authorize';
     const params = new URLSearchParams({
       client_id: 'spacemountain-live',
-      redirect_uri: `${req.protocol}://${req.get('host')}/auth/callback`,
+      redirect_uri: 'https://spacemountain.live/auth/callback',
       state: Math.random().toString(36).slice(2),
     });
     res.redirect(`${spmtUrl}?${params}`);
