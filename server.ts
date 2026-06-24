@@ -332,6 +332,49 @@ async function startServer() {
     }
   });
 
+  // ─── Shop: Get products ───
+  app.get('/api/shop/products', (req, res) => {
+    try {
+      const products = db.select().from(communityTools).all(); // temp reuse, we'll add a products table
+      res.json([
+        { id: 'tee-cosmic', name: 'Cosmic Tee', description: 'SpaceMountain.live logo on premium black cotton', price: 29.99, image: '/assets/space-logo-main.png', category: 'apparel' },
+        { id: 'hoodie-nebula', name: 'Nebula Hoodie', description: 'Deep space pullover with embroidered rocket patch', price: 54.99, image: '/assets/space-logo-main.png', category: 'apparel' },
+        { id: 'sticker-pack', name: 'Sticker Pack (6)', description: 'Holographic space-themed vinyl stickers', price: 12.99, image: '/assets/space-badges-clean.png', category: 'accessories' },
+        { id: 'mug-station', name: 'Station Mug', description: 'Matte black ceramic mug with glow-in-dark logo', price: 18.99, image: '/assets/space-logo-main.png', category: 'accessories' },
+        { id: 'overlay-pack', name: 'Stream Overlay Pack', description: 'Full cosmic stream overlay set for OBS', price: 9.99, image: '/assets/app-streamweaver.png', category: 'digital' },
+        { id: 'badge-set', name: 'Sub Badge Collection', description: '12 animated space-themed Twitch sub badges', price: 14.99, image: '/assets/space-badges-clean.png', category: 'digital' },
+      ]);
+    } catch (err) {
+      res.status(500).json({ error: 'Failed to load products' });
+    }
+  });
+
+  // ─── Shop: Create PayPal order ───
+  app.post('/api/shop/create-order', async (req, res) => {
+    const { items } = req.body; // [{id, quantity}]
+    if (!items || !items.length) return res.status(400).json({ error: 'No items' });
+
+    const catalog: Record<string, number> = {
+      'tee-cosmic': 29.99, 'hoodie-nebula': 54.99, 'sticker-pack': 12.99,
+      'mug-station': 18.99, 'overlay-pack': 9.99, 'badge-set': 14.99,
+    };
+
+    const total = items.reduce((sum: number, item: any) => {
+      return sum + (catalog[item.id] || 0) * (item.quantity || 1);
+    }, 0);
+
+    // Return order info for PayPal client-side buttons to use
+    res.json({ orderId: `ORD-${Date.now()}`, total: total.toFixed(2), currency: 'USD' });
+  });
+
+  // ─── Shop: Capture PayPal order (webhook/confirmation) ───
+  app.post('/api/shop/capture-order', (req, res) => {
+    const { orderId, paypalOrderId, payerEmail } = req.body;
+    // In production: verify with PayPal API that payment was captured
+    console.log(`Order ${orderId} captured via PayPal (${paypalOrderId}) from ${payerEmail}`);
+    res.json({ success: true, message: 'Order confirmed! Check your email for details.' });
+  });
+
   // Vite Integration Middleware
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({

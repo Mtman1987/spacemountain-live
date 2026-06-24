@@ -13,6 +13,7 @@ import CosmicHeader from './components/CosmicHeader';
 import MainAppSuite from './components/MainAppSuite';
 import SettingsPanel from './components/SettingsPanel';
 import RightSidebar from './components/RightSidebar';
+import Shop from './components/Shop';
 
 const sleekRocketIcon = '/assets/model-rocket.png';
 
@@ -51,7 +52,11 @@ function ProcessedRocketImage({ className, glowHex }: { className?: string; glow
 export default function App() {
   // Navigation & Interactive Tabs
   const [activeTab, setActiveTab] = useState<string>(() => {
-    if (typeof window !== 'undefined' && window.location.pathname === '/settings') return 'settings';
+    if (typeof window !== 'undefined') {
+      const path = window.location.pathname;
+      if (path === '/settings') return 'settings';
+      if (path === '/shop') return 'shop';
+    }
     return 'dashboard';
   });
 
@@ -137,7 +142,13 @@ export default function App() {
   }, [rocketFlying]);
 
   useEffect(() => {
-    const nextPath = activeTab === 'settings' ? '/settings' : '/';
+    const pathMap: Record<string, string> = {
+      'dashboard': '/', 'settings': '/settings', 'shop': '/shop',
+      'apps': '/apps', 'inbox': '/inbox', 'forums': '/forums',
+      'rooms': '/rooms', 'mtnview': '/mtnview', 'builder': '/builder',
+      'crew': '/crew', 'help': '/help',
+    };
+    const nextPath = pathMap[activeTab] || '/';
     if (window.location.pathname !== nextPath) {
       window.history.pushState({ activeTab }, '', nextPath);
     }
@@ -145,7 +156,14 @@ export default function App() {
 
   useEffect(() => {
     const handlePopState = () => {
-      setActiveTab(window.location.pathname === '/settings' ? 'settings' : 'dashboard');
+      const path = window.location.pathname;
+      const routeMap: Record<string, string> = {
+        '/': 'dashboard', '/settings': 'settings', '/shop': 'shop',
+        '/apps': 'apps', '/inbox': 'inbox', '/forums': 'forums',
+        '/rooms': 'rooms', '/mtnview': 'mtnview', '/builder': 'builder',
+        '/crew': 'crew', '/help': 'help',
+      };
+      setActiveTab(routeMap[path] || 'dashboard');
     };
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
@@ -1233,6 +1251,22 @@ export default function App() {
                     + ADD STEP
                   </button>
                 </div>
+              </motion.div>
+            )}
+
+            {/* TAB: SHOP */}
+            {activeTab === 'shop' && (
+              <motion.div
+                key="shop"
+                initial={{ opacity: 0, y: 15 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -15 }}
+                transition={{ duration: 0.3 }}
+              >
+                <Shop 
+                  accentColor={currentTheme.glowHex}
+                  paypalClientId={undefined /* Set your PayPal Client ID here */}
+                />
               </motion.div>
             )}
 
