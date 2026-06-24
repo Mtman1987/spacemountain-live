@@ -127,6 +127,20 @@ export default function Shop({ accentColor, paypalClientId }: ShopProps) {
         </button>
       </div>
 
+      {/* Streamlabs merch link */}
+      <a
+        href="https://streamlabs.com/mtman1987/merch"
+        target="_blank"
+        rel="noopener noreferrer"
+        className="flex items-center justify-between p-4 rounded-2xl border border-white/10 bg-white/[0.02] hover:bg-white/[0.05] transition-all no-underline group"
+      >
+        <div className="flex flex-col">
+          <span className="text-sm font-bold text-white group-hover:text-amber-400 transition-colors">Mtman1987's Merch</span>
+          <span className="text-[10px] text-zinc-400 mt-0.5">SpaceMountain branded merch coming soon — check out what's live now!</span>
+        </div>
+        <span className="text-xs font-bold px-3 py-1.5 rounded-lg border transition-all" style={{ borderColor: `${accentColor}40`, color: accentColor }}>Visit Store →</span>
+      </a>
+
       {/* Filters */}
       <div className="flex gap-2">
         {['all', 'apparel', 'accessories', 'digital'].map(cat => (
