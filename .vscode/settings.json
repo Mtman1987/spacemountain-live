@@ -1,0 +1,5 @@
+{
+    "chatgpt.gpt3.searchGrounding.enabled": true,
+    "chatgpt.gpt3.responsesAPI.enabled": true,
+    "chatgpt.autoAddCurrentFile": true
+}
