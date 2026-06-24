@@ -117,6 +117,11 @@ async function startServer() {
     console.error('Error seeding community tools:', err);
   }
 
+  // Health check endpoint
+  app.get('/api/health', (req, res) => {
+    res.json({ status: 'ok', app: 'spacemountain-live', uptime: process.uptime() });
+  });
+
   // API Route: Domain-specific branding
   app.get('/api/branding', (req, res) => {
     const host = req.get('host') || 'spacemountain.live';
