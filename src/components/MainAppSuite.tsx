@@ -38,24 +38,24 @@ export default function MainAppSuite({ tools, onTriggerAction, accentColor, pref
   };
 
   const appLinks: Record<string, string> = {
-    'streamweaver': 'https://streamweaver.spacemountain.live',
-    'chat-tag': 'https://chattag.spacemountain.live',
-    'discord-hub': 'https://discord.spacemountain.live',
-    'hearmeout': 'https://hearmeout.spacemountain.live',
-    'mountainview': 'https://mountainview.spacemountain.live',
-    'mail': 'https://spmt.live/inbox',
-    'forums': 'https://spmt.live/forums',
-    'builder': 'https://builder.spacemountain.live',
+    'streamweaver': '/streamweaver',
+    'chat-tag': '/chattag',
+    'discord-hub': '/discordstreamhub',
+    'hearmeout': '/hearmeout',
+    'mountainview': '/mtnview',
+    'mail': '/inbox',
+    'forums': '/forums',
+    'builder': '/builder',
   };
 
   const appStatus: Record<string, 'live' | 'coming-soon'> = {
-    'streamweaver': 'coming-soon',
-    'chat-tag': 'coming-soon',
-    'discord-hub': 'coming-soon',
-    'hearmeout': 'coming-soon',
+    'streamweaver': 'live',
+    'chat-tag': 'live',
+    'discord-hub': 'live',
+    'hearmeout': 'live',
     'mountainview': 'coming-soon',
-    'mail': 'coming-soon',
-    'forums': 'coming-soon',
+    'mail': 'live',
+    'forums': 'live',
     'builder': 'coming-soon',
   };
 
@@ -118,8 +118,10 @@ export default function MainAppSuite({ tools, onTriggerAction, accentColor, pref
               }}
               onClick={() => {
                 onTriggerAction(tool.id);
-                if (appLinks[tool.id] && appStatus[tool.id] === 'live') {
-                  window.open(appLinks[tool.id], '_blank');
+                if (appLinks[tool.id]) {
+                  if (appStatus[tool.id] === 'live') {
+                    window.location.href = appLinks[tool.id];
+                  }
                 }
               }}
             >

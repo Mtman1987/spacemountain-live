@@ -1,6 +1,8 @@
 import express from 'express';
 import path from 'path';
 import fs from 'fs';
+import http from 'http';
+import https from 'https';
 import { createServer as createViteServer } from 'vite';
 import { db, sqlite } from './src/db/connection.js';
 import { users, communityTools, userPreferences } from './src/db/schema.js';
@@ -330,6 +332,35 @@ async function startServer() {
         mediaJobsCount: 72,
       });
     }
+  });
+
+  // ─── App Proxy Routes ───
+  // Proxy /streamweaver, /hearmeout, /chattag, /discordstreamhub to their Fly apps
+  const appProxyMap: Record<string, string> = {
+    '/streamweaver': 'https://streamweaver-new.fly.dev',
+    '/hearmeout': 'https://hearmeout-main.fly.dev',
+    '/chattag': 'https://chat-tag-new.fly.dev',
+    '/discordstreamhub': 'https://discord-stream-hub-new.fly.dev',
+  };
+
+  Object.entries(appProxyMap).forEach(([route, target]) => {
+    app.use(route, (req, res) => {
+      const url = new URL(req.url || '/', target);
+      const mod = url.protocol === 'https:' ? https : http;
+      const proxyReq = mod.request(url.toString(), {
+        method: req.method,
+        headers: { ...req.headers, host: new URL(target).host },
+      }, (proxyRes) => {
+        res.writeHead(proxyRes.statusCode || 502, proxyRes.headers);
+        proxyRes.pipe(res);
+      });
+      proxyReq.on('error', () => res.status(502).json({ error: `Could not reach ${route}` }));
+      if (req.method !== 'GET' && req.method !== 'HEAD') {
+        req.pipe(proxyReq);
+      } else {
+        proxyReq.end();
+      }
+    });
   });
 
   // ─── Shop: Get products ───
