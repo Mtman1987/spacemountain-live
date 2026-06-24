@@ -22,8 +22,8 @@ export default function CosmicHeader({ activeTab, setActiveTab, accentColor, ide
   const [isSearchExpanded, setIsSearchExpanded] = useState(false);
 
   // Calculate dynamic level based on points
-  const currentPoints = identity?.points || 12500;
-  const currentLevel = Math.floor(currentPoints / 300) || 41;
+  const currentPoints = identity?.points || 0;
+  const currentLevel = Math.floor(currentPoints / 300) || 1;
 
   return (
     <header
@@ -128,55 +128,65 @@ export default function CosmicHeader({ activeTab, setActiveTab, accentColor, ide
         </button>
       </div>
 
-      {/* 3. Dynamic Sci-Fi User Profile Capsule */}
-      <button 
-        onClick={() => setActiveTab('settings')}
-        className="flex items-center gap-3 p-1 px-3 rounded-xl bg-white/[0.03] hover:bg-white/10 border border-white/10 transition-all shadow-lg group shrink-0"
-        title="User Account Settings"
-      >
-        {/* Glowing border avatar */}
-        <div 
-          className="w-8.5 h-8.5 rounded-full p-0.5 transition-all duration-300 relative shrink-0"
-          style={{
-            background: `linear-gradient(135deg, ${accentColor}, transparent)`
-          }}
+      {/* 3. Dynamic Sci-Fi User Profile Capsule OR Sign In Button */}
+      {identity ? (
+        <button 
+          onClick={() => setActiveTab('settings')}
+          className="flex items-center gap-3 p-1 px-3 rounded-xl bg-white/[0.03] hover:bg-white/10 border border-white/10 transition-all shadow-lg group shrink-0"
+          title="User Account Settings"
         >
-          <div className="w-full h-full rounded-full overflow-hidden border border-black relative">
-            <img 
-              src={realAvatar} 
-              alt={identity?.displayName || 'NovaStar'} 
-              className="w-full h-full object-cover"
-              referrerPolicy="no-referrer"
-            />
+          {/* Glowing border avatar */}
+          <div 
+            className="w-8.5 h-8.5 rounded-full p-0.5 transition-all duration-300 relative shrink-0"
+            style={{
+              background: `linear-gradient(135deg, ${accentColor}, transparent)`
+            }}
+          >
+            <div className="w-full h-full rounded-full overflow-hidden border border-black relative">
+              <img 
+                src={realAvatar} 
+                alt={identity?.displayName || 'Captain'} 
+                className="w-full h-full object-cover"
+                referrerPolicy="no-referrer"
+              />
+            </div>
+            {/* Active pilot dot */}
+            <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-500 rounded-full border-2 border-[#090b14]" />
           </div>
-          {/* Active pilot dot */}
-          <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-500 rounded-full border-2 border-[#090b14]" />
-        </div>
 
-        {/* Pilot details */}
-        <div className="flex flex-col items-start leading-tight">
-          <div className="flex items-center gap-1.5">
-            <span className="text-xs font-sans font-extrabold tracking-wide text-white group-hover:text-amber-400 transition-colors">
-              {identity?.displayName || 'NovaStar'}
-            </span>
-            <span 
-              className="text-[9px] px-1.5 py-0.5 rounded font-mono font-black border uppercase tracking-wider"
-              style={{
-                borderColor: `${accentColor}40`,
-                color: accentColor,
-                backgroundColor: `${accentColor}10`
-              }}
-            >
-              LVL {currentLevel}
-            </span>
+          {/* Pilot details */}
+          <div className="flex flex-col items-start leading-tight">
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs font-sans font-extrabold tracking-wide text-white group-hover:text-amber-400 transition-colors">
+                {identity.displayName}
+              </span>
+              <span 
+                className="text-[9px] px-1.5 py-0.5 rounded font-mono font-black border uppercase tracking-wider"
+                style={{
+                  borderColor: `${accentColor}40`,
+                  color: accentColor,
+                  backgroundColor: `${accentColor}10`
+                }}
+              >
+                LVL {currentLevel}
+              </span>
+            </div>
+            <div className="flex items-center gap-1.5 mt-0.5 text-[9px] font-mono font-bold text-zinc-400">
+              <span className="text-emerald-400">● ONLINE</span>
+              <span className="text-zinc-600">|</span>
+              <span className="text-zinc-400">{currentPoints.toLocaleString()} XP</span>
+            </div>
           </div>
-          <div className="flex items-center gap-1.5 mt-0.5 text-[9px] font-mono font-bold text-zinc-400">
-            <span className="text-emerald-400">● ONLINE</span>
-            <span className="text-zinc-600">|</span>
-            <span className="text-zinc-400">{currentPoints.toLocaleString()} XP</span>
-          </div>
-        </div>
-      </button>
+        </button>
+      ) : (
+        <a
+          href="/auth/login"
+          className="flex items-center gap-2 px-4 py-2 rounded-xl font-sans font-extrabold text-xs text-black transition-all transform hover:-translate-y-0.5 no-underline shadow-lg shrink-0"
+          style={{ backgroundColor: accentColor, boxShadow: `0 4px 16px ${accentColor}44` }}
+        >
+          Sign In with SPMT
+        </a>
+      )}
     </header>
   );
 }

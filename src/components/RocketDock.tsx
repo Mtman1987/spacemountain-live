@@ -33,8 +33,8 @@ export default function RocketDock({
   // Profile dropdown state
   const [isProfileOpen, setIsProfileOpen] = useState(false);
 
-  const currentPoints = identity?.points || 12500;
-  const currentLevel = Math.floor(currentPoints / 300) || 41;
+  const currentPoints = identity?.points || 0;
+  const currentLevel = Math.floor(currentPoints / 300) || 1;
   const showTopProfilePod = rocketFlying && !isFloating;
   const dockSide = preferences?.sidebarPosition || 'left';
   const sidebarStyle = preferences?.sidebarStyle || 'docked';
@@ -153,6 +153,7 @@ const realAvatar = '/assets/astronaut-avatar.jpg';
       </div>
 
       {/* D. Compact Profile & Internal Pop-up Cockpit (Placed at the bottom) */}
+      {identity ? (
       <div className="relative mt-auto shrink-0 flex flex-col items-center justify-center pb-2 pt-1 z-50">
         <button
           onClick={() => setIsProfileOpen(!isProfileOpen)}
@@ -261,6 +262,20 @@ const realAvatar = '/assets/astronaut-avatar.jpg';
           )}
         </AnimatePresence>
       </div>
+      ) : (
+      <div className="relative mt-auto shrink-0 flex flex-col items-center justify-center pb-2 pt-1 z-50">
+        <a
+          href="/auth/login"
+          className="flex flex-col items-center gap-2 p-3 w-full rounded-2xl hover:bg-white/5 transition-all text-center no-underline"
+        >
+          <div className="w-[50px] h-[50px] rounded-full border border-white/10 flex items-center justify-center text-lg bg-zinc-900">
+            🚀
+          </div>
+          <span className="text-[9px] font-mono font-bold tracking-wider" style={{ color: accentColor }}>SIGN IN</span>
+          <span className="text-[8px] text-zinc-500">with spmt.live</span>
+        </a>
+      </div>
+      )}
     </aside>
   );
 }

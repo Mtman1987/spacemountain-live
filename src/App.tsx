@@ -169,18 +169,8 @@ export default function App() {
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
   
-  // Identity States (Pre-initialized to NovaStar to match the user's uploaded image instantly!)
-  const [identity, setIdentity] = useState<UserProfile | null>({
-    id: 'u_novastar',
-    displayName: 'NovaStar',
-    username: 'novastar',
-    recoveryEmail: 'novastar@spmt.live',
-    role: 'Creator',
-    status: 'Online',
-    points: 12500,
-    avatarSpeaking: false,
-    createdAt: new Date().toISOString()
-  });
+  // Identity States - null until signed in via spmt.live
+  const [identity, setIdentity] = useState<UserProfile | null>(null);
 
   // User Preferences / Appearance states matching the customizable customizer exactly
   const [preferences, setPreferences] = useState<UserPreferences>({
@@ -269,8 +259,41 @@ export default function App() {
   // Interactive points animations list (floating points indicator!)
   const [pointPopups, setPointPopups] = useState<{ id: number; text: string; x: number; y: number }[]>([]);
 
-  // Initialize: Fetch data from the SQLite DB & API endpoints
+  // Initialize: Check auth status and fetch data
   useEffect(() => {
+    // Check for OAuth callback code in URL
+    const params = new URLSearchParams(window.location.search);
+    const authCode = params.get('auth_code');
+    if (authCode) {
+      // Exchange code for user info
+      fetch('https://spmt.live/api/oauth/userinfo', {
+        headers: { 'Authorization': `Bearer ${authCode}` },
+        credentials: 'include',
+      })
+        .then(r => r.ok ? r.json() : null)
+        .then(user => {
+          if (user) {
+            const profile: UserProfile = {
+              id: user.id,
+              displayName: user.display_name || user.username,
+              username: user.username,
+              recoveryEmail: user.email,
+              role: 'Captain',
+              status: 'Online',
+              points: 0,
+              avatarSpeaking: false,
+              createdAt: user.created_at,
+            };
+            setIdentity(profile);
+            localStorage.setItem('spmtIdentity', JSON.stringify(profile));
+            localStorage.setItem('spmtToken', authCode);
+            // Clean URL
+            window.history.replaceState({}, '', '/');
+          }
+        })
+        .catch(() => {});
+    }
+
     // 1. Fetch domain branding
     fetch('/api/branding')
       .then(res => res.json())
@@ -305,7 +328,7 @@ export default function App() {
         const parsed = JSON.parse(cachedUser);
         setIdentity(parsed);
       } catch (e) {
-        // Fallback to NovaStar
+        // No session
       }
     }
   }, []);
