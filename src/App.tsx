@@ -226,32 +226,24 @@ export default function App() {
     mediaJobsCount: 72,
   });
 
-  // Secure Inbox messages state
-  const [mails, setMails] = useState([
-    { id: 'm1', folder: 'inbox', from: 'athena@spmt.live', to: 'novastar@spmt.live', subject: 'Welcome to your SpaceMountain Station', preview: 'Greetings Captain, your station mail is active and ready.', body: 'Welcome NovaStar! This visual layout mimics secure messaging. Feel free to draft, send, or remove mock messages.', time: 'Just now', tag: 'System' },
-    { id: 'm2', folder: 'inbox', from: 'mountainview@spmt.live', to: 'novastar@spmt.live', subject: 'MountainView AI Glasses pairing complete', preview: 'QR engine synced. Voice commands mapped successfully.', body: 'Your VR HUD interface is fully calibrated. Custom scanning pipelines are now queryable inside the database.', time: '5m ago', tag: 'Hardware' },
-    { id: 'm3', folder: 'inbox', from: 'streamweaver@spmt.live', to: 'novastar@spmt.live', subject: 'Sub alert trigger verified (+5,000 XP)', preview: 'Twitch integration points flow logged in SQLite.', body: 'Detected subscription activity. Awarding community points and routing notifications into the overlay hub.', time: '1h ago', tag: 'Overlays' }
-  ]);
+  // Secure Inbox messages state - fetched from spmt.live
+  const [mails, setMails] = useState<any[]>([]);
   const [composeTo, setComposeTo] = useState('');
   const [composeSubject, setComposeSubject] = useState('');
   const [composeBody, setComposeBody] = useState('');
   const [isComposing, setIsComposing] = useState(false);
 
-  // Forums Threads state
-  const [forumThreads, setForumThreads] = useState([
-    { id: 't1', title: 'How do I connect my StreamWeaver OBS overlay?', category: 'Technical Support', posts: 14, author: 'LunaVibes', repliedBy: 'Athena AI', isOpen: true },
-    { id: 't2', title: 'MountainView Smart Glasses voice macro cheat-sheet', category: 'General', posts: 8, author: 'EchoPulse', repliedBy: 'NovaStar', isOpen: true },
-    { id: 't3', title: 'Deep space ambient synth party tonight - vote on tracklist!', category: 'Community Events', posts: 32, author: 'NovaStar', repliedBy: 'LunaVibes', isOpen: true },
-  ]);
+  // Forums Threads state - fetched from spmt.live
+  const [forumThreads, setForumThreads] = useState<any[]>([]);
   const [newThreadTitle, setNewThreadTitle] = useState('');
   const [newThreadCategory, setNewThreadCategory] = useState('Technical Support');
   const [newThreadBody, setNewThreadBody] = useState('');
   const [isCreatingThread, setIsCreatingThread] = useState(false);
 
-  // Voice rooms sound state
-  const [voiceRoomActive, setVoiceRoomActive] = useState(true);
-  const [micState, setMicState] = useState<'muted' | 'listening'>('listening');
-  const [speakingUsers, setSpeakingUsers] = useState<string[]>(['NovaStar', 'LunaVibes']);
+  // Voice rooms state
+  const [voiceRoomActive, setVoiceRoomActive] = useState(false);
+  const [micState, setMicState] = useState<'muted' | 'listening'>('muted');
+  const [speakingUsers, setSpeakingUsers] = useState<string[]>([]);
 
   // MountainView QR HUD Seed state
   const [qrHUDSeed, setQrHUDSeed] = useState('https://spacemountain.live/invite/novastar');
@@ -321,6 +313,46 @@ export default function App() {
       })
       .catch(err => console.error('Stats fetch failed:', err));
 
+    // 4. Fetch inbox from spmt.live if logged in
+    const spmtToken = localStorage.getItem('spmtToken');
+    if (spmtToken) {
+      fetch('https://spmt.live/api/messages/inbox', {
+        headers: { 'Authorization': `Bearer ${spmtToken}` },
+        credentials: 'include',
+      })
+        .then(r => r.ok ? r.json() : [])
+        .then(messages => {
+          setMails(messages.map((m: any) => ({
+            id: m.id,
+            folder: 'inbox',
+            from: `${m.from_user}@spmt.live`,
+            to: identity?.username ? `${identity.username}@spmt.live` : '',
+            subject: m.subject || 'No subject',
+            preview: m.body?.substring(0, 50) + '...',
+            body: m.body,
+            time: new Date(m.created_at).toLocaleString(),
+            tag: 'Message',
+          })));
+        })
+        .catch(() => {});
+
+      // 5. Fetch forum threads from spmt.live
+      fetch('https://spmt.live/api/forum/threads')
+        .then(r => r.ok ? r.json() : [])
+        .then(threads => {
+          setForumThreads(threads.map((t: any) => ({
+            id: t.id,
+            title: t.title,
+            category: t.category,
+            posts: t.post_count || 1,
+            author: t.author,
+            repliedBy: '',
+            isOpen: true,
+          })));
+        })
+        .catch(() => {});
+    }
+
     // Restore local user session if available
     const cachedUser = localStorage.getItem('spmtIdentity');
     if (cachedUser) {
@@ -333,13 +365,9 @@ export default function App() {
     }
   }, []);
 
-  // Periodic visual simulation: simulate speaking indicator changes
+  // Periodic visual simulation: increment points flow
   useEffect(() => {
     const timer = setInterval(() => {
-      const speakers = ['NovaStar', 'LunaVibes', 'EchoPulse', 'athena'];
-      const randomSpeakers = speakers.filter(() => Math.random() > 0.4);
-      setSpeakingUsers(randomSpeakers);
-      
       // Slightly increment total points flow as an active dynamic dashboard
       setStats(prev => ({
         ...prev,
@@ -458,51 +486,62 @@ export default function App() {
     }
   };
 
-  // Send a Mail secure message locally
-  const handleSendMail = (e: React.FormEvent) => {
+  // Send a Mail secure message via spmt.live
+  const handleSendMail = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!composeTo || !composeBody) return;
 
-    const newMail = {
-      id: `m-${Date.now()}`,
-      folder: 'sent',
-      from: identity ? `${identity.username}@spmt.live` : 'novastar@spmt.live',
-      to: composeTo,
-      subject: composeSubject || 'Station dispatch',
-      preview: composeBody.substring(0, 45) + '...',
-      body: composeBody,
-      time: 'Just now',
-      tag: 'Draft'
-    };
+    const spmtToken = localStorage.getItem('spmtToken');
+    if (!spmtToken) { alert('Please sign in first'); return; }
 
-    setMails(prev => [newMail, ...prev]);
-    setIsComposing(false);
-    setComposeTo('');
-    setComposeSubject('');
-    setComposeBody('');
-    alert('Message routed into secure station database!');
+    try {
+      const res = await fetch('https://spmt.live/api/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${spmtToken}` },
+        body: JSON.stringify({ to: composeTo.replace(/@spmt\.live$/, ''), subject: composeSubject, body: composeBody }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setIsComposing(false);
+        setComposeTo('');
+        setComposeSubject('');
+        setComposeBody('');
+        alert('Message sent!');
+      } else {
+        alert(data.error || 'Failed to send');
+      }
+    } catch {
+      alert('Failed to connect to spmt.live');
+    }
   };
 
-  // Create a new Forums Thread
-  const handleCreateThread = (e: React.FormEvent) => {
+  // Create a new Forums Thread via spmt.live
+  const handleCreateThread = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newThreadTitle || !newThreadBody) return;
 
-    const newThread = {
-      id: `t-${Date.now()}`,
-      title: newThreadTitle,
-      category: newThreadCategory,
-      posts: 1,
-      author: identity?.displayName || 'NovaStar',
-      repliedBy: 'None yet',
-      isOpen: true
-    };
+    const spmtToken = localStorage.getItem('spmtToken');
+    if (!spmtToken) { alert('Please sign in first'); return; }
 
-    setForumThreads(prev => [newThread, ...prev]);
-    setIsCreatingThread(false);
-    setNewThreadTitle('');
-    setNewThreadBody('');
-    alert('Forum discussion thread created successfully!');
+    try {
+      const res = await fetch('https://spmt.live/api/forum/threads', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${spmtToken}` },
+        body: JSON.stringify({ title: newThreadTitle, category: newThreadCategory, body: newThreadBody }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setForumThreads(prev => [{ id: data.id, title: data.title, category: newThreadCategory, posts: 1, author: identity?.username || '', repliedBy: '', isOpen: true }, ...prev]);
+        setIsCreatingThread(false);
+        setNewThreadTitle('');
+        setNewThreadBody('');
+        alert('Thread created!');
+      } else {
+        alert(data.error || 'Failed to create thread');
+      }
+    } catch {
+      alert('Failed to connect to spmt.live');
+    }
   };
 
   // Define visual styling maps according to active theme preset
