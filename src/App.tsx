@@ -318,6 +318,19 @@ export default function App() {
     // 4. Fetch inbox from spmt.live if logged in
     const spmtToken = localStorage.getItem('spmtToken');
     if (spmtToken) {
+      // Fetch user's DSH points for display
+      fetch('https://spmt.live/api/arena/shop', {
+        headers: { 'Authorization': `Bearer ${spmtToken}` },
+        credentials: 'include',
+      })
+        .then(r => r.ok ? r.json() : null)
+        .then(data => {
+          if (data?.balance) {
+            setIdentity(prev => prev ? { ...prev, points: data.balance } : prev);
+          }
+        })
+        .catch(() => {});
+
       fetch('https://spmt.live/api/messages/inbox', {
         headers: { 'Authorization': `Bearer ${spmtToken}` },
         credentials: 'include',
