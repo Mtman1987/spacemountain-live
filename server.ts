@@ -122,6 +122,25 @@ async function startServer() {
     res.json({ status: 'ok', app: 'spacemountain-live', uptime: process.uptime() });
   });
 
+  // OAuth2 callback - handles redirect from spmt.live after user authorizes
+  app.get('/auth/callback', (req, res) => {
+    const { code, state } = req.query;
+    // In production, exchange code for token server-side
+    // For now, redirect to frontend with the code
+    res.redirect(`/?auth_code=${code}${state ? `&state=${state}` : ''}`);
+  });
+
+  // OAuth2 login redirect - sends user to spmt.live to authenticate
+  app.get('/auth/login', (req, res) => {
+    const spmtUrl = 'https://spmt.live/api/oauth/authorize';
+    const params = new URLSearchParams({
+      client_id: 'spacemountain-live',
+      redirect_uri: `${req.protocol}://${req.get('host')}/auth/callback`,
+      state: Math.random().toString(36).slice(2),
+    });
+    res.redirect(`${spmtUrl}?${params}`);
+  });
+
   // API Route: Domain-specific branding
   app.get('/api/branding', (req, res) => {
     const host = req.get('host') || 'spacemountain.live';

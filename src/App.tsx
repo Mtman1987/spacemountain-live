@@ -727,16 +727,18 @@ export default function App() {
 
                   {/* Core CTAs */}
                   <div className="flex items-center gap-3">
-                    <button 
-                      onClick={() => setActiveTab('settings')}
-                      className="px-6 py-2.5 rounded-xl font-sans font-extrabold text-xs text-black transition-all transform hover:-translate-y-0.5 active:translate-y-0 cursor-pointer shadow-lg"
+                    <a 
+                      href="https://spmt.live"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-6 py-2.5 rounded-xl font-sans font-extrabold text-xs text-black transition-all transform hover:-translate-y-0.5 active:translate-y-0 cursor-pointer shadow-lg inline-block no-underline"
                       style={{
                         backgroundColor: currentTheme.glowHex,
                         boxShadow: `0 4px 20px ${currentTheme.glowHex}55`,
                       }}
                     >
                       Create Your Account
-                    </button>
+                    </a>
                     <button 
                       onClick={() => setActiveTab('apps')}
                       className="px-6 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 font-sans font-bold text-xs text-zinc-300 hover:text-white transition-all transform hover:-translate-y-0.5 active:translate-y-0"
