@@ -14,6 +14,7 @@ import MainAppSuite from './components/MainAppSuite';
 import SettingsPanel from './components/SettingsPanel';
 import RightSidebar from './components/RightSidebar';
 import Shop from './components/Shop';
+import Arena from './components/Arena';
 
 const sleekRocketIcon = '/assets/model-rocket.png';
 
@@ -56,6 +57,7 @@ export default function App() {
       const path = window.location.pathname;
       if (path === '/settings') return 'settings';
       if (path === '/shop') return 'shop';
+      if (path === '/arena') return 'arena';
     }
     return 'dashboard';
   });
@@ -143,7 +145,7 @@ export default function App() {
 
   useEffect(() => {
     const pathMap: Record<string, string> = {
-      'dashboard': '/', 'settings': '/settings', 'shop': '/shop',
+      'dashboard': '/', 'settings': '/settings', 'shop': '/shop', 'arena': '/arena',
       'apps': '/apps', 'inbox': '/inbox', 'forums': '/forums',
       'rooms': '/rooms', 'mtnview': '/mtnview', 'builder': '/builder',
       'crew': '/crew', 'help': '/help',
@@ -158,7 +160,7 @@ export default function App() {
     const handlePopState = () => {
       const path = window.location.pathname;
       const routeMap: Record<string, string> = {
-        '/': 'dashboard', '/settings': 'settings', '/shop': 'shop',
+        '/': 'dashboard', '/settings': 'settings', '/shop': 'shop', '/arena': 'arena',
         '/apps': 'apps', '/inbox': 'inbox', '/forums': 'forums',
         '/rooms': 'rooms', '/mtnview': 'mtnview', '/builder': 'builder',
         '/crew': 'crew', '/help': 'help',
@@ -775,7 +777,7 @@ export default function App() {
                       }}
                     />
 
-                    {/* Small flying rocket inside or orbiting the centerpiece as an interactive element */}
+                    {/* Small flying rocket - ARENA TRIGGER */}
                     <motion.div
                       animate={{ 
                         y: [-4, 4, -4],
@@ -786,7 +788,10 @@ export default function App() {
                         repeat: Infinity,
                         ease: "easeInOut"
                       }}
-                      className="absolute z-20 top-6 right-20 text-xl filter drop-shadow-[0_0_8px_rgba(251,191,36,0.5)]"
+                      id="arenaRocketTrigger"
+                      className="absolute z-20 top-6 right-20 text-xl filter drop-shadow-[0_0_8px_rgba(251,191,36,0.5)] cursor-pointer"
+                      onClick={() => setActiveTab('arena')}
+                      title="Enter Rocket Arena!"
                     >
                       🚀
                     </motion.div>
@@ -1329,6 +1334,19 @@ export default function App() {
                   accentColor={currentTheme.glowHex}
                   paypalClientId={undefined /* Set your PayPal Client ID here */}
                 />
+              </motion.div>
+            )}
+
+            {/* TAB: ARENA */}
+            {activeTab === 'arena' && (
+              <motion.div
+                key="arena"
+                initial={{ opacity: 0, y: 15 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -15 }}
+                transition={{ duration: 0.3 }}
+              >
+                <Arena accentColor={currentTheme.glowHex} />
               </motion.div>
             )}
 
@@ -1945,6 +1963,22 @@ function AppRocketLogic({ rocketFlying, setRocketFlying, rocketStateRef }: AppRo
       const state = rocketStateRef.current;
       const rocket = document.getElementById('rocketLauncher');
       const dock = document.getElementById('floatingDockPanel');
+      const arenaTrigger = document.getElementById('arenaRocketTrigger');
+
+      // Check collision with arena trigger
+      if (rocket && arenaTrigger && state.mode === 'free') {
+        const r = rocket.getBoundingClientRect();
+        const t = arenaTrigger.getBoundingClientRect();
+        const rx = r.left + r.width / 2;
+        const ry = r.top + r.height / 2;
+        const tx = t.left + t.width / 2;
+        const ty = t.top + t.height / 2;
+        if (Math.hypot(rx - tx, ry - ty) < 40) {
+          window.location.href = '/arena';
+          return;
+        }
+      }
+
       if (rocket && state.mode === 'free' && !state.dragRocket && (!dock || !dock.classList.contains('open')) && window.innerWidth > 760) {
         const cx = state.rocketX + 36;
         const cy = state.rocketY + 36;
