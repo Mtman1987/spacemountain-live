@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>HearMeOut Station — Docked Rocket + Dense Starfield</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@1/css/pico.min.css" />
+  <style>
+    :root {
+      --img: url("./test/assets/ChatGPT%20Image%20May%2031,%202026,%2001_00_16%20PM.png");
+      --bg: #030611;
+      --glass: rgba(8, 13, 34, 0.36);
+      --line: rgba(184, 139, 255, 0.26);
+      --text: #fbf7ff;
+      --muted: #a9b3db;
+      --soft: #d0caee;
+      --purple: #a968ff;
+      --violet: #7c3cff;
+      --cyan: #45e7ff;
+      --pink: #ff5de4;
+      --green: #58f7ad;
+      --radius: 24px;
+      --blur: 24px;
+      --max: 1720px;
+      color-scheme: dark;
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      min-height: 340vh;
+      background: var(--bg);
+      color: var(--text);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      overflow-x: hidden;
+      isolation: isolate;
+    }
+    a { color: inherit; text-decoration: none; }
+    button, input { font: inherit; }
+
+    .space-scene { position: fixed; inset: 0; z-index: -30; overflow: hidden; background: #02050f; pointer-events: none; }
+    .space-scene::before { content: ""; position: absolute; left: -20vw; bottom: -30vh; width: clamp(520px, 62vw, 1040px); aspect-ratio: 1; border-radius: 50%; background: radial-gradient(circle at 42% 34%, rgba(255,255,255,.18), rgba(255,255,255,0) 12%), radial-gradient(circle at 54% 52%, rgba(140,83,255,.38), rgba(80,38,146,.92) 38%, rgba(13,10,30,.98) 74%); box-shadow: 0 0 140px rgba(103,74,188,.24); opacity: .84; }
+    .space-depth, .space-color, .star-layer, .ring-back-layer, .ring-front-layer, .planet-mask, .scene-vignette { position: absolute; will-change: transform; }
+    .space-depth { inset: -4vh -3vw; background-image: linear-gradient(180deg, rgba(2,6,18,.08), rgba(2,6,18,.28)), var(--img); background-size: cover; background-position: center center; filter: saturate(1.08) contrast(1.02) brightness(.92); opacity: .9; transform-origin: center; }
+    .space-color { inset: 0; background: radial-gradient(circle at 46% 34%, rgba(69,231,255,.04), transparent 32%), radial-gradient(circle at 80% 68%, rgba(255,93,228,.05), transparent 30%), linear-gradient(180deg, rgba(3,6,17,.16), rgba(3,6,17,.36)); mix-blend-mode: screen; opacity: .26; }
+    .star-layer { inset: -2vh -2vw; width: 104%; height: 104%; opacity: .98; mix-blend-mode: screen; }
+    .star-layer .dust { fill: rgba(255,255,255,.62); filter: drop-shadow(0 0 2px rgba(255,255,255,.5)); }
+    .star-layer .pin { fill: rgba(255,255,255,.98); filter: drop-shadow(0 0 4px rgba(255,255,255,.72)); }
+    .star-layer .mid { fill: #dacdff; filter: drop-shadow(0 0 7px rgba(218,205,255,.82)); }
+    .star-layer .hot { fill: #fff; filter: drop-shadow(0 0 9px #fff) drop-shadow(0 0 18px rgba(169,104,255,.65)); }
+    .dust { animation: tw 11s ease-in-out infinite; }
+    .pin { animation: tw 9s ease-in-out infinite; }
+    .mid { animation: tw 7s ease-in-out infinite reverse; }
+    .hot { animation: hot 5.4s ease-in-out infinite; transform-origin: center; }
+    @keyframes tw { 0%,100% { opacity: .52; } 50% { opacity: 1; } }
+    @keyframes hot { 0%,100% { opacity: .68; transform: scale(.98); } 50% { opacity: 1; transform: scale(1.08); } }
+    .ring-back-layer, .ring-front-layer { inset: auto auto clamp(-72px,-6vw,-24px) clamp(-215px,-10vw,-80px); width: clamp(760px,58vw,1160px); height: auto; transform: rotate(-8deg); filter: drop-shadow(0 0 12px rgba(169,104,255,.30)) drop-shadow(0 0 28px rgba(69,231,255,.14)); }
+    .ring-back-layer { opacity: .18; clip-path: polygon(0 0,100% 0,100% 45%,48% 45%,38% 100%,0 100%); }
+    .ring-front-layer { opacity: .84; }
+    .ring-back ellipse, .ring-front path { fill: none; stroke-linecap: round; vector-effect: non-scaling-stroke; }
+    .ring-back ellipse { stroke: rgba(130,190,255,.30); stroke-width: 5; }
+    .ring-front path { stroke: url(#ringGradient); stroke-width: 5; stroke-dasharray: 34 18 132 36; animation: ringFlow 28s linear infinite; }
+    @keyframes ringFlow { to { stroke-dashoffset: -400; } }
+    .planet-mask { inset: 0; background: radial-gradient(ellipse at 8% 102%, rgba(1,3,8,.48) 0 24%, rgba(1,3,8,.18) 32%, rgba(1,3,8,.02) 44%, transparent 60%); mix-blend-mode: multiply; opacity: .18; }
+    .scene-vignette { inset: 0; background: radial-gradient(circle at 50% 44%, transparent 0 58%, rgba(3,6,17,.04) 82%, rgba(3,6,17,.16) 100%), linear-gradient(180deg, rgba(3,6,17,.02), rgba(3,6,17,.14)); }
+
+    nav.container-fluid { position: sticky; top: 0; z-index: 60; min-height: 68px; padding: .48rem clamp(5.5rem,6.2vw,6.8rem) .48rem clamp(.9rem,1.6vw,1.2rem); border-bottom: 1px solid rgba(210,178,255,.14); background: rgba(4,8,24,.34); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px); }
+    nav ul { align-items: center; }
+    nav strong { display: inline-flex; align-items: center; gap: .65rem; color: var(--text); font-size: 1rem; letter-spacing: -.03em; }
+    .brand-mark { width: 38px; height: 38px; display: inline-grid; place-items: center; border-radius: 12px; border: 2px solid rgba(255,255,255,.76); background: linear-gradient(135deg, rgba(69,231,255,.10), rgba(169,104,255,.24)); box-shadow: 0 0 24px rgba(169,104,255,.46), inset 0 0 18px rgba(69,231,255,.10); position: relative; }
+    .brand-mark::after { content: ""; position: absolute; inset: -8px; border-radius: 17px; border: 1px solid rgba(69,231,255,.18); box-shadow: 0 0 22px rgba(169,104,255,.18); animation: dockPulse 2.8s ease-in-out infinite; }
+    .dock-bay { position: fixed; left: 18px; top: 14px; z-index: 110; width: 56px; height: 56px; display: grid; place-items: center; border-radius: 18px; border: 1px solid rgba(210,178,255,.26); background: rgba(7,12,30,.48); color: #efe9ff; box-shadow: 0 0 28px rgba(169,104,255,.18), inset 0 1px 0 rgba(255,255,255,.08); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); }
+    .dock-bay::before, .dock-bay::after { content: ""; width: 18px; height: 2px; border-radius: 999px; background: currentColor; box-shadow: 0 -6px 0 currentColor, 0 6px 0 currentColor; opacity: .92; }
+    .dock-bay span { display: none; }
+    @keyframes dockPulse { 0%,100% { opacity: .25; transform: scale(.96); } 50% { opacity: .9; transform: scale(1.06); } }
+    nav a { color: var(--soft); }
+    nav a[role=button], .primary-btn { color: #fff !important; background: linear-gradient(135deg, rgba(169,104,255,.9), rgba(124,60,255,.88)) !important; border: 1px solid rgba(226,198,255,.44) !important; border-radius: 13px; box-shadow: 0 0 18px rgba(169,104,255,.22); }
+
+    main.container { width: min(var(--max), calc(100% - 32px)); max-width: var(--max); margin-inline: auto; padding: .8rem 0 2rem; }
+    .hero-spacer { height: 7vh; }
+    .glass-card, article { position: relative; overflow: hidden; border-radius: var(--radius); background: var(--glass); border: 1px solid var(--line); backdrop-filter: blur(var(--blur)) saturate(1.25); -webkit-backdrop-filter: blur(var(--blur)) saturate(1.25); box-shadow: 0 0 28px rgba(169,104,255,.10), inset 0 1px 0 rgba(255,255,255,.08); }
+    .glass-card::before, article::before { content: ""; position: absolute; inset: 0; pointer-events: none; background: radial-gradient(circle at 10% 0%, rgba(169,104,255,.12), transparent 34%), radial-gradient(circle at 86% 4%, rgba(69,231,255,.055), transparent 32%), linear-gradient(135deg, rgba(255,255,255,.032), transparent 42%); }
+    .glass-card > *, article > * { position: relative; z-index: 1; }
+    .app-shell { display: grid; grid-template-columns: minmax(0,1fr) minmax(330px,390px); gap: 1rem; align-items: start; min-height: 92vh; }
+    .main-stage { min-width: 0; display: grid; gap: 1rem; }
+    .hero-room { min-height: clamp(470px, 66vh, 620px); padding: clamp(1.2rem,2.6vw,1.8rem); display: grid; grid-template-columns: minmax(110px,140px) minmax(0,1fr); gap: 1.35rem; align-items: start; background: rgba(8,13,34,.28); }
+    .hero-copy { min-width: 0; display: grid; align-content: center; gap: .75rem; }
+    .room-art { width: clamp(110px,12vw,140px); height: clamp(110px,12vw,140px); border-radius: 28px; align-self: center; background: radial-gradient(circle at 46% 35%, rgba(255,255,255,.3), transparent 15%), radial-gradient(circle at 50% 54%, rgba(69,231,255,.2), transparent 30%), linear-gradient(135deg, rgba(169,104,255,.36), rgba(255,93,228,.18)), rgba(255,255,255,.04); border: 1px solid rgba(226,198,255,.24); box-shadow: 0 0 34px rgba(169,104,255,.2); }
+    h1,h2,h3 { color: var(--text); letter-spacing: -.045em; }
+    h1 { margin: .35rem 0; font-size: clamp(2.4rem,4.4vw,5.1rem); line-height: .9; }
+    h2 { font-size: clamp(1.8rem,3vw,2.8rem); }
+    p { color: var(--muted); line-height: 1.6; }
+    .hero-copy h1 { max-width: 8ch; }
+    .hero-copy p { max-width: 46ch; }
+    .hero-copy h1 { margin: 0; word-break: normal; overflow-wrap: normal; }
+    .hero-copy p { margin: 0; }
+    .gradient-text { color: transparent; background: linear-gradient(90deg,#fff,#efcfff 32%,var(--purple),var(--cyan)); -webkit-background-clip: text; background-clip: text; }
+    .kicker { display: inline-flex; align-items: center; gap: .45rem; min-height: 29px; padding: 0 .7rem; border-radius: 999px; color: #eadcff; border: 1px solid rgba(169,104,255,.48); background: rgba(169,104,255,.13); font-size: .68rem; font-weight: 900; letter-spacing: .08em; text-transform: uppercase; }
+    .hero-actions { grid-column: 1 / -1; min-width: 0; display: flex; gap: .65rem; flex-wrap: wrap; justify-content: flex-start; padding-top: .35rem; }
+    .soft-btn { min-height: 42px; padding: 0 .86rem; display: inline-flex; align-items: center; justify-content: center; border-radius: 13px; color: var(--text); background: rgba(255,255,255,.055); border: 1px solid rgba(255,255,255,.12); font-weight: 800; }
+    .module-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(245px, 1fr)); gap: 1rem; }
+    .user-card { min-height: 236px; padding: 1rem; text-align: center; border-radius: 22px; background: rgba(10,16,42,.38); display: grid; align-content: center; }
+    .user-card[data-speaking=true] { border-color: rgba(88,247,173,.46); box-shadow: 0 0 28px rgba(88,247,173,.13), inset 0 1px 0 rgba(255,255,255,.08); }
+    .avatar-ring { position: relative; width: 108px; height: 108px; margin: .25rem auto .75rem; display: grid; place-items: center; border-radius: 50%; background: conic-gradient(from 180deg,var(--cyan),var(--purple),var(--pink),var(--cyan)); box-shadow: 0 0 24px rgba(169,104,255,.24); }
+    .avatar { width: 46px; height: 46px; border-radius: 50%; background: radial-gradient(circle at 34% 24%,rgba(255,255,255,.45),transparent 18%),linear-gradient(135deg,#0e2b50,#743cff 55%,#090617); border: 1px solid rgba(169,104,255,.72); box-shadow: 0 0 18px rgba(169,104,255,.24); }
+    .avatar-ring .avatar { width: 96px; height: 96px; border-width: 2px; }
+    .avatar.speaking { border-color: var(--green); box-shadow: 0 0 18px rgba(88,247,173,.42); }
+    .user-card[data-speaking=true] .avatar-ring::before, .user-card[data-speaking=true] .avatar-ring::after { content: ""; position: absolute; inset: -8px; border-radius: 50%; border: 1px solid rgba(88,247,173,.55); animation: audio 1.4s ease-out infinite; }
+    .user-card[data-speaking=true] .avatar-ring::after { animation-delay: .4s; }
+    @keyframes audio { from { opacity: .8; transform: scale(.92); } to { opacity: 0; transform: scale(1.18); } }
+    .role { color: var(--muted); font-size: .82rem; }
+    .card-actions { display: flex; gap: .5rem; justify-content: center; margin-top: .8rem; }
+    .round-btn { width: 36px; height: 36px; display: grid; place-items: center; border-radius: 50%; background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.12); }
+    .info-strip { display: grid; grid-template-columns: repeat(auto-fit, minmax(270px, 1fr)); gap: 1rem; }
+    .info-card { padding: 1rem; min-height: 155px; background: rgba(10,16,42,.34); display: grid; align-content: start; }
+    .stat { font-size: 2.05rem; font-weight: 950; letter-spacing: -.05em; }
+    .chat-panel { min-height: clamp(470px, 66vh, 620px); padding: 1rem; display: grid; grid-template-rows: auto auto 1fr auto; background: rgba(8,13,34,.36); }
+    .mini-label { color: var(--soft); text-transform: uppercase; letter-spacing: .095em; font-size: .72rem; font-weight: 900; margin: .5rem 0 1rem; }
+    .chat-tabs { display: grid; grid-template-columns: repeat(3,1fr); gap: .5rem; margin-bottom: 1rem; }
+    .chat-tab { min-height: 40px; border-radius: 12px; background: rgba(255,255,255,.045); border: 1px solid rgba(255,255,255,.10); color: var(--soft); font-weight: 800; }
+    .chat-tab.active { background: rgba(169,104,255,.28); border-color: rgba(169,104,255,.58); color: #fff; }
+    .message { display: grid; grid-template-columns: 38px 1fr; gap: .7rem; margin-bottom: 1rem; }
+    .message .avatar { width: 38px; height: 38px; }
+    .message-top { display: flex; gap: .5rem; align-items: baseline; }
+    .message-name { color: var(--cyan); font-weight: 900; }
+    .message-time { color: var(--muted); font-size: .75rem; }
+    .message-text { color: var(--text); font-size: .95rem; }
+    .bot-prompt { padding: .9rem; border-radius: 18px; background: rgba(69,231,255,.06); border: 1px solid rgba(69,231,255,.16); margin-bottom: 1rem; }
+    .chat-input-row { display: grid; grid-template-columns: 1fr auto; gap: .65rem; }
+    input { color: var(--text)!important; border-color: rgba(255,255,255,.14)!important; background: rgba(255,255,255,.055)!important; border-radius: 14px!important; }
+    .send { width: 54px; min-height: 48px; border-radius: 14px; }
+    .parallax-section { margin-top: 5rem; display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 1rem; }
+    .big-lore-card { padding: clamp(1.2rem,3vw,1.8rem); min-height: 280px; display: grid; align-content: start; }
+
+    .rocket-launcher { position: fixed; left: 25px; top: 15px; z-index: 120; width: 72px; height: 72px; border-radius: 26px; display: grid; place-items: center; color: #fff; background: transparent !important; border: 1px solid transparent !important; box-shadow: none; cursor: pointer; user-select: none; touch-action: none; --angle: 0deg; transition: left 160ms ease-out, top 160ms ease-out, background 160ms ease-out; }
+    .rocket-launcher.free { cursor: grab; }
+    .rocket-launcher.open, .rocket-launcher.docked { background: rgba(10,16,42,.42)!important; border-color: rgba(210,178,255,.32)!important; backdrop-filter: blur(18px); box-shadow: 0 0 28px rgba(169,104,255,.24), inset 0 1px 0 rgba(255,255,255,.08); }
+    .rocket-launcher.docked:not(.open) { background: transparent!important; border-color: transparent!important; box-shadow: none; backdrop-filter: none; }
+    .rocket-launcher.docked:not(.open)::after { content: ""; position: absolute; inset: 7px; border-radius: 20px; border: 1px solid rgba(69,231,255,.34); box-shadow: 0 0 22px rgba(169,104,255,.22); animation: dockPulse 2.4s ease-in-out infinite; }
+    .rocket-launcher:hover { background: rgba(169,104,255,.08)!important; }
+    .rocket-launcher span { font-size: 1.85rem; filter: drop-shadow(0 0 10px rgba(69,231,255,.75)); pointer-events: none; transform: rotate(var(--angle)); transition: transform 160ms ease-out; display: inline-block; }
+    .dock-panel { position: fixed; left: 0; top: 68px; z-index: 100; width: min(360px, calc(100vw - 32px)); min-width: 280px; max-width: 560px; min-height: calc(100vh - 68px); max-height: calc(100vh - 68px); resize: horizontal; overflow: auto; display: none; padding: 1rem; background: rgba(8,13,34,.48); border-radius: 0 24px 24px 0; }
+    .dock-panel.floating { border-radius: var(--radius); min-height: 430px; max-height: calc(100vh - 36px); resize: both; }
+    .dock-panel.open { display: block; }
+    .dock-head { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding-bottom: .8rem; margin-bottom: .8rem; border-bottom: 1px solid rgba(255,255,255,.10); cursor: move; user-select: none; }
+    .dock-head strong { display: block; }
+    .dock-head small, .dock-item span { color: var(--muted); }
+    .dock-close { width: 36px; height: 36px; border-radius: 12px; display: grid; place-items: center; background: rgba(255,255,255,.06)!important; border: 1px solid rgba(255,255,255,.12)!important; color: #fff!important; }
+    .dock-list { display: grid; gap: .55rem; }
+    .dock-item { display: grid; grid-template-columns: 38px 1fr; gap: .75rem; align-items: center; min-height: 58px; padding: .65rem; border-radius: 16px; background: rgba(255,255,255,.045); border: 1px solid rgba(255,255,255,.09); }
+    .dock-item:hover { border-color: rgba(169,104,255,.48); background: rgba(169,104,255,.12); }
+    .dock-icon { width: 38px; height: 38px; border-radius: 13px; display: grid; place-items: center; background: linear-gradient(135deg,rgba(69,231,255,.12),rgba(169,104,255,.30)); border: 1px solid rgba(210,178,255,.18); }
+    .dock-item strong, .dock-item span { display: block; }
+    .dock-item span { font-size: .82rem; }
+
+    section[aria-label="Subscribe example"] { width: min(var(--max), calc(100% - 32px)); max-width: var(--max); margin: 1rem auto 1.6rem; }
+    section[aria-label="Subscribe example"] article { padding: 1.1rem; }
+    section[aria-label="Subscribe example"] form.grid { grid-template-columns: 1fr 1fr auto; gap: .75rem; }
+    footer.container { width: min(var(--max), calc(100% - 32px)); max-width: var(--max); padding: 0 0 4rem; color: var(--muted); }
+    @media (min-width:1480px) { .module-grid { grid-template-columns: repeat(4,minmax(0,1fr)); } }
+    @media (max-width:1320px) { .hero-room { grid-template-columns: auto minmax(0,1fr); } }
+    @media (max-width:1180px) { .app-shell { grid-template-columns: 1fr; } .parallax-section { grid-template-columns: 1fr; } }
+    @media (max-width:760px) { nav.container-fluid { position: relative; padding-left: 1rem; } .dock-bay { left: 14px; top: 14px; width: 52px; height: 52px; } .hero-spacer { height: 4vh; } .hero-room, .module-grid, .info-strip, section[aria-label="Subscribe example"] form.grid { grid-template-columns: 1fr; } .hero-copy h1, .hero-copy p { max-width: none; } .room-art { width:100%; height:150px; } .rocket-launcher { left:auto!important; right:18px; top:auto!important; bottom:18px; } .dock-panel, .dock-panel.floating { left:14px!important; right:14px; top:90px!important; width:calc(100vw - 28px); min-height:430px; border-radius: var(--radius); resize: vertical; } }
+    @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none!important; scroll-behavior: auto!important; } }
+  </style>
+</head>
+<body>
+  <div class="space-scene" aria-hidden="true">
+    <div class="space-depth" data-depth="0.022"></div><div class="space-color" data-depth="0.012"></div>
+    <svg class="star-layer" data-depth="0.038" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice">
+      <g class="dust"><circle cx="22" cy="210" r=".55"/><circle cx="76" cy="48" r=".45"/><circle cx="118" cy="520" r=".55"/><circle cx="182" cy="276" r=".45"/><circle cx="236" cy="88" r=".55"/><circle cx="306" cy="716" r=".45"/><circle cx="372" cy="326" r=".55"/><circle cx="432" cy="82" r=".45"/><circle cx="506" cy="540" r=".55"/><circle cx="572" cy="246" r=".45"/><circle cx="648" cy="830" r=".55"/><circle cx="704" cy="384" r=".45"/><circle cx="778" cy="90" r=".55"/><circle cx="846" cy="462" r=".45"/><circle cx="918" cy="744" r=".55"/><circle cx="974" cy="236" r=".45"/><circle cx="1036" cy="632" r=".55"/><circle cx="1098" cy="82" r=".45"/><circle cx="1168" cy="430" r=".55"/><circle cx="1228" cy="770" r=".45"/><circle cx="1286" cy="186" r=".55"/><circle cx="1358" cy="514" r=".45"/><circle cx="1428" cy="86" r=".55"/><circle cx="1496" cy="442" r=".45"/><circle cx="1566" cy="684" r=".55"/></g>
+      <g class="pin"><circle cx="42" cy="84" r="1.1"/><circle cx="88" cy="380" r=".9"/><circle cx="156" cy="126" r=".8"/><circle cx="214" cy="610" r="1"/><circle cx="280" cy="255" r="1"/><circle cx="350" cy="98" r=".9"/><circle cx="418" cy="450" r="1.1"/><circle cx="480" cy="198" r=".8"/><circle cx="540" cy="760" r="1"/><circle cx="612" cy="330" r="1.2"/><circle cx="680" cy="115" r=".9"/><circle cx="735" cy="540" r="1"/><circle cx="802" cy="260" r="1.1"/><circle cx="875" cy="690" r=".9"/><circle cx="930" cy="118" r="1"/><circle cx="985" cy="410" r="1.1"/><circle cx="1040" cy="805" r=".9"/><circle cx="1115" cy="290" r="1"/><circle cx="1188" cy="610" r="1.1"/><circle cx="1244" cy="146" r=".9"/><circle cx="1305" cy="445" r="1.1"/><circle cx="1380" cy="705" r=".8"/><circle cx="1450" cy="216" r="1.2"/><circle cx="1518" cy="535" r=".9"/><circle cx="1570" cy="88" r="1"/><circle cx="152" cy="760" r="1.1"/><circle cx="328" cy="818" r="1"/><circle cx="1510" cy="808" r="1.2"/></g>
+      <g class="mid"><circle cx="122" cy="206" r="1.8"/><circle cx="270" cy="508" r="1.5"/><circle cx="392" cy="180" r="1.7"/><circle cx="532" cy="322" r="2"/><circle cx="690" cy="174" r="1.6"/><circle cx="818" cy="590" r="1.9"/><circle cx="965" cy="342" r="1.6"/><circle cx="1120" cy="525" r="1.8"/><circle cx="1265" cy="265" r="1.7"/><circle cx="1395" cy="620" r="1.8"/><circle cx="1500" cy="318" r="1.7"/></g>
+      <g class="hot"><circle cx="214" cy="150" r="2.8"/><circle cx="440" cy="246" r="2.5"/><circle cx="746" cy="308" r="2.9"/><circle cx="1055" cy="174" r="3.2"/><circle cx="1298" cy="720" r="2.7"/><circle cx="1515" cy="112" r="2.6"/></g>
+    </svg>
+    <svg class="ring-back-layer" data-depth="0.05" viewBox="0 0 1000 330"><g class="ring-back"><ellipse cx="500" cy="165" rx="460" ry="76"></ellipse><ellipse cx="500" cy="165" rx="390" ry="58"></ellipse></g></svg><div class="planet-mask" data-depth="0.022"></div>
+    <svg class="ring-front-layer" data-depth="0.05" viewBox="0 0 1000 330"><defs><linearGradient id="ringGradient" x1="0%" y1="50%" x2="100%" y2="50%"><stop offset="0%" stop-color="#45e7ff" stop-opacity="0"/><stop offset="16%" stop-color="#45e7ff" stop-opacity=".32"/><stop offset="48%" stop-color="#fff2ff" stop-opacity=".9"/><stop offset="72%" stop-color="#ff5de4" stop-opacity=".52"/><stop offset="100%" stop-color="#a968ff" stop-opacity="0"/></linearGradient></defs><g class="ring-front"><path d="M42 170 C230 255 735 255 958 165"></path><path d="M116 188 C300 240 705 240 884 178"></path></g></svg><div class="scene-vignette"></div>
+  </div>
+
+  <button class="dock-bay" id="dockBay" type="button" aria-label="Dock bay"><span>Menu</span></button>
+  <button class="rocket-launcher docked" id="rocketLauncher" type="button" aria-label="Toggle movable station dock"><span>🚀</span></button>
+  <aside class="dock-panel glass-card" id="dockPanel" aria-label="Movable station dock"><div class="dock-head" id="dockHandle"><div><strong>Station Dock</strong><small>Docked mode: normal sidebar • double-click rocket to blast off</small></div><button class="dock-close" id="dockClose" type="button">×</button></div><div class="dock-list"><a class="dock-item" href="#"><span class="dock-icon">⌂</span><span><strong>Station Home</strong><span>Website lobby and ecosystem intro</span></span></a><a class="dock-item" href="#"><span class="dock-icon">☊</span><span><strong>HearMeOut</strong><span>Rooms, voice, chat, community signal</span></span></a><a class="dock-item" href="#"><span class="dock-icon">▣</span><span><strong>Overlay Bay</strong><span>Stream widgets and visual systems</span></span></a><a class="dock-item" href="#"><span class="dock-icon">≋</span><span><strong>DJ Deck</strong><span>Music, room effects, vibe control</span></span></a><a class="dock-item" href="#"><span class="dock-icon">✦</span><span><strong>Bot Comms</strong><span>Athena and Scarlett answer WHAT?</span></span></a></div></aside>
+  <nav class="container-fluid"><ul><li><strong><span class="brand-mark"></span> HearMeOut Station</strong></li></ul><ul><li><a href="#rooms">Rooms</a></li><li><a href="#community">Community</a></li><li><a href="#join" role="button">Copy Overlay</a></li></ul></nav>
+  <main class="container"><div><section><div class="hero-spacer"></div><div class="app-shell" id="rooms"><section class="main-stage"><article class="hero-room"><div class="room-art"></div><div class="hero-copy"><span class="kicker">Live room • public signal • high quality</span><h1>Galactic <span class="gradient-text">Hangout</span></h1><p>Casual creator chat, community onboarding, music, watch parties, and bot-guided answers for anyone who lands here and asks: “What is this?”</p></div><div class="hero-actions"><a class="soft-btn" href="#">Invite Crew</a><a class="soft-btn" href="#">Share Room</a><a class="soft-btn primary-btn" href="#">Join Signal</a></div></article><div class="module-grid"><article class="user-card" data-speaking="true"><div class="avatar-ring"><div class="avatar speaking"></div></div><h3>NovaStar</h3><div class="role">Host · speaking</div><div class="card-actions"><span class="round-btn">🎙</span><span class="round-btn">🎧</span><span class="round-btn">⋯</span></div></article><article class="user-card" data-speaking="true"><div class="avatar-ring"><div class="avatar speaking"></div></div><h3>LunaVibes</h3><div class="role">Captain · onboarding</div><div class="card-actions"><span class="round-btn">🎙</span><span class="round-btn">🎧</span><span class="round-btn">⋯</span></div></article><article class="user-card"><div class="avatar-ring"><div class="avatar"></div></div><h3>Orbitron</h3><div class="role">Passenger · listening</div><div class="card-actions"><span class="round-btn">🎙</span><span class="round-btn">🎧</span><span class="round-btn">⋯</span></div></article><article class="user-card"><div class="avatar-ring"><div class="avatar"></div></div><h3>EchoPulse</h3><div class="role">Duty Captain</div><div class="card-actions"><span class="round-btn">🎙</span><span class="round-btn">🎧</span><span class="round-btn">⋯</span></div></article></div><div class="info-strip" id="community"><article class="info-card"><span class="kicker">Docking Bay</span><div class="stat" style="color:var(--cyan)">Start</div><p>The rocket begins docked in the header. Click opens a normal left sidebar. Double-click releases hidden flight mode.</p></article><article class="info-card"><span class="kicker">Starfield</span><div class="stat" style="color:var(--pink)">Dense</div><p>More stars, more sizes, more glow, and the parallax layer stays above the real space image.</p></article><article class="info-card"><span class="kicker">Egg Hunter</span><div class="stat" style="color:var(--green)">Secret</div><p>Dragging the released rocket back onto the logo square docks it again. This is ready for your bot-title lore.</p></article></div><div class="parallax-section"><article class="big-lore-card"><span class="kicker">Normal Behavior</span><h2>Click the docked rocket like a regular menu.</h2><p>Most users get a normal, understandable sidebar pattern: click to open, click to close. The rocket just makes it feel like part of the world.</p></article><article class="big-lore-card"><span class="kicker">Hidden Behavior</span><h2>Double-click to blast off.</h2><p>The rocket undocks, starts following the cursor, rotates toward its travel direction, and can be dragged around. Drop it on the logo square to dock again.</p></article></div></section><aside class="chat-panel glass-card"><div class="mini-label">• Station Comms</div><div class="chat-tabs"><button class="chat-tab active">In-App</button><button class="chat-tab">Twitch</button><button class="chat-tab">Discord</button></div><div><div class="bot-prompt"><strong>Ask the station bots</strong><p style="margin:.35rem 0 0">“What is Space Mountain?” “Where do I start?” “How do overlays connect?”</p></div><div class="message"><div class="avatar speaking"></div><div><div class="message-top"><span class="message-name">Athena</span><span class="message-time">10:24 PM</span></div><div class="message-text">The rocket starts docked. Double-clicking unlocks flight mode.</div></div></div><div class="message"><div class="avatar"></div><div><div class="message-top"><span class="message-name">Scarlett</span><span class="message-time">10:25 PM</span></div><div class="message-text">Egg Hunter status pending. Try docking it back in the bay.</div></div></div><div class="message"><div class="avatar"></div><div><div class="message-top"><span class="message-name">LunaVibes</span><span class="message-time">10:26 PM</span></div><div class="message-text">The star layer is way more visible now ✨</div></div></div></div><form class="chat-input-row"><input placeholder="Message in-app chat..."/><button class="send primary-btn" type="button">➤</button></form></aside></div></section></div></main>
+  <section aria-label="Subscribe example" id="join"><div class="container"><article><hgroup><h2>Open a station signal.</h2><h3>Join updates, request access, or ask a bot what this ecosystem does.</h3></hgroup><form class="grid"><input type="text" id="firstname" name="firstname" placeholder="Captain name" aria-label="Captain name" required/><input type="email" id="email" name="email" placeholder="Signal email" aria-label="Signal email" required/><button type="submit" onclick="event.preventDefault()">Request Docking</button></form></article></div></section><footer class="container"><small><a href="#rooms">App Dock</a> • <a href="#community">Community Concourse</a></small></footer>
+  <script>
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const parallaxNodes = document.querySelectorAll('[data-depth]');
+    let easedScroll = 0, mousePX = 0, mousePY = 0, easedMousePX = 0, easedMousePY = 0;
+    function updateParallax(){ const y = window.scrollY || 0; easedScroll += (y - easedScroll) * .032; easedMousePX += (mousePX - easedMousePX) * .05; easedMousePY += (mousePY - easedMousePY) * .05; if(!reduceMotion){ parallaxNodes.forEach(n => { const d = Number(n.dataset.depth || .02); const mx = easedMousePX * d * 30; const my = easedMousePY * d * 24; n.style.transform = `translate3d(${mx}px, ${easedScroll * d + my}px, 0)`; }); } requestAnimationFrame(updateParallax); }
+    requestAnimationFrame(updateParallax);
+
+    const rocket = document.getElementById('rocketLauncher'), dock = document.getElementById('dockPanel'), closeBtn = document.getElementById('dockClose'), handle = document.getElementById('dockHandle'), dockBay = document.getElementById('dockBay');
+    let mouseX = 60, mouseY = 34, prevMouseX = 60, prevMouseY = 34, rocketX = 25, rocketY = 15, mode = 'docked', dragRocket = false, moved = false, downX = 0, downY = 0, startRX = 0, startRY = 0, startPX = 0, startPY = 0;
+    function placeRocketInBay(){ const r = dockBay.getBoundingClientRect(); rocketX = r.left + r.width/2 - 36; rocketY = r.top + r.height/2 - 36; rocket.style.left = rocketX + 'px'; rocket.style.top = rocketY + 'px'; rocket.style.right = 'auto'; rocket.style.bottom = 'auto'; rocket.style.setProperty('--angle','0deg'); }
+    function setDocked(){ mode = 'docked'; rocket.classList.add('docked'); rocket.classList.remove('free','open'); dock.classList.remove('floating'); placeRocketInBay(); }
+    function openDock(){ dock.classList.add('open'); rocket.classList.add('open'); if(mode === 'docked'){ dock.classList.remove('floating'); dock.style.left = '0px'; dock.style.top = '68px'; dock.style.width = 'min(360px, calc(100vw - 32px))'; } else { dock.classList.add('floating'); const r = rocket.getBoundingClientRect(); dock.style.left = Math.min(window.innerWidth - 380, Math.max(18, r.left + 84)) + 'px'; dock.style.top = Math.min(window.innerHeight - 460, Math.max(80, r.top - 10)) + 'px'; attachRocketToFloatingDock(); } }
+    function closeDock(){ dock.classList.remove('open'); rocket.classList.remove('open'); if(mode === 'docked') placeRocketInBay(); }
+    function toggleDock(){ dock.classList.contains('open') ? closeDock() : openDock(); }
+    function releaseRocket(){ mode = 'free'; rocket.classList.remove('docked'); rocket.classList.add('free'); closeDock(); rocketX = Math.min(window.innerWidth - 92, rocketX + 96); rocketY = Math.max(90, rocketY + 26); rocket.style.left = rocketX + 'px'; rocket.style.top = rocketY + 'px'; }
+    function attachRocketToFloatingDock(){ if(mode !== 'free' || !dock.classList.contains('open')) return; const p = dock.getBoundingClientRect(); rocketX = p.left - 82; rocketY = p.top + 8; rocket.style.left = rocketX + 'px'; rocket.style.top = rocketY + 'px'; }
+    function nearDockBay(){ const a = rocket.getBoundingClientRect(), b = dockBay.getBoundingClientRect(); const ax = a.left + a.width/2, ay = a.top + a.height/2, bx = b.left + b.width/2, by = b.top + b.height/2; return Math.hypot(ax - bx, ay - by) < 62; }
+    function orient(dx, dy){ if(Math.hypot(dx, dy) < .2) return; const angle = Math.atan2(dy, dx) * 180 / Math.PI + 45; rocket.style.setProperty('--angle', angle + 'deg'); }
+    window.addEventListener('mousemove', e => { prevMouseX = mouseX; prevMouseY = mouseY; mouseX = e.clientX; mouseY = e.clientY; mousePX = (e.clientX / window.innerWidth - .5) * 2; mousePY = (e.clientY / window.innerHeight - .5) * 2; });
+    function followRocket(){ if(!reduceMotion && !dragRocket && mode === 'free' && !dock.classList.contains('open') && window.innerWidth > 760){ const cx = rocketX + 36, cy = rocketY + 36, toX = cx - mouseX, toY = cy - mouseY, mx = mouseX - prevMouseX, my = mouseY - prevMouseY, dist = Math.hypot(toX,toY), toward = (mx*toX + my*toY) > 0; let f = toward ? .006 : .048; if(dist < 110) f *= .22; if(dist < 54) f = .002; const nextX = rocketX + (mouseX - 36 - rocketX) * f, nextY = rocketY + (mouseY - 36 - rocketY) * f; orient(nextX - rocketX, nextY - rocketY); rocketX = nextX; rocketY = nextY; rocket.style.left = Math.min(window.innerWidth - 92, Math.max(12, rocketX)) + 'px'; rocket.style.top = Math.min(window.innerHeight - 92, Math.max(72, rocketY)) + 'px'; } requestAnimationFrame(followRocket); }
+    requestAnimationFrame(followRocket);
+
+    rocket.addEventListener('pointerdown', e => { if(mode === 'docked') return; dragRocket = true; moved = false; downX = e.clientX; downY = e.clientY; const rr = rocket.getBoundingClientRect(), pr = dock.getBoundingClientRect(); startRX = rr.left; startRY = rr.top; startPX = pr.left || 0; startPY = pr.top || 68; rocket.setPointerCapture(e.pointerId); rocket.style.cursor = 'grabbing'; });
+    rocket.addEventListener('click', e => { if(mode === 'docked') toggleDock(); });
+    rocket.addEventListener('pointermove', e => { if(!dragRocket) return; const dx = e.clientX - downX, dy = e.clientY - downY; if(Math.hypot(dx,dy) > 5) moved = true; rocketX = Math.min(window.innerWidth - 92, Math.max(12, startRX + dx)); rocketY = Math.min(window.innerHeight - 92, Math.max(72, startRY + dy)); rocket.style.left = rocketX + 'px'; rocket.style.top = rocketY + 'px'; orient(dx,dy); if(mode === 'free' && dock.classList.contains('open')){ dock.style.left = Math.min(window.innerWidth - 90, Math.max(10, startPX + dx)) + 'px'; dock.style.top = Math.min(window.innerHeight - 90, Math.max(10, startPY + dy)) + 'px'; } });
+    rocket.addEventListener('pointerup', e => { if(mode === 'docked') return; dragRocket = false; rocket.style.cursor = 'grab'; rocket.releasePointerCapture(e.pointerId); if(!moved){ toggleDock(); return; } if(mode === 'free' && nearDockBay()){ closeDock(); setDocked(); } });
+    rocket.addEventListener('dblclick', e => { e.preventDefault(); mode === 'docked' ? releaseRocket() : setDocked(); });
+    closeBtn.addEventListener('click', closeDock);
+    let dragPanel = false, dsx = 0, dsy = 0, psx = 0, psy = 0;
+    handle.addEventListener('pointerdown', e => { if(e.target.closest('button')) return; if(mode === 'docked') return; dragPanel = true; dsx = e.clientX; dsy = e.clientY; const r = dock.getBoundingClientRect(); psx = r.left; psy = r.top; handle.setPointerCapture(e.pointerId); });
+    handle.addEventListener('pointermove', e => { if(!dragPanel || mode !== 'free') return; const x = Math.min(window.innerWidth - 90, Math.max(10, psx + e.clientX - dsx)); const y = Math.min(window.innerHeight - 90, Math.max(10, psy + e.clientY - dsy)); dock.style.left = x + 'px'; dock.style.top = y + 'px'; attachRocketToFloatingDock(); orient(e.clientX - dsx, e.clientY - dsy); });
+    handle.addEventListener('pointerup', e => { if(!dragPanel) return; dragPanel = false; handle.releasePointerCapture(e.pointerId); });
+    dockBay.addEventListener('click', () => { if(mode === 'free' && nearDockBay()) setDocked(); });
+    window.addEventListener('resize', () => { if(mode === 'docked') placeRocketInBay(); else if(dock.classList.contains('open')) attachRocketToFloatingDock(); });
+    window.addEventListener('load', () => { setDocked(); requestAnimationFrame(() => requestAnimationFrame(placeRocketInBay)); });
+    setDocked();
+  </script>
+</body>
+</html>

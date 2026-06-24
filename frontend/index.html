@@ -1,0 +1,243 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>SpaceMountain.live</title>
+  <meta name="description" content="SpaceMountain.live universal account portal." />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;800;900&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/index.css" />
+</head>
+<body>
+  <div class="space-scene" aria-hidden="true">
+    <div class="space-depth" data-depth="0.018"></div>
+    <div class="space-tint" data-depth="0.012"></div>
+    <svg class="star-layer" data-depth="0.044" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice">
+      <g class="dust">
+        <circle cx="24" cy="74" r=".55"/><circle cx="82" cy="218" r=".45"/><circle cx="146" cy="520" r=".7"/><circle cx="224" cy="118" r=".55"/><circle cx="302" cy="712" r=".5"/><circle cx="376" cy="330" r=".65"/><circle cx="455" cy="86" r=".5"/><circle cx="532" cy="554" r=".55"/><circle cx="616" cy="238" r=".5"/><circle cx="702" cy="818" r=".65"/><circle cx="776" cy="382" r=".5"/><circle cx="858" cy="104" r=".7"/><circle cx="934" cy="468" r=".55"/><circle cx="1018" cy="750" r=".5"/><circle cx="1092" cy="226" r=".65"/><circle cx="1176" cy="636" r=".5"/><circle cx="1258" cy="96" r=".55"/><circle cx="1334" cy="436" r=".5"/><circle cx="1420" cy="776" r=".7"/><circle cx="1498" cy="182" r=".55"/><circle cx="1566" cy="610" r=".5"/>
+      </g>
+      <g class="pin">
+        <circle cx="56" cy="370" r="1.1"/><circle cx="154" cy="132" r=".9"/><circle cx="236" cy="612" r="1.1"/><circle cx="344" cy="96" r=".9"/><circle cx="444" cy="450" r="1.2"/><circle cx="536" cy="182" r=".9"/><circle cx="642" cy="640" r="1"/><circle cx="746" cy="304" r="1.2"/><circle cx="862" cy="692" r=".9"/><circle cx="966" cy="146" r="1.1"/><circle cx="1064" cy="410" r="1.2"/><circle cx="1172" cy="804" r=".9"/><circle cx="1276" cy="266" r="1.1"/><circle cx="1390" cy="616" r="1.2"/><circle cx="1516" cy="318" r=".9"/>
+      </g>
+      <g class="mid">
+        <circle cx="214" cy="164" r="2.1"/><circle cx="392" cy="260" r="1.8"/><circle cx="604" cy="116" r="1.7"/><circle cx="820" cy="588" r="2.1"/><circle cx="1048" cy="180" r="2.3"/><circle cx="1288" cy="716" r="1.8"/><circle cx="1504" cy="108" r="2"/>
+      </g>
+      <g class="hot">
+        <circle cx="332" cy="222" r="3"/><circle cx="692" cy="306" r="2.7"/><circle cx="1110" cy="530" r="3.2"/><circle cx="1450" cy="224" r="2.8"/>
+      </g>
+    </svg>
+    <div class="scene-vignette"></div>
+  </div>
+
+  <aside class="capsule-sidebar" id="capsuleDock" aria-label="SpaceMountain navigation">
+    <div class="capsule-shell">
+      <button class="capsule-rocket-frame" id="rocketBay" type="button" aria-label="Collapse or expand dock">
+        <span class="rocket-glass">
+        </span>
+      </button>
+
+      <nav class="side-nav">
+        <button class="side-item active" type="button" data-page="dashboard"><span class="home-icon"></span><b>Home</b></button>
+        <button class="side-item" type="button" data-page="apps"><span class="apps-icon"></span><b>Apps</b></button>
+        <button class="side-item" type="button" data-page="inbox"><span class="mail-icon"></span><b>Inbox</b></button>
+        <button class="side-item" type="button" data-page="forums"><span class="chat-icon"></span><b>Forums</b></button>
+        <button class="side-item" type="button" data-page="rooms"><span class="rooms-icon"></span><b>Rooms</b></button>
+        <button class="side-item" type="button" data-page="overlay"><span class="grid-icon"></span><b>Overlay Bay</b></button>
+        <button class="side-item" type="button" data-page="builder"><span class="tools-icon"></span><b>Builder</b></button>
+        <button class="side-item" type="button" data-page="mountainview"><span class="mountain-icon"></span><b>MtnView</b></button>
+        <button class="side-item" type="button" data-page="crew"><span class="shield-icon"></span><b>Crew Desk</b></button>
+        <button class="side-item" type="button" data-page="settings"><span class="settings-icon"></span><b>Settings</b></button>
+        <button class="side-item" type="button" data-page="help"><span class="help-icon"></span><b>Help</b></button>
+      </nav>
+
+      <button class="capsule-toggle" id="capsuleQuickToggle" type="button" aria-label="Expand quick menu" aria-expanded="false"></button>
+
+      <section class="capsule-profile" aria-label="Signed in user">
+        <span class="profile-avatar"></span>
+        <strong>NovaStar</strong>
+        <span>Creator</span>
+        <small><i></i> Online</small>
+      </section>
+
+      <section class="capsule-drawer" id="capsuleDrawer" aria-label="Quick actions">
+        <h2>Quick Actions</h2>
+        <button type="button" data-page="dashboard"><span class="apps-icon"></span>Open Dashboard</button>
+        <button type="button" data-page="apps"><span class="grid-icon"></span>Manage Apps</button>
+        <button type="button" data-page="settings"><span class="settings-icon"></span>Account Settings</button>
+        <button type="button" data-page="settings"><span class="tools-icon"></span>Theme & Customization</button>
+
+        <h2>Active Theme</h2>
+        <button class="theme-card" type="button" data-page="settings">
+          <span></span>
+          <strong>Solar Flare<small>Theme sync active</small></strong>
+        </button>
+
+        <h2>Across Your Apps</h2>
+        <div class="sync-list">
+          <p><span>Theme Sync</span><b>On</b></p>
+          <p><span>Messages</span><b>3</b></p>
+          <p><span>Connections</span><b>8</b></p>
+          <p><span>Assets</span><b>1.2 TB</b></p>
+        </div>
+      </section>
+    </div>
+  </aside>
+
+  <button class="rocket-launcher docked" id="rocketLauncher" type="button" aria-label="Rocket dock control">
+    <span class="concept-rocket"></span>
+  </button>
+
+  <header class="top-header">
+    <a class="header-brand" href="#dashboard" aria-label="SpaceMountain.live dashboard">
+      <span class="brand-mark"></span>
+      <span>SPACEMOUNTAIN<span>.LIVE</span></span>
+    </a>
+    <div class="header-tools">
+      <div class="search-shell" id="searchShell">
+        <button class="tool-button search-button" id="searchButton" type="button" aria-label="Open search"><span class="search-icon"></span></button>
+        <input id="siteSearch" type="search" placeholder="Search station..." aria-label="Search station" />
+      </div>
+      <button class="tool-button bell-icon" type="button" aria-label="Notifications"><span></span></button>
+      <button class="tool-button settings-button settings-icon" type="button" data-page="settings" aria-label="Settings"></button>
+      <button class="profile-chip" id="profileChip" type="button" data-page="profile" aria-label="Open profile">
+        <span class="mini-avatar"></span>
+        <span><strong>NovaStar</strong><small>Online</small></span>
+      </button>
+    </div>
+  </header>
+
+  <aside class="flight-panel glass-panel" id="flightPanel" aria-label="Flight mode station panel">
+    <div class="flight-panel-head" id="flightPanelHandle">
+      <div>
+        <strong>Station Panel</strong>
+        <small>Flight mode controls</small>
+      </div>
+      <button type="button" id="flightPanelClose" aria-label="Close station panel"></button>
+    </div>
+    <div class="flight-panel-body">
+      <nav class="flight-panel-nav">
+        <button type="button" data-page="dashboard"><span class="home-icon"></span>Home</button>
+        <button type="button" data-page="apps"><span class="apps-icon"></span>Apps</button>
+        <button type="button" data-page="inbox"><span class="mail-icon"></span>Inbox</button>
+        <button type="button" data-page="forums"><span class="chat-icon"></span>Forums</button>
+        <button type="button" data-page="rooms"><span class="rooms-icon"></span>Rooms</button>
+        <button type="button" data-page="builder"><span class="tools-icon"></span>Builder</button>
+        <button type="button" data-page="mountainview"><span class="mountain-icon"></span>MtnView</button>
+        <button type="button" data-page="crew"><span class="shield-icon"></span>Crew Desk</button>
+        <button type="button" data-page="settings"><span class="settings-icon"></span>Settings</button>
+      </nav>
+      <section class="flight-panel-data">
+        <h2>Quick Actions</h2>
+        <button type="button" data-page="dashboard">Open Dashboard</button>
+        <button type="button" data-page="apps">Manage Apps</button>
+        <button type="button" data-page="settings">Theme & Customization</button>
+        <h2>Cockpit Data</h2>
+        <p><span>Theme Sync</span><b>On</b></p>
+        <p><span>Messages</span><b>3</b></p>
+        <p><span>Connections</span><b>8</b></p>
+      </section>
+    </div>
+  </aside>
+
+  <main class="main-stage">
+    <section class="page active" id="page-dashboard">
+      <section class="hero-section">
+        <div class="hero-badge" aria-label="SpaceMountain.live logo"></div>
+        <h1>One Account.<br><span>One Universe.</span></h1>
+        <p class="hero-subtitle">spmt.live is your universal account for all SpaceMountain apps and services.</p>
+        <div class="hero-actions">
+          <button class="primary-button" type="button">Create Your Account</button>
+          <button class="ghost-button" type="button" data-page="apps">Explore Apps</button>
+        </div>
+      </section>
+
+      <section class="app-suite glass-panel" id="apps">
+        <h2><span></span> YOUR APP SUITE <span></span></h2>
+        <div class="app-grid">
+          <article class="app-card"><span class="badge-icon streamweaver-badge"></span><h3>StreamWeaver</h3><p>Streaming & Tools</p></article>
+          <article class="app-card"><span class="badge-icon chattag-badge"></span><h3>ChatTag</h3><p>Game System</p></article>
+          <article class="app-card"><span class="badge-icon discord-badge"></span><h3>Discord Stream Hub</h3><p>Auth & Shoutouts</p></article>
+          <article class="app-card"><span class="badge-icon hearmeout-badge"></span><h3>Hear Me Out</h3><p>Voice & Rooms</p></article>
+          <article class="app-card"><span class="badge-icon mountainview-badge"></span><h3>MountainView</h3><p>Smart Glasses Hub</p></article>
+          <article class="app-card"><span class="badge-icon mail-badge"></span><h3>spmt.live Mail</h3><p>Secure Messaging</p></article>
+          <article class="app-card"><span class="badge-icon forums-badge"></span><h3>Forums</h3><p>Community Hub</p></article>
+          <article class="app-card"><span class="badge-icon builder-badge"></span><h3>Builder</h3><p>Pages & QR Codes</p></article>
+        </div>
+        <div class="metric-row">
+          <div><span>12+</span><small>Powerful Apps</small></div>
+          <div><span>50k+</span><small>Active Users</small></div>
+          <div><span>1M+</span><small>Connections Made</small></div>
+          <div><span>Infinite</span><small>Possibilities</small></div>
+        </div>
+      </section>
+    </section>
+
+    <section class="page" id="page-apps">
+      <div class="page-title"><h1>Apps</h1><p>Manage the SpaceMountain suite from one account.</p></div>
+      <section class="app-suite glass-panel app-suite-page">
+        <div class="app-grid">
+          <article class="app-card"><span class="badge-icon streamweaver-badge"></span><h3>StreamWeaver</h3><p>Streaming & creator tools</p></article>
+          <article class="app-card"><span class="badge-icon chattag-badge"></span><h3>ChatTag</h3><p>Game identity and tags</p></article>
+          <article class="app-card"><span class="badge-icon discord-badge"></span><h3>Discord Stream Hub</h3><p>Auth, shoutouts, and alerts</p></article>
+          <article class="app-card"><span class="badge-icon hearmeout-badge"></span><h3>Hear Me Out</h3><p>Rooms, voice, and watch parties</p></article>
+          <article class="app-card"><span class="badge-icon mountainview-badge"></span><h3>MountainView</h3><p>Smart glasses command center</p></article>
+          <article class="app-card"><span class="badge-icon mail-badge"></span><h3>spmt.live Mail</h3><p>Secure messages</p></article>
+          <article class="app-card"><span class="badge-icon forums-badge"></span><h3>Forums</h3><p>Community hub</p></article>
+          <article class="app-card"><span class="badge-icon builder-badge"></span><h3>Builder</h3><p>Pages and QR codes</p></article>
+        </div>
+      </section>
+    </section>
+
+    <section class="page settings-page" id="page-settings">
+      <div class="page-title">
+        <h1>Settings</h1>
+        <p>Customize your experience. This page is separate from the dashboard.</p>
+      </div>
+      <div class="settings-grid">
+        <aside class="settings-menu glass-panel">
+          <button class="setting-tab active" type="button">Appearance</button>
+          <button class="setting-tab" type="button">Theme Presets</button>
+          <button class="setting-tab" type="button">Layout</button>
+          <button class="setting-tab" type="button">Chat & Tabs</button>
+          <button class="setting-tab" type="button">Motion & Effects</button>
+          <button class="setting-tab" type="button">Voice UI</button>
+        </aside>
+        <article class="settings-card glass-panel">
+          <h2>Accent Color</h2>
+          <div class="swatches">
+            <button class="swatch active orange" type="button"></button><button class="swatch red" type="button"></button><button class="swatch purple" type="button"></button><button class="swatch blue" type="button"></button><button class="swatch cyan" type="button"></button><button class="swatch green" type="button"></button><button class="swatch gold" type="button"></button>
+          </div>
+          <label>Glass Opacity <output>65%</output><input type="range" value="65"></label>
+          <label>Blur Strength <output>22px</output><input type="range" min="0" max="40" value="22"></label>
+          <label>Glow Intensity <output>80%</output><input type="range" value="80"></label>
+        </article>
+        <article class="settings-card glass-panel">
+          <h2>Cosmic Background</h2>
+          <label>Star Density <output>70%</output><input type="range" value="70"></label>
+          <label>Nebula Intensity <output>80%</output><input type="range" value="80"></label>
+          <label>Parallax Depth <output>65%</output><input type="range" value="65"></label>
+        </article>
+        <article class="settings-card glass-panel">
+          <h2>Surface & UI</h2>
+          <div class="segmented"><button type="button">Compact</button><button class="active" type="button">Comfortable</button><button type="button">Spacious</button></div>
+          <label>Border Strength <output>60%</output><input type="range" value="60"></label>
+          <div class="segmented four"><button type="button">Sm</button><button class="active" type="button">Md</button><button type="button">Lg</button><button type="button">Full</button></div>
+        </article>
+      </div>
+    </section>
+
+    <section class="page utility-page" id="page-inbox" data-title="Inbox" data-copy="Unified spmt.live messages, alerts, and app notifications."></section>
+    <section class="page utility-page" id="page-forums" data-title="Forums" data-copy="Community threads, feature requests, and creator support."></section>
+    <section class="page utility-page" id="page-rooms" data-title="Rooms" data-copy="Voice rooms, watch parties, and live community spaces."></section>
+    <section class="page utility-page" id="page-overlay" data-title="Overlay Bay" data-copy="Stream overlays, widgets, and scene components."></section>
+    <section class="page utility-page" id="page-builder" data-title="Builder" data-copy="Pages, QR codes, landing screens, and app launch tools."></section>
+    <section class="page utility-page" id="page-mountainview" data-title="MtnView" data-copy="Smart glasses control, voice command routing, and visual context."></section>
+    <section class="page utility-page" id="page-crew" data-title="Crew Desk" data-copy="Admin workflows, review queues, and connected service health."></section>
+    <section class="page utility-page" id="page-help" data-title="Help" data-copy="Support, onboarding, and status information for the SpaceMountain ecosystem."></section>
+  </main>
+
+  <script src="/js/index.js"></script>
+</body>
+</html>

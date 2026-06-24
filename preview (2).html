@@ -1,0 +1,2721 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <title>spacemountain.live — Station Shell Pages</title>
+
+  <style>
+    :root {
+      --space-bg: url("./test/assets/ChatGPT%20Image%20May%2031,%202026,%2001_00_16%20PM.png");
+      --brand-sheet: url("./assets/spacemountain-brand-sheet.png");
+
+      --bg: #02050f;
+      --glass: rgba(8, 13, 34, 0.18);
+      --glass-strong: rgba(8, 13, 34, 0.30);
+      --glass-soft: rgba(255, 255, 255, 0.04);
+      --line: rgba(210, 178, 255, 0.22);
+      --line-strong: rgba(210, 178, 255, 0.42);
+
+      --text: #fbf7ff;
+      --muted: #a9b3db;
+      --soft: #d0caee;
+
+      --purple: #a968ff;
+      --violet: #7c3cff;
+      --cyan: #45e7ff;
+      --pink: #ff5de4;
+      --green: #58f7ad;
+      --gold: #ffd166;
+      --red: #ff5577;
+
+      --radius: 26px;
+      --blur: 30px;
+      --sidebar: 304px;
+      --sidebar-collapsed: 86px;
+      --gap: 22px;
+      --max: 1780px;
+
+      color-scheme: dark;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--bg);
+      color: var(--text);
+      font-family:
+        Inter,
+        ui-sans-serif,
+        system-ui,
+        -apple-system,
+        BlinkMacSystemFont,
+        "Segoe UI",
+        sans-serif;
+      overflow-x: hidden;
+      isolation: isolate;
+    }
+
+    button,
+    input,
+    textarea,
+    select {
+      font: inherit;
+    }
+
+    button {
+      cursor: pointer;
+    }
+
+    a {
+      color: inherit;
+      text-decoration: none;
+    }
+
+    code {
+      color: #ddf8ff;
+      background: rgba(69, 231, 255, 0.08);
+      border: 1px solid rgba(69, 231, 255, 0.18);
+      padding: 3px 7px;
+      border-radius: 9px;
+      font-size: 0.82rem;
+    }
+
+    /* =========================================================
+       BACKGROUND FROM ORIGINAL WORK
+       ========================================================= */
+
+    .space-scene {
+      position: fixed;
+      inset: 0;
+      z-index: -40;
+      overflow: hidden;
+      pointer-events: none;
+      background: #02050f;
+    }
+
+    .space-depth {
+      position: absolute;
+      inset: -4vh -3vw;
+      background-image:
+        linear-gradient(180deg, rgba(2, 6, 18, 0.08), rgba(2, 6, 18, 0.28)),
+        var(--space-bg),
+        radial-gradient(circle at 46% 34%, rgba(69, 231, 255, 0.05), transparent 32%),
+        radial-gradient(circle at 80% 68%, rgba(255, 93, 228, 0.06), transparent 30%),
+        linear-gradient(135deg, #02050f, #081027 55%, #15051e);
+      background-size: cover;
+      background-position: center center;
+      filter: saturate(1.1) contrast(1.03) brightness(0.9);
+      opacity: 0.95;
+      will-change: transform;
+      transform-origin: center;
+    }
+
+    .space-scene::before {
+      content: "";
+      position: absolute;
+      left: -24vw;
+      bottom: -34vh;
+      width: clamp(560px, 64vw, 1080px);
+      aspect-ratio: 1;
+      border-radius: 50%;
+      background:
+        radial-gradient(circle at 42% 34%, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0) 12%),
+        radial-gradient(circle at 54% 52%, rgba(140, 83, 255, 0.36), rgba(80, 38, 146, 0.9) 38%, rgba(13, 10, 30, 0.96) 74%);
+      box-shadow: 0 0 140px rgba(103, 74, 188, 0.24);
+      opacity: 0.72;
+    }
+
+    .scene-vignette {
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(circle at 50% 42%, transparent 0 48%, rgba(3, 6, 17, 0.1) 70%, rgba(3, 6, 17, 0.28) 100%),
+        linear-gradient(90deg, rgba(3, 6, 17, 0.24), transparent 48%, rgba(3, 6, 17, 0.28)),
+        linear-gradient(180deg, rgba(3, 6, 17, 0.01), rgba(3, 6, 17, 0.12));
+    }
+
+    .star-layer,
+    .star-layer-2,
+    .star-layer-3 {
+      position: fixed;
+      inset: 0;
+      z-index: -30;
+      pointer-events: none;
+      opacity: 0.82;
+      mix-blend-mode: screen;
+    }
+
+    .star-layer::before,
+    .star-layer::after,
+    .star-layer-2::before,
+    .star-layer-2::after,
+    .star-layer-3::before,
+    .star-layer-3::after {
+      content: "";
+      position: absolute;
+      border-radius: 50%;
+      background: transparent;
+      animation-name: barelyTwinkle;
+      animation-timing-function: ease-in-out;
+      animation-iteration-count: infinite;
+      will-change: transform, opacity;
+    }
+
+    @keyframes barelyTwinkle {
+      0%, 100% {
+        transform: translate3d(0, 0, 0) scale(0.98);
+        opacity: 0.62;
+      }
+
+      50% {
+        transform: translate3d(0.7px, -0.8px, 0) scale(1.04);
+        opacity: 1;
+      }
+    }
+
+    .star-layer::before {
+      width: 1px;
+      height: 1px;
+      box-shadow:
+        5vw 85vh 1px 1px #fff,
+        15vw 35vh 1px 1px #fff,
+        25vw 10vh 1px 1px #fff,
+        40vw 80vh 1px 1px #fff,
+        55vw 20vh 1px 1px #fff,
+        68vw 45vh 1px 1px #fff,
+        82vw 70vh 1px 1px #fff,
+        95vw 5vh 1px 1px #fff,
+        33vw 33vh 1px 1px #fff,
+        66vw 66vh 1px 1px #fff,
+        23vw 48vh 1px 1px #fff,
+        88vw 12vh 1px 1px #fff,
+        7vw 5vh 1px 1px #fff,
+        92vw 30vh 1px 1px #fff,
+        45vw 60vh 1px 1px #fff,
+        75vw 80vh 1px 1px #fff;
+      animation-duration: 480s;
+    }
+
+    .star-layer::after {
+      width: 2px;
+      height: 2px;
+      box-shadow:
+        10vw 10vh 2px 2px #fff,
+        30vw 70vh 2px 2px #fff,
+        50vw 40vh 2px 2px #fff,
+        70vw 5vh 2px 2px #fff,
+        90vw 40vh 2px 2px #fff,
+        45vw 90vh 2px 2px #fff,
+        20vw 55vh 2px 2px #fff,
+        80vw 25vh 2px 2px #fff,
+        18vw 82vh 2px 2px #fff,
+        58vw 8vh 2px 2px #fff;
+      animation-duration: 540s;
+    }
+
+    .star-layer-2::before {
+      width: 1.5px;
+      height: 1.5px;
+      box-shadow:
+        8vw 25vh 1.5px 1.5px #fff,
+        28vw 90vh 1.5px 1.5px #fff,
+        48vw 5vh 1.5px 1.5px #fff,
+        62vw 60vh 1.5px 1.5px #fff,
+        85vw 15vh 1.5px 1.5px #fff,
+        98vw 80vh 1.5px 1.5px #fff,
+        3vw 40vh 1.5px 1.5px #fff,
+        22vw 72vh 1.5px 1.5px #fff,
+        51vw 28vh 1.5px 1.5px #fff,
+        77vw 52vh 1.5px 1.5px #fff;
+      animation-duration: 510s;
+    }
+
+    .star-layer-2::after {
+      width: 0.5px;
+      height: 0.5px;
+      box-shadow:
+        2vw 15vh 0.5px 0.5px #fff,
+        12vw 65vh 0.5px 0.5px #fff,
+        22vw 30vh 0.5px 0.5px #fff,
+        32vw 95vh 0.5px 0.5px #fff,
+        42vw 45vh 0.5px 0.5px #fff,
+        52vw 85vh 0.5px 0.5px #fff,
+        62vw 25vh 0.5px 0.5px #fff,
+        72vw 75vh 0.5px 0.5px #fff,
+        82vw 10vh 0.5px 0.5px #fff,
+        92vw 55vh 0.5px 0.5px #fff;
+      animation-duration: 450s;
+    }
+
+    .star-layer-3::before {
+      width: 1px;
+      height: 1px;
+      box-shadow:
+        60vw 15vh 1px 1px #fff,
+        5vw 45vh 1px 1px #fff,
+        80vw 55vh 1px 1px #fff,
+        35vw 90vh 1px 1px #fff,
+        12vw 22vh 1px 1px #fff,
+        94vw 75vh 1px 1px #fff,
+        28vw 65vh 1px 1px #fff,
+        73vw 18vh 1px 1px #fff,
+        49vw 3vh 1px 1px #fff,
+        99vw 40vh 1px 1px #fff;
+      animation-duration: 500s;
+    }
+
+    .star-layer-3::after {
+      width: 0.5px;
+      height: 0.5px;
+      box-shadow:
+        14vw 28vh 0.5px 0.5px #fff,
+        38vw 82vh 0.5px 0.5px #fff,
+        63vw 8vh 0.5px 0.5px #fff,
+        81vw 60vh 0.5px 0.5px #fff,
+        4vw 90vh 0.5px 0.5px #fff,
+        96vw 20vh 0.5px 0.5px #fff,
+        26vw 40vh 0.5px 0.5px #fff,
+        71vw 85vh 0.5px 0.5px #fff,
+        53vw 30vh 0.5px 0.5px #fff,
+        89vw 70vh 0.5px 0.5px #fff;
+      animation-duration: 460s;
+    }
+
+    /* =========================================================
+       BASE UI
+       ========================================================= */
+
+    .glass {
+      background: var(--glass);
+      border: 1px solid var(--line);
+      backdrop-filter: blur(var(--blur)) saturate(1.32);
+      -webkit-backdrop-filter: blur(var(--blur)) saturate(1.32);
+      box-shadow:
+        0 0 28px rgba(169, 104, 255, 0.08),
+        inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    }
+
+    .glass.strong {
+      background: var(--glass-strong);
+    }
+
+    .btn,
+    .btn-soft,
+    .icon-btn {
+      min-height: 43px;
+      border-radius: 15px;
+      color: var(--text);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      background: rgba(255, 255, 255, 0.052);
+      transition:
+        transform 180ms ease,
+        border-color 180ms ease,
+        background 180ms ease,
+        box-shadow 180ms ease;
+    }
+
+    .btn,
+    .btn-soft {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 0 15px;
+      font-weight: 850;
+    }
+
+    .icon-btn {
+      width: 43px;
+      display: inline-grid;
+      place-items: center;
+    }
+
+    .btn {
+      color: white;
+      border-color: rgba(226, 198, 255, 0.44);
+      background: linear-gradient(135deg, rgba(69, 231, 255, 0.82), rgba(169, 104, 255, 0.92), rgba(255, 93, 228, 0.82));
+      box-shadow: 0 0 20px rgba(169, 104, 255, 0.18);
+    }
+
+    .btn-soft:hover,
+    .icon-btn:hover {
+      background: rgba(169, 104, 255, 0.16);
+      border-color: rgba(169, 104, 255, 0.58);
+      transform: translateY(-1px);
+    }
+
+    .btn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 0 28px rgba(169, 104, 255, 0.34);
+    }
+
+    .kicker,
+    .mini {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      color: #eadcff;
+      border: 1px solid rgba(169, 104, 255, 0.48);
+      background: rgba(169, 104, 255, 0.13);
+      text-transform: uppercase;
+      letter-spacing: 0.09em;
+      font-weight: 950;
+    }
+
+    .kicker {
+      min-height: 30px;
+      padding: 0 11px;
+      border-radius: 999px;
+      font-size: 0.7rem;
+    }
+
+    .mini {
+      min-height: 26px;
+      padding: 0 9px;
+      border-radius: 999px;
+      font-size: 0.66rem;
+      margin-bottom: 12px;
+    }
+
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      min-height: 28px;
+      padding: 0 10px;
+      border-radius: 999px;
+      color: #f1ddff;
+      background: rgba(169, 104, 255, 0.16);
+      border: 1px solid rgba(169, 104, 255, 0.38);
+      font-size: 0.76rem;
+      font-weight: 850;
+    }
+
+    .tag.live {
+      color: #d7ffea;
+      background: rgba(88, 247, 173, 0.12);
+      border-color: rgba(88, 247, 173, 0.38);
+    }
+
+    .tag.warn {
+      color: #fff0ba;
+      background: rgba(255, 209, 102, 0.12);
+      border-color: rgba(255, 209, 102, 0.36);
+    }
+
+    .tag.pink {
+      color: #ffd8f6;
+      background: rgba(255, 93, 228, 0.12);
+      border-color: rgba(255, 93, 228, 0.36);
+    }
+
+    h1,
+    h2,
+    h3 {
+      margin: 0;
+      color: var(--text);
+      letter-spacing: -0.055em;
+      text-shadow: 0 0 24px rgba(3, 6, 17, 0.28);
+    }
+
+    h1 {
+      font-size: clamp(3.2rem, 7vw, 7.2rem);
+      line-height: 0.88;
+    }
+
+    h2 {
+      font-size: clamp(2.1rem, 4vw, 3.5rem);
+      line-height: 0.98;
+    }
+
+    h3 {
+      font-size: 1.18rem;
+    }
+
+    p {
+      color: var(--muted);
+      line-height: 1.6;
+    }
+
+    .gradient-text {
+      color: transparent;
+      background: linear-gradient(90deg, #fff, #efcfff 32%, var(--purple), var(--cyan));
+      -webkit-background-clip: text;
+      background-clip: text;
+    }
+
+    .input,
+    textarea,
+    select {
+      width: 100%;
+      min-height: 46px;
+      border-radius: 15px;
+      color: var(--text);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      background: rgba(255, 255, 255, 0.055);
+      padding: 0 13px;
+      outline: none;
+    }
+
+    textarea {
+      min-height: 110px;
+      padding: 12px 13px;
+      resize: vertical;
+    }
+
+    .field {
+      display: grid;
+      gap: 7px;
+      margin-bottom: 12px;
+    }
+
+    .field label {
+      color: var(--soft);
+      font-size: 0.86rem;
+      font-weight: 850;
+    }
+
+    .grid {
+      display: grid;
+      gap: var(--gap);
+    }
+
+    .grid-2 {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .grid-3 {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .grid-4 {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+
+    .card {
+      position: relative;
+      overflow: hidden;
+      border-radius: var(--radius);
+      padding: 20px;
+      min-height: 160px;
+    }
+
+    .card::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background:
+        radial-gradient(circle at 10% 0%, rgba(169, 104, 255, 0.1), transparent 34%),
+        radial-gradient(circle at 86% 4%, rgba(69, 231, 255, 0.045), transparent 32%),
+        linear-gradient(135deg, rgba(255, 255, 255, 0.026), transparent 42%);
+    }
+
+    .card > * {
+      position: relative;
+      z-index: 1;
+    }
+
+    .row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px;
+      border-radius: 18px;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .row + .row {
+      margin-top: 10px;
+    }
+
+    .avatar {
+      width: 44px;
+      height: 44px;
+      flex: 0 0 auto;
+      border-radius: 50%;
+      background:
+        radial-gradient(circle at 35% 25%, rgba(255, 255, 255, 0.42), transparent 16%),
+        linear-gradient(135deg, #0e2b50, #743cff 55%, #090617);
+      border: 1px solid rgba(169, 104, 255, 0.72);
+      box-shadow: 0 0 18px rgba(169, 104, 255, 0.24);
+    }
+
+    .avatar.speaking {
+      border-color: var(--green);
+      box-shadow: 0 0 18px rgba(88, 247, 173, 0.42);
+      animation: speakPulse 1.35s ease-in-out infinite;
+    }
+
+    @keyframes speakPulse {
+      0%, 100% {
+        box-shadow: 0 0 16px rgba(88, 247, 173, 0.28);
+      }
+
+      50% {
+        box-shadow: 0 0 28px rgba(88, 247, 173, 0.78);
+      }
+    }
+
+    .row-main {
+      min-width: 0;
+      flex: 1;
+    }
+
+    .row-main strong,
+    .row-main span {
+      display: block;
+      overflow: hidden;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+    }
+
+    .row-main span {
+      color: var(--muted);
+      font-size: 0.86rem;
+    }
+
+    /* =========================================================
+       APP SHELL WITH PAGE NAV SIDEBAR
+       ========================================================= */
+
+    .app-shell {
+      width: min(var(--max), calc(100% - 28px));
+      margin: 0 auto;
+      min-height: 100vh;
+      display: grid;
+      grid-template-columns: var(--sidebar) minmax(0, 1fr);
+      gap: var(--gap);
+      padding: 14px 0 80px;
+      transition: grid-template-columns 240ms ease;
+    }
+
+    body.sidebar-collapsed .app-shell {
+      grid-template-columns: var(--sidebar-collapsed) minmax(0, 1fr);
+    }
+
+    .side-nav {
+      position: sticky;
+      top: 14px;
+      height: calc(100vh - 28px);
+      border-radius: var(--radius);
+      overflow: hidden;
+      padding: 16px;
+    }
+
+    .side-inner {
+      height: 100%;
+      display: grid;
+      grid-template-rows: auto auto 1fr auto;
+      gap: 16px;
+    }
+
+    .brand-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .brand {
+      min-width: 0;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-weight: 950;
+    }
+
+    .brand-mark {
+      width: 48px;
+      height: 48px;
+      flex: 0 0 auto;
+      display: grid;
+      place-items: center;
+      border-radius: 16px;
+      border: 2px solid rgba(255, 255, 255, 0.72);
+      background:
+        radial-gradient(circle at 35% 25%, rgba(255, 255, 255, 0.28), transparent 16%),
+        linear-gradient(135deg, rgba(69, 231, 255, 0.12), rgba(169, 104, 255, 0.28), rgba(255, 93, 228, 0.12));
+      box-shadow:
+        0 0 24px rgba(169, 104, 255, 0.44),
+        inset 0 0 18px rgba(69, 231, 255, 0.1);
+    }
+
+    .brand-copy {
+      min-width: 0;
+    }
+
+    .brand-copy strong,
+    .brand-copy small {
+      display: block;
+      overflow: hidden;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+    }
+
+    .brand-copy strong {
+      text-transform: lowercase;
+      letter-spacing: -0.03em;
+    }
+
+    .brand-copy small {
+      color: var(--muted);
+      font-size: 0.78rem;
+      margin-top: 2px;
+    }
+
+    .user-id-card {
+      padding: 12px;
+      border-radius: 20px;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .user-id-card strong,
+    .user-id-card span {
+      display: block;
+      overflow: hidden;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+    }
+
+    .user-id-card span {
+      color: var(--green);
+      font-size: 0.84rem;
+      margin-top: 3px;
+    }
+
+    .page-nav {
+      overflow: auto;
+      display: grid;
+      align-content: start;
+      gap: 8px;
+      padding-right: 2px;
+    }
+
+    .page-nav-btn {
+      min-height: 52px;
+      display: grid;
+      grid-template-columns: 36px 1fr auto;
+      align-items: center;
+      gap: 12px;
+      padding: 0 12px;
+      border-radius: 16px;
+      color: var(--soft);
+      background: transparent;
+      border: 1px solid transparent;
+      text-align: left;
+      transition: 180ms ease;
+    }
+
+    .page-nav-btn:hover,
+    .page-nav-btn.active {
+      color: #fff;
+      background: rgba(169, 104, 255, 0.16);
+      border-color: rgba(169, 104, 255, 0.46);
+    }
+
+    .nav-icon {
+      width: 32px;
+      height: 32px;
+      display: grid;
+      place-items: center;
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.045);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .nav-text strong,
+    .nav-text small {
+      display: block;
+      overflow: hidden;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+    }
+
+    .nav-text small {
+      color: var(--muted);
+      font-size: 0.78rem;
+      margin-top: 2px;
+    }
+
+    .nav-badge {
+      color: var(--muted);
+      font-size: 0.76rem;
+      font-weight: 850;
+    }
+
+    .side-footer {
+      display: grid;
+      gap: 10px;
+    }
+
+    body.sidebar-collapsed .side-nav {
+      padding-inline: 10px;
+    }
+
+    body.sidebar-collapsed .brand-copy,
+    body.sidebar-collapsed .user-id-card,
+    body.sidebar-collapsed .nav-text,
+    body.sidebar-collapsed .nav-badge,
+    body.sidebar-collapsed .side-footer .btn-soft span {
+      display: none;
+    }
+
+    body.sidebar-collapsed .brand-row {
+      justify-content: center;
+      flex-direction: column;
+    }
+
+    body.sidebar-collapsed .page-nav-btn {
+      grid-template-columns: 1fr;
+      justify-items: center;
+      padding: 0;
+    }
+
+    .main-page {
+      min-width: 0;
+      display: grid;
+      gap: var(--gap);
+    }
+
+    .topbar {
+      position: sticky;
+      top: 14px;
+      z-index: 30;
+      min-height: 72px;
+      border-radius: var(--radius);
+      padding: 14px 18px;
+      display: grid;
+      grid-template-columns: 1fr auto;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .topbar strong,
+    .topbar span {
+      display: block;
+    }
+
+    .topbar strong {
+      font-size: 1rem;
+    }
+
+    .topbar span {
+      color: var(--muted);
+      font-size: 0.86rem;
+      margin-top: 2px;
+    }
+
+    .top-actions {
+      display: flex;
+      gap: 10px;
+      justify-content: flex-end;
+      flex-wrap: wrap;
+    }
+
+    .page {
+      display: none;
+      gap: var(--gap);
+    }
+
+    .page.active {
+      display: grid;
+    }
+
+    /* =========================================================
+       SPLASH
+       ========================================================= */
+
+    .splash {
+      min-height: calc(100vh - 128px);
+      display: grid;
+      grid-template-columns: minmax(0, 1.08fr) minmax(370px, 0.92fr);
+      gap: var(--gap);
+      align-items: stretch;
+    }
+
+    .splash-logo {
+      min-height: 660px;
+      border-radius: calc(var(--radius) + 8px);
+      position: relative;
+      overflow: hidden;
+      display: grid;
+      place-items: center;
+      padding: 30px;
+    }
+
+    .splash-logo::before {
+      content: "";
+      position: absolute;
+      inset: 18px;
+      border-radius: 30px;
+      background:
+        linear-gradient(180deg, rgba(3, 6, 17, 0.02), rgba(3, 6, 17, 0.18)),
+        var(--brand-sheet);
+      background-size: contain;
+      background-position: center;
+      background-repeat: no-repeat;
+      opacity: 0.9;
+      filter: drop-shadow(0 0 38px rgba(169, 104, 255, 0.24));
+    }
+
+    .fallback-brand {
+      position: relative;
+      z-index: 1;
+      text-align: center;
+      max-width: 950px;
+    }
+
+    .fallback-brand h1 {
+      text-transform: lowercase;
+      margin-bottom: 16px;
+    }
+
+    .fallback-brand p {
+      max-width: 680px;
+      margin: 0 auto;
+      font-size: 1.08rem;
+    }
+
+    .auth-card {
+      min-height: 660px;
+      border-radius: calc(var(--radius) + 8px);
+      padding: clamp(22px, 4vw, 38px);
+      display: grid;
+      align-content: center;
+    }
+
+    .auth-card h2 {
+      margin: 18px 0 14px;
+    }
+
+    .handle-box {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      align-items: center;
+      gap: 0;
+      border-radius: 17px;
+      overflow: hidden;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      background: rgba(255, 255, 255, 0.055);
+    }
+
+    .handle-box input {
+      border: 0;
+      background: transparent;
+      border-radius: 0;
+    }
+
+    .handle-suffix {
+      min-height: 46px;
+      display: inline-flex;
+      align-items: center;
+      padding: 0 14px;
+      color: var(--cyan);
+      border-left: 1px solid rgba(255, 255, 255, 0.1);
+      font-weight: 900;
+    }
+
+    .auth-mode {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin: 18px 0;
+    }
+
+    .tiny-note {
+      color: var(--muted);
+      font-size: 0.86rem;
+      line-height: 1.5;
+    }
+
+    /* =========================================================
+       DASHBOARD / APPS
+       ========================================================= */
+
+    .hero-page {
+      min-height: 480px;
+      border-radius: calc(var(--radius) + 8px);
+      padding: clamp(22px, 4vw, 38px);
+      display: grid;
+      align-content: center;
+    }
+
+    .hero-page h1 {
+      max-width: 980px;
+      margin: 18px 0 18px;
+    }
+
+    .hero-page p {
+      max-width: 780px;
+      font-size: 1.06rem;
+    }
+
+    .hero-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 11px;
+      margin-top: 26px;
+    }
+
+    .app-badge {
+      height: 170px;
+      display: grid;
+      place-items: center;
+      margin-bottom: 14px;
+      border-radius: 24px;
+      border: 1px solid rgba(255, 255, 255, 0.09);
+      background:
+        radial-gradient(circle at 50% 32%, rgba(255, 255, 255, 0.16), transparent 18%),
+        linear-gradient(135deg, rgba(69, 231, 255, 0.12), rgba(169, 104, 255, 0.22), rgba(255, 93, 228, 0.12));
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.08),
+        0 0 26px rgba(169, 104, 255, 0.08);
+      font-size: 3.5rem;
+    }
+
+    .stat {
+      font-size: clamp(1.8rem, 3vw, 2.55rem);
+      font-weight: 950;
+      letter-spacing: -0.055em;
+      margin-bottom: 6px;
+    }
+
+    .cyan {
+      color: var(--cyan);
+    }
+
+    .pink {
+      color: var(--pink);
+    }
+
+    .green {
+      color: var(--green);
+    }
+
+    .gold {
+      color: var(--gold);
+    }
+
+    /* =========================================================
+       MESSAGING / EMAIL-LIKE UI
+       ========================================================= */
+
+    .mail-shell {
+      min-height: 680px;
+      display: grid;
+      grid-template-columns: 250px minmax(280px, 0.74fr) minmax(0, 1.18fr);
+      gap: var(--gap);
+    }
+
+    .mail-sidebar,
+    .message-list,
+    .message-reader {
+      border-radius: var(--radius);
+      padding: 16px;
+      overflow: hidden;
+    }
+
+    .mail-folders {
+      display: grid;
+      gap: 8px;
+      margin-top: 16px;
+    }
+
+    .folder-btn {
+      min-height: 46px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      border-radius: 15px;
+      color: var(--soft);
+      border: 1px solid transparent;
+      background: transparent;
+      padding: 0 12px;
+      text-align: left;
+    }
+
+    .folder-btn.active,
+    .folder-btn:hover {
+      color: #fff;
+      background: rgba(169, 104, 255, 0.15);
+      border-color: rgba(169, 104, 255, 0.38);
+    }
+
+    .mail-list {
+      display: grid;
+      gap: 10px;
+      overflow: auto;
+      max-height: 580px;
+      padding-right: 3px;
+    }
+
+    .mail-item {
+      display: grid;
+      gap: 5px;
+      border-radius: 18px;
+      padding: 13px;
+      text-align: left;
+      color: var(--text);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      background: rgba(255, 255, 255, 0.042);
+    }
+
+    .mail-item.active,
+    .mail-item:hover {
+      border-color: rgba(69, 231, 255, 0.38);
+      background: rgba(69, 231, 255, 0.08);
+    }
+
+    .mail-item strong,
+    .mail-item span {
+      display: block;
+      overflow: hidden;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+    }
+
+    .mail-item span {
+      color: var(--muted);
+      font-size: 0.83rem;
+    }
+
+    .reader-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 14px;
+      padding-bottom: 14px;
+      margin-bottom: 14px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .reader-meta {
+      color: var(--muted);
+      font-size: 0.88rem;
+      line-height: 1.6;
+    }
+
+    .compose-grid {
+      margin-top: 16px;
+      display: grid;
+      gap: 10px;
+    }
+
+    .address-input {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      border-radius: 15px;
+      overflow: hidden;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      background: rgba(255, 255, 255, 0.055);
+    }
+
+    .address-input input {
+      border: 0;
+      border-radius: 0;
+      background: transparent;
+    }
+
+    .address-input span {
+      min-height: 46px;
+      display: inline-flex;
+      align-items: center;
+      padding: 0 12px;
+      color: var(--cyan);
+      border-left: 1px solid rgba(255, 255, 255, 0.1);
+      font-weight: 900;
+    }
+
+    /* =========================================================
+       FORUMS
+       ========================================================= */
+
+    .forum-shell {
+      display: grid;
+      grid-template-columns: minmax(260px, 0.72fr) minmax(0, 1.28fr);
+      gap: var(--gap);
+      min-height: 670px;
+    }
+
+    .forum-category,
+    .thread-item {
+      border-radius: 20px;
+      padding: 14px;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .forum-category + .forum-category,
+    .thread-item + .thread-item {
+      margin-top: 12px;
+    }
+
+    .thread-item {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .thread-item strong,
+    .thread-item span {
+      display: block;
+    }
+
+    .thread-item span {
+      color: var(--muted);
+      font-size: 0.86rem;
+      margin-top: 4px;
+    }
+
+    /* =========================================================
+       BUILDER / QR / GLASSES
+       ========================================================= */
+
+    .device-hero {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(330px, 0.72fr);
+      gap: var(--gap);
+    }
+
+    .glasses-visual {
+      min-height: 440px;
+      display: grid;
+      place-items: center;
+      border-radius: var(--radius);
+      background:
+        radial-gradient(circle at 50% 42%, rgba(69, 231, 255, 0.14), transparent 28%),
+        radial-gradient(circle at 62% 58%, rgba(169, 104, 255, 0.16), transparent 30%),
+        rgba(255, 255, 255, 0.02);
+      border: 1px solid rgba(210, 178, 255, 0.18);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .glasses {
+      width: min(440px, 86%);
+      height: 170px;
+      position: relative;
+      filter: drop-shadow(0 0 34px rgba(69, 231, 255, 0.18));
+    }
+
+    .lens {
+      position: absolute;
+      top: 36px;
+      width: 168px;
+      height: 92px;
+      border-radius: 38px;
+      border: 3px solid rgba(234, 220, 255, 0.72);
+      background:
+        radial-gradient(circle at 36% 28%, rgba(255, 255, 255, 0.28), transparent 16%),
+        linear-gradient(135deg, rgba(69, 231, 255, 0.2), rgba(169, 104, 255, 0.18), rgba(3, 6, 17, 0.42));
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.12),
+        0 0 28px rgba(169, 104, 255, 0.22);
+    }
+
+    .lens.left {
+      left: 28px;
+    }
+
+    .lens.right {
+      right: 28px;
+    }
+
+    .bridge {
+      position: absolute;
+      left: 50%;
+      top: 72px;
+      width: 76px;
+      height: 22px;
+      transform: translateX(-50%);
+      border-top: 4px solid rgba(234, 220, 255, 0.72);
+      border-radius: 50%;
+    }
+
+    .temple {
+      position: absolute;
+      top: 82px;
+      width: 90px;
+      height: 4px;
+      border-radius: 999px;
+      background: linear-gradient(90deg, rgba(255, 255, 255, 0.8), rgba(69, 231, 255, 0.1));
+    }
+
+    .temple.left {
+      left: -40px;
+      transform: rotate(16deg);
+    }
+
+    .temple.right {
+      right: -40px;
+      transform: rotate(-16deg);
+    }
+
+    .hud-dot {
+      position: absolute;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--green);
+      box-shadow: 0 0 16px var(--green);
+      animation: hudBlink 2s ease-in-out infinite;
+    }
+
+    .hud-dot.one {
+      left: 88px;
+      top: 62px;
+    }
+
+    .hud-dot.two {
+      right: 94px;
+      top: 102px;
+      animation-delay: -0.6s;
+    }
+
+    @keyframes hudBlink {
+      0%, 100% {
+        opacity: 0.45;
+      }
+
+      50% {
+        opacity: 1;
+      }
+    }
+
+    .workflow {
+      min-height: 430px;
+      position: relative;
+      border-radius: 24px;
+      border: 1px dashed rgba(210, 178, 255, 0.26);
+      background:
+        radial-gradient(circle at 50% 44%, rgba(169, 104, 255, 0.1), transparent 28%),
+        rgba(255, 255, 255, 0.025);
+      overflow: hidden;
+    }
+
+    .workflow::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+      background-size: 42px 42px;
+      opacity: 0.45;
+    }
+
+    .node {
+      position: absolute;
+      z-index: 1;
+      width: 190px;
+      border-radius: 18px;
+      padding: 14px;
+      background: rgba(8, 13, 34, 0.42);
+      border: 1px solid rgba(210, 178, 255, 0.22);
+      box-shadow: 0 0 22px rgba(169, 104, 255, 0.1);
+    }
+
+    .node strong,
+    .node span {
+      display: block;
+    }
+
+    .node span {
+      color: var(--muted);
+      font-size: 0.8rem;
+      margin-top: 4px;
+    }
+
+    .node.one {
+      left: 30px;
+      top: 36px;
+    }
+
+    .node.two {
+      left: 285px;
+      top: 130px;
+    }
+
+    .node.three {
+      right: 48px;
+      top: 58px;
+    }
+
+    .node.four {
+      right: 175px;
+      bottom: 46px;
+    }
+
+    .qr-grid {
+      width: 230px;
+      height: 230px;
+      display: grid;
+      grid-template-columns: repeat(13, 1fr);
+      gap: 4px;
+      padding: 14px;
+      border-radius: 24px;
+      background: rgba(255, 255, 255, 0.055);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      box-shadow:
+        0 0 28px rgba(69, 231, 255, 0.1),
+        inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    }
+
+    .qr-cell {
+      border-radius: 4px;
+      background: rgba(255, 255, 255, 0.1);
+    }
+
+    .qr-cell.on {
+      background: linear-gradient(135deg, var(--cyan), var(--purple), var(--pink));
+      box-shadow: 0 0 8px rgba(69, 231, 255, 0.34);
+    }
+
+    /* =========================================================
+       RESPONSIVE
+       ========================================================= */
+
+    @media (max-width: 1380px) {
+      .mail-shell {
+        grid-template-columns: 220px minmax(0, 1fr);
+      }
+
+      .message-reader {
+        grid-column: 1 / -1;
+      }
+
+      .grid-4 {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .splash,
+      .device-hero,
+      .forum-shell {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 980px) {
+      .app-shell,
+      body.sidebar-collapsed .app-shell {
+        grid-template-columns: 1fr;
+      }
+
+      .side-nav {
+        position: relative;
+        height: auto;
+        top: 0;
+      }
+
+      .side-inner {
+        grid-template-rows: auto auto auto auto;
+      }
+
+      .page-nav {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        overflow: visible;
+      }
+
+      .page-nav-btn {
+        grid-template-columns: 36px 1fr;
+      }
+
+      .nav-badge {
+        display: none;
+      }
+
+      body.sidebar-collapsed .brand-copy,
+      body.sidebar-collapsed .user-id-card,
+      body.sidebar-collapsed .nav-text,
+      body.sidebar-collapsed .side-footer .btn-soft span {
+        display: block;
+      }
+
+      body.sidebar-collapsed .page-nav-btn {
+        grid-template-columns: 36px 1fr;
+        justify-items: stretch;
+        padding: 0 12px;
+      }
+
+      .topbar {
+        position: relative;
+        top: 0;
+        grid-template-columns: 1fr;
+      }
+
+      .top-actions {
+        justify-content: flex-start;
+      }
+
+      .splash-logo,
+      .auth-card {
+        min-height: 520px;
+      }
+
+      .mail-shell {
+        grid-template-columns: 1fr;
+      }
+
+      .grid-3,
+      .grid-4 {
+        grid-template-columns: 1fr;
+      }
+
+      .node {
+        position: relative;
+        left: auto !important;
+        right: auto !important;
+        top: auto !important;
+        bottom: auto !important;
+        margin: 14px;
+      }
+
+      .workflow {
+        min-height: auto;
+        padding: 10px 0;
+      }
+    }
+
+    @media (max-width: 620px) {
+      :root {
+        --gap: 16px;
+      }
+
+      .app-shell {
+        width: min(100% - 18px, var(--max));
+        padding-top: 9px;
+      }
+
+      .page-nav {
+        grid-template-columns: 1fr;
+      }
+
+      .splash-logo,
+      .auth-card {
+        min-height: auto;
+      }
+
+      h1 {
+        font-size: clamp(2.7rem, 16vw, 4.2rem);
+      }
+
+      .handle-box,
+      .address-input {
+        grid-template-columns: 1fr;
+      }
+
+      .handle-suffix,
+      .address-input span {
+        border-left: 0;
+        border-top: 1px solid rgba(255, 255, 255, 0.1);
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *,
+      *::before,
+      *::after {
+        animation: none !important;
+        scroll-behavior: auto !important;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="space-scene" aria-hidden="true">
+    <div class="space-depth" data-depth="0.022"></div>
+    <div class="scene-vignette"></div>
+  </div>
+
+  <div class="star-layer" data-depth="0.035" aria-hidden="true"></div>
+  <div class="star-layer-2" data-depth="0.05" aria-hidden="true"></div>
+  <div class="star-layer-3" data-depth="0.025" aria-hidden="true"></div>
+
+  <div class="app-shell">
+    <aside class="side-nav glass">
+      <div class="side-inner">
+        <div class="brand-row">
+          <a class="brand" href="#" data-page="splash">
+            <span class="brand-mark">✦</span>
+            <span class="brand-copy">
+              <strong>spacemountain.live</strong>
+              <small>one universe. endless connections.</small>
+            </span>
+          </a>
+
+          <button class="icon-btn" id="collapseSidebar" type="button" aria-label="Collapse sidebar">☰</button>
+        </div>
+
+        <div class="user-id-card" id="identityCard">
+          <strong>Guest Passenger</strong>
+          <span>not signed in</span>
+        </div>
+
+        <nav class="page-nav" aria-label="Page navigation">
+          <button class="page-nav-btn active" type="button" data-page="splash">
+            <span class="nav-icon">✦</span>
+            <span class="nav-text"><strong>Splash</strong><small>Logo + sign in</small></span>
+            <span class="nav-badge">Start</span>
+          </button>
+
+          <button class="page-nav-btn" type="button" data-page="dashboard">
+            <span class="nav-icon">⌂</span>
+            <span class="nav-text"><strong>Station Home</strong><small>Live overview</small></span>
+            <span class="nav-badge">Live</span>
+          </button>
+
+          <button class="page-nav-btn" type="button" data-page="apps">
+            <span class="nav-icon">✧</span>
+            <span class="nav-text"><strong>App Suite</strong><small>All systems</small></span>
+            <span class="nav-badge">5</span>
+          </button>
+
+          <button class="page-nav-btn" type="button" data-page="messages">
+            <span class="nav-icon">✉</span>
+            <span class="nav-text"><strong>spmt.live Mail</strong><small>Internal messaging</small></span>
+            <span class="nav-badge">8</span>
+          </button>
+
+          <button class="page-nav-btn" type="button" data-page="forums">
+            <span class="nav-icon">☷</span>
+            <span class="nav-text"><strong>Forums</strong><small>Threads + posts</small></span>
+            <span class="nav-badge">24</span>
+          </button>
+
+          <button class="page-nav-btn" type="button" data-page="rooms">
+            <span class="nav-icon">☊</span>
+            <span class="nav-text"><strong>Rooms</strong><small>HearMeOut</small></span>
+            <span class="nav-badge">4</span>
+          </button>
+
+          <button class="page-nav-btn" type="button" data-page="mountainview">
+            <span class="nav-icon">⌐</span>
+            <span class="nav-text"><strong>MountainView</strong><small>AI glasses</small></span>
+            <span class="nav-badge">New</span>
+          </button>
+
+          <button class="page-nav-btn" type="button" data-page="builder">
+            <span class="nav-icon">▦</span>
+            <span class="nav-text"><strong>Builder</strong><small>QR + workflows</small></span>
+            <span class="nav-badge">AI</span>
+          </button>
+
+          <button class="page-nav-btn" type="button" data-page="overlays">
+            <span class="nav-icon">▣</span>
+            <span class="nav-text"><strong>Overlays</strong><small>OBS sandbox</small></span>
+            <span class="nav-badge">OBS</span>
+          </button>
+
+          <button class="page-nav-btn" type="button" data-page="crew">
+            <span class="nav-icon">✦</span>
+            <span class="nav-text"><strong>Crew Desk</strong><small>Duty + support</small></span>
+            <span class="nav-badge">Today</span>
+          </button>
+        </nav>
+
+        <div class="side-footer">
+          <button class="btn-soft" type="button" data-page="messages">✉ <span>Open Inbox</span></button>
+          <button class="btn-soft" type="button" id="resetIdentity">↺ <span>Reset Demo Login</span></button>
+        </div>
+      </div>
+    </aside>
+
+    <main class="main-page">
+      <header class="topbar glass">
+        <div>
+          <strong id="pageTitle">Splash</strong>
+          <span id="pageSubtitle">Large logo, identity signup, and station entry point</span>
+        </div>
+
+        <div class="top-actions">
+          <button class="btn-soft" type="button" data-page="messages">spmt.live mail</button>
+          <button class="btn-soft" type="button" data-page="forums">forums</button>
+          <button class="btn" type="button" data-page="dashboard">enter station</button>
+        </div>
+      </header>
+
+      <section class="page active" id="page-splash">
+        <div class="splash">
+          <article class="splash-logo glass">
+            <div class="fallback-brand">
+              <span class="kicker">Official Station</span>
+              <h1><span class="gradient-text">spacemountain.live</span></h1>
+              <p>
+                One universe. Endless connections. A creator station for apps, bots, rooms, overlays,
+                internal messaging, forums, AI glasses, QR workflows, and generation tools.
+              </p>
+            </div>
+          </article>
+
+          <aside class="auth-card glass">
+            <span class="kicker">Captain Passport</span>
+            <h2>Create your <span class="gradient-text">@spmt.live</span> identity</h2>
+            <p>
+              This is not normal public email yet. This is the UI for your internal station identity,
+              messaging, app-to-app notifications, forums, chat, and private community mail.
+            </p>
+
+            <div class="auth-mode">
+              <button class="btn" type="button" id="signupMode">Sign up</button>
+              <button class="btn-soft" type="button" id="signinMode">Sign in</button>
+            </div>
+
+            <form id="identityForm">
+              <div class="field">
+                <label for="displayName">Display name</label>
+                <input class="input" id="displayName" placeholder="Commander" autocomplete="name" />
+              </div>
+
+              <div class="field">
+                <label for="handleInput">Station username</label>
+                <div class="handle-box">
+                  <input id="handleInput" placeholder="mtman1987" autocomplete="username" />
+                  <span class="handle-suffix">@spmt.live</span>
+                </div>
+              </div>
+
+              <div class="field">
+                <label for="recoveryInput">Recovery email / real email</label>
+                <input class="input" id="recoveryInput" type="email" placeholder="your-real-email@example.com" autocomplete="email" />
+              </div>
+
+              <button class="btn" type="submit" style="width:100%;">Create / enter station</button>
+            </form>
+
+            <p class="tiny-note">
+              Later this form can connect to your database. The `@spmt.live` address becomes an internal account,
+              inbox, forum identity, app identity, and notification address.
+            </p>
+          </aside>
+        </div>
+      </section>
+
+      <section class="page" id="page-dashboard">
+        <article class="hero-page glass">
+          <span class="kicker">Station Home</span>
+          <h1>Everything routes through <span class="gradient-text">spacemountain.live</span>.</h1>
+          <p>
+            This page becomes the live station dashboard: captains, rooms, messages, app alerts, QR scans,
+            AI media jobs, shoutouts, games, crew status, and MountainView device activity.
+          </p>
+
+          <div class="hero-actions">
+            <button class="btn" type="button" data-page="apps">Open App Suite</button>
+            <button class="btn-soft" type="button" data-page="messages">Open Mail</button>
+            <button class="btn-soft" type="button" data-page="forums">Open Forums</button>
+            <button class="btn-soft" type="button" data-page="mountainview">Pair MountainView</button>
+          </div>
+        </article>
+
+        <div class="grid grid-4">
+          <article class="card glass">
+            <span class="mini">Points Flow</span>
+            <div class="stat green" id="pointsToday">184,999</div>
+            <p>points awarded today across streams, games, chat, and events.</p>
+          </article>
+
+          <article class="card glass">
+            <span class="mini">Internal Mail</span>
+            <div class="stat cyan" id="mailCount">8</div>
+            <p>station messages, app alerts, and person-to-person notes.</p>
+          </article>
+
+          <article class="card glass">
+            <span class="mini">QR Scans</span>
+            <div class="stat gold" id="qrScans">1,284</div>
+            <p>MountainView scans and app links triggered today.</p>
+          </article>
+
+          <article class="card glass">
+            <span class="mini">AI Media Jobs</span>
+            <div class="stat pink" id="mediaJobs">72</div>
+            <p>image and video prompt jobs queued or drafted.</p>
+          </article>
+        </div>
+
+        <div class="grid grid-3">
+          <article class="card glass">
+            <span class="mini">Live Captains</span>
+            <div id="liveList"></div>
+          </article>
+
+          <article class="card glass">
+            <span class="mini">Open Rooms</span>
+            <div id="roomList"></div>
+          </article>
+
+          <article class="card glass">
+            <span class="mini">App Alerts</span>
+            <div id="alertList"></div>
+          </article>
+        </div>
+      </section>
+
+      <section class="page" id="page-apps">
+        <article class="hero-page glass">
+          <span class="kicker">App Suite</span>
+          <h1>Five station systems, one shell.</h1>
+          <p>
+            Chat Tag, Discord Stream Hub, StreamWeaver, HearMeOut, and MountainView should all feel like rooms
+            aboard the same station, not disconnected websites.
+          </p>
+        </article>
+
+        <div class="grid grid-4">
+          <article class="card glass">
+            <div class="app-badge">🏷</div>
+            <span class="mini">Game System</span>
+            <h3>Chat Tag</h3>
+            <p>Cross-stream tag, Chat Bingo, active “It” tracking, points, leaderboard, and chat announcements.</p>
+            <span class="tag live">IT: LunaVibes</span>
+          </article>
+
+          <article class="card glass">
+            <div class="app-badge">◇</div>
+            <span class="mini">Auth + Shoutout Bot</span>
+            <h3>Discord Stream Hub</h3>
+            <p>Live shoutouts, spotlight rotation, Discord bridge, community routing, and crew channels.</p>
+            <span class="tag">Bridge Online</span>
+          </article>
+
+          <article class="card glass">
+            <div class="app-badge">✦</div>
+            <span class="mini">Automation + Overlays</span>
+            <h3>StreamWeaver</h3>
+            <p>AI bots, TTS, overlays, commands, Pokémon systems, points, and OBS browser sources.</p>
+            <span class="tag live">8 overlays</span>
+          </article>
+
+          <article class="card glass">
+            <div class="app-badge">🎧</div>
+            <span class="mini">Music + Movies</span>
+            <h3>HearMeOut</h3>
+            <p>Voice rooms, music queues, watch parties, now playing, chat widgets, and room overlays.</p>
+            <span class="tag warn">4 rooms open</span>
+          </article>
+
+          <article class="card glass">
+            <div class="app-badge">⌐</div>
+            <span class="mini">AI Glasses</span>
+            <h3>MountainView</h3>
+            <p>QR scanning, builder commands, capture, app control, image generation, and video generation.</p>
+            <span class="tag pink">New system</span>
+          </article>
+
+          <article class="card glass">
+            <div class="app-badge">✉</div>
+            <span class="mini">Internal Identity</span>
+            <h3>spmt.live Mail</h3>
+            <p>Person-to-person, app-to-person, forum, bot, and station notification messages.</p>
+            <span class="tag live">Prototype</span>
+          </article>
+
+          <article class="card glass">
+            <div class="app-badge">☷</div>
+            <span class="mini">Community</span>
+            <h3>Forums</h3>
+            <p>Threads, guides, crew announcements, disputes, applications, and help channels.</p>
+            <span class="tag">24 threads</span>
+          </article>
+
+          <article class="card glass">
+            <div class="app-badge">▦</div>
+            <span class="mini">Builder</span>
+            <h3>Workflow Studio</h3>
+            <p>Connect QR scans, bots, overlays, rooms, messages, Discord, Twitch, and AI media actions.</p>
+            <span class="tag warn">Mock UI</span>
+          </article>
+        </div>
+      </section>
+
+      <section class="page" id="page-messages">
+        <article class="hero-page glass">
+          <span class="kicker">spmt.live Internal Mail</span>
+          <h1>Email-style UI, station-style messaging.</h1>
+          <p>
+            Users make a username and get a station address like <strong id="mailIdentityPreview">captain@spmt.live</strong>.
+            This can work like email visually, but be powered by your database as internal private messages,
+            app alerts, bot notes, forum notifications, and chat history.
+          </p>
+        </article>
+
+        <div class="mail-shell">
+          <aside class="mail-sidebar glass">
+            <span class="mini">Mailbox</span>
+            <button class="btn" type="button" id="composeBtn" style="width:100%;">Compose</button>
+
+            <div class="mail-folders">
+              <button class="folder-btn active" type="button" data-folder="inbox"><span>Inbox</span><strong>8</strong></button>
+              <button class="folder-btn" type="button" data-folder="sent"><span>Sent</span><strong>2</strong></button>
+              <button class="folder-btn" type="button" data-folder="app"><span>App Alerts</span><strong>5</strong></button>
+              <button class="folder-btn" type="button" data-folder="crew"><span>Crew</span><strong>3</strong></button>
+              <button class="folder-btn" type="button" data-folder="forums"><span>Forum Replies</span><strong>12</strong></button>
+              <button class="folder-btn" type="button" data-folder="bots"><span>Bot Notes</span><strong>4</strong></button>
+            </div>
+          </aside>
+
+          <section class="message-list glass">
+            <span class="mini" id="mailFolderTitle">Inbox</span>
+            <div class="mail-list" id="mailList"></div>
+          </section>
+
+          <article class="message-reader glass" id="messageReader"></article>
+        </div>
+      </section>
+
+      <section class="page" id="page-forums">
+        <article class="hero-page glass">
+          <span class="kicker">Station Forums</span>
+          <h1>Forums tied to identities, apps, and messages.</h1>
+          <p>
+            A forum thread can notify users through their <strong>@spmt.live</strong> inbox, route to Discord,
+            trigger bot help, or become a crew/application workflow later.
+          </p>
+        </article>
+
+        <div class="forum-shell">
+          <aside class="card glass">
+            <span class="mini">Forum Categories</span>
+
+            <div class="forum-category">
+              <h3>Bridge Reports</h3>
+              <p>Announcements, updates, rules, station status.</p>
+              <span class="tag live">Crew</span>
+            </div>
+
+            <div class="forum-category">
+              <h3>Captain Help</h3>
+              <p>Bot help, overlays, stream setup, onboarding.</p>
+              <span class="tag">Support</span>
+            </div>
+
+            <div class="forum-category">
+              <h3>MountainView Lab</h3>
+              <p>QR flows, glasses tests, AI capture ideas.</p>
+              <span class="tag pink">New</span>
+            </div>
+
+            <div class="forum-category">
+              <h3>Trade Alliance</h3>
+              <p>Partner Discords, collaborations, events.</p>
+              <span class="tag warn">Partners</span>
+            </div>
+          </aside>
+
+          <section class="card glass">
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap;">
+              <div>
+                <span class="mini">Threads</span>
+                <h3>Comms Lounge</h3>
+              </div>
+              <button class="btn" type="button" id="newThreadBtn">New Thread</button>
+            </div>
+
+            <div id="threadList" style="margin-top:16px;"></div>
+
+            <form class="compose-grid" id="threadForm" style="display:none;">
+              <div class="field">
+                <label for="threadTitle">Thread title</label>
+                <input class="input" id="threadTitle" placeholder="How do I connect my overlay?" />
+              </div>
+
+              <div class="field">
+                <label for="threadCategory">Category</label>
+                <select id="threadCategory">
+                  <option>Captain Help</option>
+                  <option>Bridge Reports</option>
+                  <option>MountainView Lab</option>
+                  <option>Trade Alliance</option>
+                  <option>StreamWeaver</option>
+                  <option>HearMeOut</option>
+                </select>
+              </div>
+
+              <div class="field">
+                <label for="threadBody">Post</label>
+                <textarea id="threadBody" placeholder="Write the first post..."></textarea>
+              </div>
+
+              <button class="btn" type="submit">Post Thread</button>
+            </form>
+          </section>
+        </div>
+      </section>
+
+      <section class="page" id="page-rooms">
+        <article class="hero-page glass">
+          <span class="kicker">HearMeOut Rooms</span>
+          <h1>Open rooms become station destinations.</h1>
+          <p>Music, movies, voice chat, onboarding, setup help, and community hangouts live here.</p>
+        </article>
+
+        <div class="grid grid-3" id="roomsGrid"></div>
+      </section>
+
+      <section class="page" id="page-mountainview">
+        <article class="hero-page glass">
+          <span class="kicker">MountainView AI Glasses</span>
+          <h1>The real-world portal into the station.</h1>
+          <p>
+            MountainView connects QR codes, app control, builder actions, image/video generation,
+            stream overlays, and internal messages.
+          </p>
+        </article>
+
+        <div class="device-hero">
+          <article class="card glass">
+            <span class="mini">Device Preview</span>
+
+            <div class="glasses-visual">
+              <div class="glasses">
+                <div class="temple left"></div>
+                <div class="temple right"></div>
+                <div class="lens left"></div>
+                <div class="lens right"></div>
+                <div class="bridge"></div>
+                <div class="hud-dot one"></div>
+                <div class="hud-dot two"></div>
+              </div>
+            </div>
+
+            <div class="row">
+              <div class="avatar speaking"></div>
+              <div class="row-main">
+                <strong>MountainView-01 paired</strong>
+                <span>Battery 88% · QR scanner ready · Builder voice commands active</span>
+              </div>
+              <span class="tag live">Online</span>
+            </div>
+          </article>
+
+          <aside class="card glass">
+            <span class="mini">Device Actions</span>
+
+            <div class="row">
+              <div class="row-main"><strong>Scan QR</strong><span>Open room, overlay, merch, forum, or workflow</span></div>
+              <span class="tag live">Ready</span>
+            </div>
+
+            <div class="row">
+              <div class="row-main"><strong>Capture</strong><span>Take image/video input for AI generation</span></div>
+              <span class="tag">Mock</span>
+            </div>
+
+            <div class="row">
+              <div class="row-main"><strong>Builder Command</strong><span>Voice prompt turns into app workflow</span></div>
+              <span class="tag pink">AI</span>
+            </div>
+
+            <div class="row">
+              <div class="row-main"><strong>Message User</strong><span>Send private note to @spmt.live identity</span></div>
+              <span class="tag">Mail</span>
+            </div>
+          </aside>
+        </div>
+      </section>
+
+      <section class="page" id="page-builder">
+        <article class="hero-page glass">
+          <span class="kicker">Workflow Builder</span>
+          <h1>Connect QR, AI, bots, rooms, messages, and overlays.</h1>
+          <p>
+            This builder UI is where MountainView scans and voice prompts can become actions across all apps.
+          </p>
+        </article>
+
+        <div class="grid grid-2">
+          <article class="card glass">
+            <span class="mini">Visual Workflow</span>
+            <div class="workflow" id="workflowCanvas">
+              <div class="node one"><strong>MountainView Scan</strong><span>QR / voice / camera capture</span></div>
+              <div class="node two"><strong>Station Gateway</strong><span>Normalize event + route app</span></div>
+              <div class="node three"><strong>StreamWeaver</strong><span>Trigger overlay or bot action</span></div>
+              <div class="node four"><strong>spmt.live Mail</strong><span>Notify user or forum thread</span></div>
+            </div>
+
+            <div class="hero-actions">
+              <button class="btn" id="addNodeBtn" type="button">Add Node</button>
+              <button class="btn-soft" type="button">Save Flow</button>
+              <button class="btn-soft" type="button">Export JSON</button>
+            </div>
+          </article>
+
+          <article class="card glass">
+            <span class="mini">QR Studio</span>
+            <h3>Create QR codes for station actions</h3>
+            <p>Examples: join room, pair glasses, open overlay, send message, start Chat Tag, claim merch.</p>
+
+            <div class="field">
+              <label for="qrAction">QR Action</label>
+              <select id="qrAction">
+                <option>Join HearMeOut Room</option>
+                <option>Pair MountainView Glasses</option>
+                <option>Open Overlay Sandbox</option>
+                <option>Send spmt.live Message</option>
+                <option>Create Forum Thread</option>
+                <option>Generate AI Image Prompt</option>
+              </select>
+            </div>
+
+            <div style="display:grid;place-items:center;margin:18px 0;">
+              <div class="qr-grid" id="qrGrid"></div>
+            </div>
+
+            <button class="btn" id="generateQrBtn" type="button">Generate QR Preview</button>
+          </article>
+        </div>
+      </section>
+
+      <section class="page" id="page-overlays">
+        <article class="hero-page glass">
+          <span class="kicker">Overlay Sandbox</span>
+          <h1>Preview OBS overlays before connecting real app data.</h1>
+          <p>Chat Tag, HearMeOut, StreamWeaver, MountainView, AI avatars, shoutouts, and card effects can all preview here.</p>
+        </article>
+
+        <div class="grid grid-3">
+          <article class="card glass"><div class="app-badge">▣</div><h3>Chat Tag Overlay</h3><p>Captain Nova tagged LunaVibes. Luna is now IT.</p></article>
+          <article class="card glass"><div class="app-badge">🎧</div><h3>HearMeOut Overlay</h3><p>Room users, voice activity, now playing, and DJ status.</p></article>
+          <article class="card glass"><div class="app-badge">⌐</div><h3>MountainView HUD</h3><p>QR scan, prompt capture, device battery, and workflow status.</p></article>
+        </div>
+      </section>
+
+      <section class="page" id="page-crew">
+        <article class="hero-page glass">
+          <span class="kicker">Crew Desk</span>
+          <h1>Duty captain, disputes, applications, and support routing.</h1>
+          <p>Every request can become a message, forum thread, crew task, or app workflow.</p>
+        </article>
+
+        <div class="grid grid-3" id="crewGrid"></div>
+      </section>
+    </main>
+  </div>
+
+  <script>
+    const body = document.body;
+    const pageTitle = document.getElementById("pageTitle");
+    const pageSubtitle = document.getElementById("pageSubtitle");
+
+    const pageMeta = {
+      splash: ["Splash", "Large logo, identity signup, and station entry point"],
+      dashboard: ["Station Home", "Live dashboard for apps, messages, rooms, and alerts"],
+      apps: ["App Suite", "All station systems shown as product doors"],
+      messages: ["spmt.live Mail", "Internal person-to-person, app-to-person, and forum messaging"],
+      forums: ["Forums", "Threads, categories, posts, and station discussions"],
+      rooms: ["HearMeOut Rooms", "Music, voice, watch parties, and setup rooms"],
+      mountainview: ["MountainView", "AI glasses, QR scanning, capture, and app control"],
+      builder: ["Builder", "QR studio, workflows, app routing, and automation"],
+      overlays: ["Overlay Sandbox", "OBS preview bay for app visuals"],
+      crew: ["Crew Desk", "Duty captain, support, applications, and disputes"]
+    };
+
+    const state = {
+      identity: JSON.parse(localStorage.getItem("spmtIdentity") || "null"),
+      activeFolder: "inbox",
+      activeMailId: "m1",
+      mails: [
+        {
+          id: "m1",
+          folder: "inbox",
+          from: "athena@spmt.live",
+          to: "commander@spmt.live",
+          subject: "Welcome to your station inbox",
+          preview: "This is where internal station messages, app alerts, and forum replies will live.",
+          body: "Commander, your spmt.live inbox is ready. This UI is email-style, but the backend can be database-powered internal messaging instead of real email.",
+          time: "Now",
+          tag: "Station"
+        },
+        {
+          id: "m2",
+          folder: "inbox",
+          from: "mountainview@spmt.live",
+          to: "commander@spmt.live",
+          subject: "MountainView paired",
+          preview: "QR scanner ready, builder voice commands active.",
+          body: "MountainView-01 is paired. QR scanning, app linking, and workflow commands are ready for mock testing.",
+          time: "2 min",
+          tag: "Glasses"
+        },
+        {
+          id: "m3",
+          folder: "app",
+          from: "streamweaver@spmt.live",
+          to: "commander@spmt.live",
+          subject: "Overlay test completed",
+          preview: "Chat Tag overlay rendered successfully in the sandbox.",
+          body: "StreamWeaver completed a mock overlay render. Next step is wiring real app data to this UI through your backend.",
+          time: "7 min",
+          tag: "Overlay"
+        },
+        {
+          id: "m4",
+          folder: "forums",
+          from: "forums@spmt.live",
+          to: "commander@spmt.live",
+          subject: "New reply in Captain Help",
+          preview: "Someone replied to: How do I connect my overlay?",
+          body: "A new reply was posted in Captain Help. This notification can link directly back into the forum thread.",
+          time: "12 min",
+          tag: "Forum"
+        },
+        {
+          id: "m5",
+          folder: "crew",
+          from: "echopulse@spmt.live",
+          to: "commander@spmt.live",
+          subject: "Duty captain check-in",
+          preview: "Dispute desk is covered today.",
+          body: "Commander, EchoPulse has the duty desk today. Disputes and crew routing can go through the Crew Desk.",
+          time: "20 min",
+          tag: "Crew"
+        },
+        {
+          id: "m6",
+          folder: "bots",
+          from: "scarlett@spmt.live",
+          to: "commander@spmt.live",
+          subject: "Athena said this was important",
+          preview: "Fine. The messaging system is actually useful.",
+          body: "Fine. I admit the internal mail idea works. Apps can message users, users can message each other, and bots can leave notes without needing a public email mailbox.",
+          time: "25 min",
+          tag: "Bot"
+        }
+      ],
+      threads: [
+        ["How do I connect my overlay?", "Captain Help · 24 replies · Athena answered"],
+        ["MountainView QR ideas", "MountainView Lab · 8 replies · Commander pinned"],
+        ["Tonight’s watch party vote", "Comms Lounge · 12 replies"],
+        ["Ship Regulations update", "Bridge Reports · crew-only draft"],
+        ["Trade Alliance partner request template", "Trade Alliance · 5 replies"]
+      ]
+    };
+
+    const liveCaptains = [
+      ["Captain NovaStar", "Crafters Nebula · building overlays", "Board", true],
+      ["LunaVibes", "Planet Twitch · cozy music room", "Board", false],
+      ["EchoPulse", "Bridge Deck · duty captain", "Crew", true],
+      ["StellarJay", "Tournament Ring · card setup", "Board", false]
+    ];
+
+    const rooms = [
+      ["Galactic Hangout", "8 / 12 captains · public voice room", "Join"],
+      ["Streamer Setup Bay", "3 / 8 captains · overlay help active", "Join"],
+      ["Watch Party Bay", "Movie night route pending", "Soon"],
+      ["Deep Space Radio", "Music room · Midnight Nebula Drive", "Listen"]
+    ];
+
+    const alerts = [
+      ["Chat Tag", "LunaVibes is currently IT", "Active"],
+      ["Discord Stream Hub", "Captain NovaStar shoutout sent", "Bridge"],
+      ["MountainView", "QR scan opened HearMeOut room", "New"],
+      ["StreamWeaver", "Bot avatar overlay ready", "OBS"]
+    ];
+
+    const crew = [
+      ["EchoPulse", "Duty Captain · disputes and welcome desk", "Today", true],
+      ["StellarJay", "Event Crew · tournaments and watch parties", "Events", false],
+      ["NovaStar", "Overlay Support · OBS and bot avatars", "Support", false],
+      ["Athena", "AI Assistant · routing and onboarding", "Bot", true],
+      ["Scarlett", "AI Assistant · secretly helpful", "Bot", false],
+      ["Orbitron", "Trade Alliance Officer · partner Discords", "Alliance", false]
+    ];
+
+    function escapeHTML(value) {
+      return String(value)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+    }
+
+    function normalizeHandle(value) {
+      return String(value || "")
+        .trim()
+        .toLowerCase()
+        .replace(/@spmt\.live$/i, "")
+        .replace(/[^a-z0-9._-]/g, "")
+        .slice(0, 32);
+    }
+
+    function currentAddress() {
+      return state.identity?.address || "captain@spmt.live";
+    }
+
+    function rowTemplate(item) {
+      const [name, meta, tag, speaking] = item;
+
+      return `
+        <div class="row">
+          <div class="avatar ${speaking ? "speaking" : ""}"></div>
+          <div class="row-main">
+            <strong>${escapeHTML(name)}</strong>
+            <span>${escapeHTML(meta)}</span>
+          </div>
+          <span class="tag ${tag === "Board" || tag === "Join" || tag === "Today" ? "live" : tag === "Soon" ? "warn" : ""}">
+            ${escapeHTML(tag)}
+          </span>
+        </div>
+      `;
+    }
+
+    function cardTemplate(item) {
+      const [name, meta, tag, speaking] = item;
+
+      return `
+        <article class="card glass">
+          <span class="mini">${escapeHTML(tag)}</span>
+          <h3>${escapeHTML(name)}</h3>
+          <p>${escapeHTML(meta)}</p>
+          ${rowTemplate([name, meta, tag, speaking])}
+        </article>
+      `;
+    }
+
+    function showPage(pageName) {
+      const page = document.getElementById(`page-${pageName}`);
+
+      if (!page) return;
+
+      document.querySelectorAll(".page").forEach((item) => {
+        item.classList.remove("active");
+      });
+
+      document.querySelectorAll("[data-page]").forEach((item) => {
+        item.classList.toggle("active", item.dataset.page === pageName);
+      });
+
+      page.classList.add("active");
+      pageTitle.textContent = pageMeta[pageName][0];
+      pageSubtitle.textContent = pageMeta[pageName][1];
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+
+    function updateIdentityUI() {
+      const identityCard = document.getElementById("identityCard");
+      const mailPreview = document.getElementById("mailIdentityPreview");
+
+      if (!state.identity) {
+        identityCard.innerHTML = `
+          <strong>Guest Passenger</strong>
+          <span>not signed in</span>
+        `;
+        mailPreview.textContent = "captain@spmt.live";
+        return;
+      }
+
+      identityCard.innerHTML = `
+        <strong>${escapeHTML(state.identity.displayName)}</strong>
+        <span>${escapeHTML(state.identity.address)}</span>
+      `;
+
+      mailPreview.textContent = state.identity.address;
+    }
+
+    function renderLists() {
+      document.getElementById("liveList").innerHTML = liveCaptains.map(rowTemplate).join("");
+      document.getElementById("roomList").innerHTML = rooms.map(rowTemplate).join("");
+      document.getElementById("alertList").innerHTML = alerts.map(rowTemplate).join("");
+      document.getElementById("roomsGrid").innerHTML = rooms.map(cardTemplate).join("");
+      document.getElementById("crewGrid").innerHTML = crew.map(cardTemplate).join("");
+    }
+
+    function renderMail() {
+      const mailList = document.getElementById("mailList");
+      const reader = document.getElementById("messageReader");
+      const folderTitle = document.getElementById("mailFolderTitle");
+
+      const folderLabels = {
+        inbox: "Inbox",
+        sent: "Sent",
+        app: "App Alerts",
+        crew: "Crew",
+        forums: "Forum Replies",
+        bots: "Bot Notes"
+      };
+
+      folderTitle.textContent = folderLabels[state.activeFolder] || "Inbox";
+
+      const visibleMails = state.mails.filter((mail) => {
+        if (state.activeFolder === "inbox") return mail.folder === "inbox";
+        return mail.folder === state.activeFolder;
+      });
+
+      if (!visibleMails.some((mail) => mail.id === state.activeMailId) && visibleMails[0]) {
+        state.activeMailId = visibleMails[0].id;
+      }
+
+      mailList.innerHTML = visibleMails.map((mail) => `
+        <button class="mail-item ${mail.id === state.activeMailId ? "active" : ""}" type="button" data-mail-id="${escapeHTML(mail.id)}">
+          <strong>${escapeHTML(mail.subject)}</strong>
+          <span>${escapeHTML(mail.from)} · ${escapeHTML(mail.time)}</span>
+          <span>${escapeHTML(mail.preview)}</span>
+        </button>
+      `).join("");
+
+      const activeMail = state.mails.find((mail) => mail.id === state.activeMailId) || visibleMails[0];
+
+      if (!activeMail) {
+        reader.innerHTML = `
+          <span class="mini">No Messages</span>
+          <h3>This folder is empty</h3>
+          <p>New internal messages will appear here.</p>
+        `;
+        return;
+      }
+
+      reader.innerHTML = `
+        <div class="reader-head">
+          <div>
+            <span class="mini">${escapeHTML(activeMail.tag)}</span>
+            <h3>${escapeHTML(activeMail.subject)}</h3>
+            <div class="reader-meta">
+              From: ${escapeHTML(activeMail.from)}<br />
+              To: ${escapeHTML(activeMail.to)}<br />
+              Time: ${escapeHTML(activeMail.time)}
+            </div>
+          </div>
+          <span class="tag">${escapeHTML(activeMail.folder)}</span>
+        </div>
+
+        <p>${escapeHTML(activeMail.body)}</p>
+
+        <form class="compose-grid" id="replyForm">
+          <div class="field">
+            <label>Reply as</label>
+            <input class="input" value="${escapeHTML(currentAddress())}" readonly />
+          </div>
+
+          <div class="field">
+            <label for="replyBody">Reply</label>
+            <textarea id="replyBody" placeholder="Write an internal reply..."></textarea>
+          </div>
+
+          <button class="btn" type="submit">Send Reply</button>
+        </form>
+      `;
+
+      const replyForm = document.getElementById("replyForm");
+
+      replyForm.addEventListener("submit", (event) => {
+        event.preventDefault();
+
+        const replyBody = document.getElementById("replyBody").value.trim();
+
+        if (!replyBody) return;
+
+        const sent = {
+          id: `m${Date.now()}`,
+          folder: "sent",
+          from: currentAddress(),
+          to: activeMail.from,
+          subject: `Re: ${activeMail.subject}`,
+          preview: replyBody.slice(0, 90),
+          body: replyBody,
+          time: "Now",
+          tag: "Sent"
+        };
+
+        state.mails.unshift(sent);
+        state.activeFolder = "sent";
+        state.activeMailId = sent.id;
+        renderMail();
+      });
+    }
+
+    function renderThreads() {
+      const list = document.getElementById("threadList");
+
+      list.innerHTML = state.threads.map((thread) => `
+        <article class="thread-item">
+          <div>
+            <strong>${escapeHTML(thread[0])}</strong>
+            <span>${escapeHTML(thread[1])}</span>
+          </div>
+          <span class="tag">Open</span>
+        </article>
+      `).join("");
+    }
+
+    function renderQR(seedText = "Join HearMeOut Room") {
+      const grid = document.getElementById("qrGrid");
+      grid.innerHTML = "";
+
+      let seed = 0;
+
+      for (const char of seedText) {
+        seed += char.charCodeAt(0);
+      }
+
+      for (let i = 0; i < 169; i++) {
+        const cell = document.createElement("span");
+        cell.className = "qr-cell";
+
+        const corner =
+          (i < 3 * 13 && i % 13 < 3) ||
+          (i < 3 * 13 && i % 13 > 9) ||
+          (i > 9 * 13 && i % 13 < 3);
+
+        const pseudoRandom = ((i * 37 + seed * 11) % 9) < 4;
+
+        if (corner || pseudoRandom) {
+          cell.classList.add("on");
+        }
+
+        grid.appendChild(cell);
+      }
+    }
+
+    document.addEventListener("click", (event) => {
+      const pageButton = event.target.closest("[data-page]");
+      const mailButton = event.target.closest("[data-mail-id]");
+      const folderButton = event.target.closest("[data-folder]");
+
+      if (pageButton) {
+        event.preventDefault();
+        showPage(pageButton.dataset.page);
+      }
+
+      if (mailButton) {
+        state.activeMailId = mailButton.dataset.mailId;
+        renderMail();
+      }
+
+      if (folderButton) {
+        state.activeFolder = folderButton.dataset.folder;
+
+        document.querySelectorAll("[data-folder]").forEach((item) => {
+          item.classList.toggle("active", item.dataset.folder === state.activeFolder);
+        });
+
+        renderMail();
+      }
+    });
+
+    document.getElementById("collapseSidebar").addEventListener("click", () => {
+      body.classList.toggle("sidebar-collapsed");
+    });
+
+    document.getElementById("identityForm").addEventListener("submit", (event) => {
+      event.preventDefault();
+
+      const displayName = document.getElementById("displayName").value.trim() || "Captain";
+      const handle = normalizeHandle(document.getElementById("handleInput").value);
+      const recovery = document.getElementById("recoveryInput").value.trim();
+
+      if (!handle) {
+        alert("Choose a station username first.");
+        return;
+      }
+
+      state.identity = {
+        displayName,
+        handle,
+        address: `${handle}@spmt.live`,
+        recovery
+      };
+
+      localStorage.setItem("spmtIdentity", JSON.stringify(state.identity));
+      updateIdentityUI();
+      showPage("dashboard");
+    });
+
+    document.getElementById("resetIdentity").addEventListener("click", () => {
+      localStorage.removeItem("spmtIdentity");
+      state.identity = null;
+      updateIdentityUI();
+      showPage("splash");
+    });
+
+    document.getElementById("composeBtn").addEventListener("click", () => {
+      const reader = document.getElementById("messageReader");
+
+      reader.innerHTML = `
+        <div class="reader-head">
+          <div>
+            <span class="mini">Compose</span>
+            <h3>New internal message</h3>
+            <div class="reader-meta">From: ${escapeHTML(currentAddress())}</div>
+          </div>
+          <span class="tag live">New</span>
+        </div>
+
+        <form class="compose-grid" id="composeForm">
+          <div class="field">
+            <label for="composeTo">To</label>
+            <div class="address-input">
+              <input id="composeTo" placeholder="athena" />
+              <span>@spmt.live</span>
+            </div>
+          </div>
+
+          <div class="field">
+            <label for="composeSubject">Subject</label>
+            <input class="input" id="composeSubject" placeholder="Station message" />
+          </div>
+
+          <div class="field">
+            <label for="composeBody">Message</label>
+            <textarea id="composeBody" placeholder="Write a person-to-person, app-to-person, or station message..."></textarea>
+          </div>
+
+          <button class="btn" type="submit">Send Message</button>
+        </form>
+      `;
+
+      document.getElementById("composeForm").addEventListener("submit", (event) => {
+        event.preventDefault();
+
+        const toHandle = normalizeHandle(document.getElementById("composeTo").value);
+        const subject = document.getElementById("composeSubject").value.trim() || "Station message";
+        const body = document.getElementById("composeBody").value.trim();
+
+        if (!toHandle || !body) return;
+
+        const sent = {
+          id: `m${Date.now()}`,
+          folder: "sent",
+          from: currentAddress(),
+          to: `${toHandle}@spmt.live`,
+          subject,
+          preview: body.slice(0, 90),
+          body,
+          time: "Now",
+          tag: "Sent"
+        };
+
+        state.mails.unshift(sent);
+        state.activeFolder = "sent";
+        state.activeMailId = sent.id;
+        renderMail();
+      });
+    });
+
+    document.getElementById("newThreadBtn").addEventListener("click", () => {
+      const form = document.getElementById("threadForm");
+      form.style.display = form.style.display === "none" ? "grid" : "none";
+    });
+
+    document.getElementById("threadForm").addEventListener("submit", (event) => {
+      event.preventDefault();
+
+      const title = document.getElementById("threadTitle").value.trim();
+      const category = document.getElementById("threadCategory").value;
+      const body = document.getElementById("threadBody").value.trim();
+
+      if (!title || !body) return;
+
+      state.threads.unshift([title, `${category} · 1 post · ${currentAddress()}`]);
+      document.getElementById("threadTitle").value = "";
+      document.getElementById("threadBody").value = "";
+      document.getElementById("threadForm").style.display = "none";
+      renderThreads();
+
+      state.mails.unshift({
+        id: `m${Date.now()}`,
+        folder: "forums",
+        from: "forums@spmt.live",
+        to: currentAddress(),
+        subject: `Thread created: ${title}`,
+        preview: `Your thread was posted in ${category}`,
+        body: `Your forum thread "${title}" was posted in ${category}. Later this can notify subscribers, Discord, or app-specific channels.`,
+        time: "Now",
+        tag: "Forum"
+      });
+    });
+
+    document.getElementById("generateQrBtn").addEventListener("click", () => {
+      renderQR(document.getElementById("qrAction").value);
+    });
+
+    let nodeCount = 0;
+
+    document.getElementById("addNodeBtn").addEventListener("click", () => {
+      const canvas = document.getElementById("workflowCanvas");
+      const node = document.createElement("div");
+
+      nodeCount += 1;
+      node.className = "node";
+      node.style.left = `${70 + (nodeCount * 46) % 520}px`;
+      node.style.top = `${250 + (nodeCount * 32) % 90}px`;
+      node.innerHTML = `
+        <strong>New Action ${nodeCount}</strong>
+        <span>Custom app route / database hook</span>
+      `;
+
+      canvas.appendChild(node);
+    });
+
+    function simulateStats() {
+      const points = document.getElementById("pointsToday");
+      const mail = document.getElementById("mailCount");
+      const qrScans = document.getElementById("qrScans");
+      const mediaJobs = document.getElementById("mediaJobs");
+
+      if (!points || !mail || !qrScans || !mediaJobs) return;
+
+      points.textContent = (Number(points.textContent.replaceAll(",", "")) + Math.floor(Math.random() * 8)).toLocaleString();
+      qrScans.textContent = (Number(qrScans.textContent.replaceAll(",", "")) + (Math.random() > 0.62 ? 1 : 0)).toLocaleString();
+      mediaJobs.textContent = (Number(mediaJobs.textContent.replaceAll(",", "")) + (Math.random() > 0.9 ? 1 : 0)).toLocaleString();
+    }
+
+    const parallaxNodes = document.querySelectorAll("[data-depth]");
+    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    let easedScroll = 0;
+    let mousePX = 0;
+    let mousePY = 0;
+    let easedMousePX = 0;
+    let easedMousePY = 0;
+
+    window.addEventListener("mousemove", (event) => {
+      mousePX = (event.clientX / window.innerWidth - 0.5) * 2;
+      mousePY = (event.clientY / window.innerHeight - 0.5) * 2;
+    });
+
+    function updateParallax() {
+      const y = window.scrollY || 0;
+      easedScroll += (y - easedScroll) * 0.032;
+      easedMousePX += (mousePX - easedMousePX) * 0.05;
+      easedMousePY += (mousePY - easedMousePY) * 0.05;
+
+      if (!reduceMotion) {
+        parallaxNodes.forEach((node) => {
+          const depth = Number(node.dataset.depth || 0.02);
+          const mx = easedMousePX * depth * 30;
+          const my = easedMousePY * depth * 24;
+          node.style.transform = `translate3d(${mx}px, ${easedScroll * depth + my}px, 0)`;
+        });
+      }
+
+      requestAnimationFrame(updateParallax);
+    }
+
+    updateIdentityUI();
+    renderLists();
+    renderMail();
+    renderThreads();
+    renderQR();
+    setInterval(simulateStats, 4200);
+    requestAnimationFrame(updateParallax);
+  </script>
+</body>
+</html>

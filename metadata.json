@@ -1,0 +1,6 @@
+{
+  "name": "Dashboard Hub",
+  "description": "A high-end, cyber-noir/glassmorphism streaming community dashboard powered by SQLite and Drizzle ORM.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

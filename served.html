@@ -1,0 +1,445 @@
+﻿<!DOCTYPE html>
+<html lang="en" data-theme="solar" data-density="comfortable">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SpaceMountain.live — Portal</title>
+  <meta name="description" content="SpaceMountain.live — one account, one universe. The central portal for your theme presets, app linkages, and community tools." />
+  <!-- Google Fonts Outfit -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/index.css" />
+</head>
+<body>
+
+  <!-- Twinkling Starfield and Parallax Space Background -->
+  <div class="space-scene" aria-hidden="true">
+    <div class="space-depth" data-depth="0.022"></div>
+    <div class="space-glow" data-depth="0.012"></div>
+    
+    <!-- Dense Twinkling Starfield -->
+    <svg class="star-layer" data-depth="0.038" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice">
+      <g class="star-group dust">
+        <circle cx="50" cy="80" r="0.5" /><circle cx="120" cy="240" r="0.7" /><circle cx="230" cy="110" r="0.6" />
+        <circle cx="340" cy="450" r="0.5" /><circle cx="480" cy="200" r="0.8" /><circle cx="560" cy="780" r="0.6" />
+        <circle cx="680" cy="310" r="0.5" /><circle cx="790" cy="150" r="0.7" /><circle cx="890" cy="540" r="0.6" />
+        <circle cx="1020" cy="220" r="0.8" /><circle cx="1150" cy="710" r="0.5" /><circle cx="1250" cy="380" r="0.7" />
+        <circle cx="1380" cy="820" r="0.6" /><circle cx="1490" cy="190" r="0.8" /><circle cx="1550" cy="510" r="0.5" />
+        <circle cx="80" cy="620" r="0.7" /><circle cx="190" cy="730" r="0.5" /><circle cx="280" cy="850" r="0.8" />
+        <circle cx="920" cy="880" r="0.6" /><circle cx="1410" cy="690" r="0.7" /><circle cx="1120" cy="40" r="0.5" />
+      </g>
+      <g class="star-group pin">
+        <circle cx="140" cy="120" r="1.1" /><circle cx="290" cy="310" r="1.3" /><circle cx="450" cy="90" r="1.2" />
+        <circle cx="620" cy="520" r="1.4" /><circle cx="730" cy="280" r="1.1" /><circle cx="910" cy="180" r="1.3" />
+        <circle cx="1080" cy="600" r="1.2" /><circle cx="1210" cy="210" r="1.4" /><circle cx="1340" cy="480" r="1.1" />
+        <circle cx="1480" cy="780" r="1.3" /><circle cx="1520" cy="150" r="1.2" /><circle cx="850" cy="810" r="1.4" />
+        <circle cx="380" cy="690" r="1.1" /><circle cx="500" cy="830" r="1.2" /><circle cx="1290" cy="890" r="1.3" />
+      </g>
+      <g class="star-group mid">
+        <circle cx="210" cy="380" r="1.8" /><circle cx="390" cy="180" r="1.6" /><circle cx="570" cy="420" r="1.9" />
+        <circle cx="760" cy="90" r="1.7" /><circle cx="980" cy="340" r="1.8" /><circle cx="1160" cy="510" r="1.6" />
+        <circle cx="1310" cy="280" r="1.9" /><circle cx="1450" cy="620" r="1.7" /><circle cx="650" cy="790" r="1.8" />
+        <circle cx="1000" cy="810" r="1.6" />
+      </g>
+      <g class="star-group hot">
+        <circle cx="310" cy="240" r="2.8" /><circle cx="690" cy="220" r="2.5" /><circle cx="1050" cy="140" r="3.0" />
+        <circle cx="1390" cy="390" r="2.7" /><circle cx="820" cy="650" r="2.9" /><circle cx="1220" cy="730" r="2.8" />
+      </g>
+    </svg>
+    <div class="scene-vignette"></div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════
+       ROCKET LAUNCHER — The single navigation control
+       ═══════════════════════════════════════════════ -->
+  <button class="rocket-launcher docked" id="rocketLauncher" type="button" aria-label="Navigation Control — Click to expand dock, double-click to launch">
+    <span>🚀</span>
+  </button>
+
+  <!-- ═══════════════════════════════════════════════
+       UNIFIED FLOATING DOCK PANEL
+       This is the ONLY sidebar. When docked it appears
+       anchored to top-left. When flying it floats freely.
+       ═══════════════════════════════════════════════ -->
+  <aside class="dock-panel" id="dockPanel" aria-label="Navigation Station">
+
+    <!-- Panel Top: Docking Station Header -->
+    <div class="dock-station-head" id="dockHandle">
+      <div class="dock-station-emblem">
+        <div class="station-ring"></div>
+        <div class="station-inner">
+          <span class="station-label" id="dockStatusLabel">DOCKED</span>
+        </div>
+      </div>
+      <div class="dock-station-info">
+        <strong>SpaceMountain</strong>
+        <span id="dockSubLabel">Navigation Station</span>
+      </div>
+      <button class="dock-close-btn" id="dockClose" type="button" aria-label="Close dock panel">×</button>
+    </div>
+
+    <!-- Profile Row -->
+    <div class="dock-profile-row" id="dockProfileRow">
+      <div class="dock-avatar">
+        <div class="dock-avatar-online"></div>
+      </div>
+      <div class="dock-profile-meta">
+        <strong id="dockUsername">Commander</strong>
+        <span class="dock-online-label">● Online</span>
+      </div>
+      <button class="dock-profile-toggle" id="dockProfileToggle" type="button" aria-label="Toggle profile section">▾</button>
+    </div>
+
+    <!-- Profile Extended (slide down) -->
+    <div class="dock-profile-extended" id="dockProfileExtended">
+      <div class="dock-profile-detail">
+        <span class="dock-detail-label">Station Address</span>
+        <span id="dockUserAddress">commander@spmt.live</span>
+      </div>
+      <div class="dock-quick-grid">
+        <button class="dock-quick-btn" type="button" data-page="settings">⚙ Settings</button>
+        <button class="dock-quick-btn" type="button" id="dockSignOutBtn">⏻ Sign Out</button>
+      </div>
+      <div class="dock-theme-pill">
+        <div class="dock-theme-dot"></div>
+        <span id="dockActiveTheme">Solar Flare</span>
+        <span class="dock-theme-sub">Active Theme</span>
+      </div>
+    </div>
+
+    <!-- Main Navigation List -->
+    <nav class="dock-nav" id="dockNav">
+      <div class="dock-nav-group-label">Navigation</div>
+      <button class="dock-nav-btn active" type="button" data-page="dashboard" aria-label="Home Dashboard">
+        <span class="dock-nav-icon">⌂</span>
+        <span class="dock-nav-text">Home</span>
+      </button>
+      <button class="dock-nav-btn" type="button" data-page="messages" aria-label="Inbox Messages">
+        <span class="dock-nav-icon">✉</span>
+        <span class="dock-nav-text">Inbox</span>
+        <span class="dock-nav-badge" id="dockMailBadge">0</span>
+      </button>
+      <button class="dock-nav-btn" type="button" data-page="forums" aria-label="Forums Discussion">
+        <span class="dock-nav-icon">💬</span>
+        <span class="dock-nav-text">Forums</span>
+      </button>
+      <button class="dock-nav-btn" type="button" data-page="rooms" aria-label="HearMeOut Rooms">
+        <span class="dock-nav-icon">☊</span>
+        <span class="dock-nav-text">Rooms</span>
+      </button>
+
+      <div class="dock-nav-group-label" style="margin-top: 6px;">Tools</div>
+      <button class="dock-nav-btn" type="button" data-page="overlays" aria-label="Overlay Sandbox">
+        <span class="dock-nav-icon">▣</span>
+        <span class="dock-nav-text">Overlay Bay</span>
+      </button>
+      <button class="dock-nav-btn" type="button" data-page="builder" aria-label="Automation Builder">
+        <span class="dock-nav-icon">⚒</span>
+        <span class="dock-nav-text">Builder</span>
+      </button>
+      <button class="dock-nav-btn" type="button" data-page="mountainview" aria-label="MountainView Glasses">
+        <span class="dock-nav-icon">🕶</span>
+        <span class="dock-nav-text">MtnView</span>
+      </button>
+      <button class="dock-nav-btn" type="button" data-page="crew" aria-label="Crew Desk">
+        <span class="dock-nav-icon">☤</span>
+        <span class="dock-nav-text">Crew Desk</span>
+      </button>
+
+      <div class="dock-nav-group-label" style="margin-top: 6px;">System</div>
+      <button class="dock-nav-btn" type="button" data-page="settings" aria-label="Interface Settings">
+        <span class="dock-nav-icon">⚙</span>
+        <span class="dock-nav-text">Settings</span>
+      </button>
+      <button class="dock-nav-btn" type="button" data-page="help" aria-label="Help Station">
+        <span class="dock-nav-icon">?</span>
+        <span class="dock-nav-text">Help</span>
+      </button>
+    </nav>
+
+    <!-- Flight Mode hint (shown when flying) -->
+    <div class="dock-flight-hint" id="dockFlightHint">
+      <span>🚀 Flight Mode Active</span>
+      <small>Drag rocket or dock panel to move. Drag rocket near top-left to re-dock.</small>
+    </div>
+
+  </aside>
+
+  <!-- ═══════════════════════════════════════════════
+       MAIN APPLICATION LAYOUT
+       No sidebar offset — dock panel floats above content
+       ═══════════════════════════════════════════════ -->
+  <div class="layout">
+
+    <!-- MAIN SHELL STAGE -->
+    <main class="main-shell">
+      
+      <!-- Topbar Header -->
+      <header class="topbar glass" id="appTopbar">
+        <div class="topbar-left">
+          <div class="brand">
+            <div class="brand-mark"></div>
+            <span>Space<strong>Mountain</strong><small>.live</small></span>
+          </div>
+        </div>
+        
+        <div class="topbar-right">
+          <!-- Slide-out Search Bar -->
+          <div class="search-container" id="searchContainer">
+            <button class="search-trigger-btn" id="searchTrigger" type="button" aria-label="Search">
+              <span class="search-icon">🔍</span>
+            </button>
+            <input class="search-input" id="searchInput" type="text" placeholder="Search apps, people, rooms..." />
+            <span class="search-shortcut">⌘K</span>
+          </div>
+          
+          <!-- Top Utilities -->
+          <button class="topbar-util-btn" type="button" aria-label="Notifications" id="notifBtn">
+            <span class="util-badge"></span>
+            🔔
+          </button>
+          <button class="topbar-util-btn" type="button" data-page="messages" aria-label="Direct Messages">
+            💬
+          </button>
+          <!-- Topbar User Avatar (click to open dock) -->
+          <div class="topbar-avatar" id="topbarAvatar" role="button" tabindex="0" aria-label="Open navigation dock"></div>
+          <div class="topbar-user-info" id="topbarUserInfo">
+            <strong id="topbarUsername">Commander</strong>
+            <span class="topbar-online">● Online</span>
+          </div>
+        </div>
+      </header>
+
+      <!-- CONTENT PAGES CONTAINER -->
+      <div class="page-stage">
+        
+        <div class="topbar-right">
+          <!-- Slide-out Search Bar -->
+          <div class="search-container" id="searchContainer">
+            <button class="search-trigger-btn" id="searchTrigger" type="button" aria-label="Search">
+              <span class="search-icon">🔍</span>
+            </button>
+            <input class="search-input" id="searchInput" type="text" placeholder="Search apps, people, rooms..." />
+            <span class="search-shortcut">⌘K</span>
+          </div>
+          
+          <!-- Top Utilities -->
+          <button class="topbar-util-btn" type="button" aria-label="Notifications" id="notifBtn">
+            <span class="util-badge"></span>
+            🔔
+          </button>
+          <button class="topbar-util-btn" type="button" data-page="messages" aria-label="Direct Messages">
+            💬
+          </button>
+          <!-- Topbar User Avatar (click to open dock) -->
+          <div class="topbar-avatar" id="topbarAvatar" role="button" tabindex="0" aria-label="Open navigation dock"></div>
+          <div class="topbar-user-info" id="topbarUserInfo">
+            <strong id="topbarUsername">Commander</strong>
+            <span class="topbar-online">● Online</span>
+          </div>
+        </div>
+      </header>
+
+      <!-- CONTENT PAGES CONTAINER -->
+      <div class="page-stage">
+        
+        <!-- PAGE 1: SPLASH (SIGN-IN/SIGN-UP) -->
+        <section class="page" id="page-splash">
+          <div class="splash-hero">
+            <div class="mountain-emblem"></div>
+            <h1>SpaceMountain<span class="gradient-text">.live</span></h1>
+            <p class="subline">One Account. One Universe. Endless Possibilities.</p>
+            <p class="hero-copy">Welcome to the central portal. Sign in to synchronize your theme presets, app linkages, and settings across the entire SpaceMountain live ecosystem.</p>
+          </div>
+
+          <div class="identity-card-wrap glass">
+            <div class="identity-modes">
+              <button class="tab-btn active" id="signupMode" type="button">Create Account</button>
+              <button class="tab-btn" id="signinMode" type="button">Access Cabin</button>
+            </div>
+
+            <form id="identityForm">
+              <div class="field">
+                <label for="displayName">Commander Name</label>
+                <input class="input" id="displayName" type="text" placeholder="e.g. NovaStar" required />
+              </div>
+              <div class="field">
+                <label for="handleInput">Station Address</label>
+                <div class="address-input-wrap">
+                  <input class="input" id="handleInput" type="text" placeholder="username" required />
+                  <span class="address-domain">@spmt.live</span>
+                </div>
+              </div>
+              <div class="field" id="recoveryField">
+                <label for="recoveryInput">Recovery Signal Email</label>
+                <input class="input" id="recoveryInput" type="email" placeholder="backup@domain.com" required />
+              </div>
+              <button class="btn btn-wide" type="submit">Establish Signal Connection</button>
+            </form>
+          </div>
+        </section>
+
+        <!-- PAGE 2: DASHBOARD -->
+        <section class="page" id="page-dashboard">
+          
+          <!-- Welcome Hero Banner -->
+          <div class="hero glass">
+            <div class="hero-content">
+              <span class="badge-tag">Command Center</span>
+              <h2>Welcome Back, <span class="gradient-text" id="dashboardUserTitle">Commander</span></h2>
+              <p>Your SQLite connection is active. Settings synchronized with SQLite. Exposing database indices to all active applications.</p>
+              <div class="hero-actions">
+                <button class="btn" type="button" data-page="apps">Launch App Suite</button>
+                <button class="btn-soft" type="button" data-page="settings">Configure Cockpit</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Dynamic Metrics Grid -->
+          <div class="grid grid-4">
+            <article class="stat-card glass">
+              <span class="stat-label">Points Harvested</span>
+              <div class="stat-value text-green" id="pointsToday">184,999</div>
+              <span class="stat-trend">▲ 14% vs yesterday</span>
+            </article>
+            <article class="stat-card glass">
+              <span class="stat-label">Inbox Signals</span>
+              <div class="stat-value text-cyan" id="mailCount">8</div>
+              <span class="stat-trend">Unread internal notes</span>
+            </article>
+            <article class="stat-card glass">
+              <span class="stat-label">QR Scans Routed</span>
+              <div class="stat-value text-gold" id="qrScans">1,284</div>
+              <span class="stat-trend">Smart Glasses linkages</span>
+            </article>
+            <article class="stat-card glass">
+              <span class="stat-label">Overlay Job Renders</span>
+              <div class="stat-value text-pink" id="mediaJobs">72</div>
+              <span class="stat-trend">StreamWeaver rendering active</span>
+            </article>
+          </div>
+
+          <!-- Lists Split Column -->
+          <div class="grid grid-3">
+            
+            <!-- Live Captain Signals -->
+            <article class="list-card glass">
+              <h3>Live Crew Signals</h3>
+              <p class="section-desc">Active captains currently on the network.</p>
+              <div class="list-items" id="liveList"></div>
+            </article>
+            
+            <!-- Active HearMeOut Rooms -->
+            <article class="list-card glass">
+              <h3>HearMeOut Channels</h3>
+              <p class="section-desc">Open voice and watch channels.</p>
+              <div class="list-items" id="roomList"></div>
+            </article>
+            
+            <!-- System Notifications -->
+            <article class="list-card glass">
+              <h3>System Event Log</h3>
+              <p class="section-desc">Real-time status updates.</p>
+              <div class="list-items" id="alertList"></div>
+            </article>
+          </div>
+        </section>
+
+        <!-- PAGE 3: APP SUITE -->
+        <section class="page" id="page-apps">
+          <div class="page-header-row">
+            <h2>App Suite</h2>
+            <p>One login. Infinite universe. Launch ecosystem systems.</p>
+          </div>
+
+          <div class="app-suite-grid">
+            <button class="app-door-card glass" type="button" data-page="overlays">
+              <div class="app-door-icon icon-streamweaver" aria-hidden="true"></div>
+              <strong>StreamWeaver</strong>
+              <span>Streaming & overlay templates</span>
+            </button>
+            <button class="app-door-card glass" type="button" data-page="rooms">
+              <div class="app-door-icon icon-chattag" aria-hidden="true"></div>
+              <strong>ChatTag</strong>
+              <span>Interactive voice gaming systems</span>
+            </button>
+            <button class="app-door-card glass" type="button" data-page="forums">
+              <div class="app-door-icon icon-discord" aria-hidden="true"></div>
+              <strong>Discord Hub</strong>
+              <span>Server feeds & shoutouts</span>
+            </button>
+            <button class="app-door-card glass" type="button" data-page="rooms">
+              <div class="app-door-icon icon-hearmeout" aria-hidden="true"></div>
+              <strong>Hear Me Out</strong>
+              <span>Voice rooms and watch lounges</span>
+            </button>
+            <button class="app-door-card glass" type="button" data-page="mountainview">
+              <div class="app-door-icon text-green">🕶</div>
+              <strong>MountainView</strong>
+              <span>Smart glasses HUD hub</span>
+            </button>
+            <button class="app-door-card glass" type="button" data-page="messages">
+              <div class="app-door-icon text-orange">✉</div>
+              <strong>spmt.live Mail</strong>
+              <span>Secure internal database messages</span>
+            </button>
+            <button class="app-door-card glass" type="button" data-page="forums">
+              <div class="app-door-icon text-blue">👥</div>
+              <strong>Forums</strong>
+              <span>Community text nodes</span>
+            </button>
+            <button class="app-door-card glass" type="button" data-page="builder">
+              <div class="app-door-icon text-purple">⚒</div>
+              <strong>Builder</strong>
+              <span>QR studio & node workflow routing</span>
+            </button>
+          </div>
+        </section>
+
+        <!-- PAGE 4: MAILBOX / MESSAGES -->
+        <section class="page" id="page-messages">
+          <div class="mailbox-layout">
+            
+            <!-- Mail Folders and Mail list -->
+            <div class="mailbox-sidebar glass">
+              <button class="btn btn-accent btn-wide" id="composeBtn" type="button">Compose Signal</button>
+              
+              <nav class="mailbox-folders">
+                <button class="folder-btn active" data-folder="inbox" type="button">Inbox</button>
+                <button class="folder-btn" data-folder="sent" type="button">Sent</button>
+                <button class="folder-btn" data-folder="app" type="button">App Alerts</button>
+                <button class="folder-btn" data-folder="crew" type="button">Crew Comms</button>
+                <button class="folder-btn" data-folder="forums" type="button">Forum Replies</button>
+                <button class="folder-btn" data-folder="bots" type="button">Bot Notes</button>
+              </nav>
+
+              <h4 class="mailbox-section-title" id="mailFolderTitle">Inbox</h4>
+              <div class="mail-list-container" id="mailList"></div>
+            </div>
+
+            <!-- Mail Reader Pane -->
+            <article class="mailbox-reader glass" id="messageReader">
+              <!-- Rendered Dynamically -->
+            </article>
+          </div>
+        </section>
+
+        <!-- Remaining pages omitted for brevity (copied from root index.html) -->
+      </div>
+
+      <!-- FOOTER -->
+      <footer class="footer">
+        <span>One login. Infinite universe.</span>
+        <span>Join our community: <a href="#forums" class="text-cyan">Discord</a> · <a href="#forums" class="text-pink">Twitter</a></span>
+      </footer>
+    </main>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <!-- App scripts -->
+  <script type="module" src="js/index.js"></script>
+</body>
+</html>
+
