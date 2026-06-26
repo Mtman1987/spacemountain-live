@@ -156,6 +156,33 @@ export default function App() {
     }
   }, [activeTab]);
 
+  // Fetch points from DSH on every tab change
+  useEffect(() => {
+    const cachedUser = localStorage.getItem('spmtIdentity');
+    if (!cachedUser) return;
+    try {
+      const user = JSON.parse(cachedUser);
+      if (!user.username) return;
+      fetch(`https://spmt.live/api/user/lookup?username=${encodeURIComponent(user.username)}`)
+        .then(r => r.ok ? r.json() : null)
+        .then(spmtUser => {
+          if (!spmtUser?.discord_id) return;
+          return fetch('https://discord-stream-hub-new.fly.dev/api/points/balance', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer 1234' },
+            body: JSON.stringify({ userId: spmtUser.discord_id, username: user.username }),
+          });
+        })
+        .then(r => r?.ok ? r.json() : null)
+        .then(data => {
+          if (data?.points !== undefined) {
+            setIdentity(prev => prev ? { ...prev, points: data.points } : prev);
+          }
+        })
+        .catch(() => {});
+    } catch {}
+  }, [activeTab]);
+
   useEffect(() => {
     const handlePopState = () => {
       const path = window.location.pathname;
@@ -318,27 +345,7 @@ export default function App() {
     // 4. Fetch inbox from spmt.live if logged in
     const spmtToken = localStorage.getItem('spmtToken');
     if (spmtToken) {
-      // Fetch user's points from DSH leaderboard
-      fetch('https://discord-stream-hub-new.fly.dev/api/leaderboard', {
-        headers: { 'Authorization': `Bearer 1234` },
-      })
-        .then(r => r.ok ? r.json() : [])
-        .then((leaderboard: any[]) => {
-          if (Array.isArray(leaderboard)) {
-            const cachedUser = localStorage.getItem('spmtIdentity');
-            if (cachedUser) {
-              const user = JSON.parse(cachedUser);
-              const match = leaderboard.find((e: any) => 
-                e.username?.toLowerCase() === user.username?.toLowerCase() ||
-                e.displayName?.toLowerCase() === user.displayName?.toLowerCase()
-              );
-              if (match?.points) {
-                setIdentity(prev => prev ? { ...prev, points: match.points } : prev);
-              }
-            }
-          }
-        })
-        .catch(() => {});
+      // Points are fetched on every tab change (see below)
 
       fetch('https://spmt.live/api/messages/inbox', {
         headers: { 'Authorization': `Bearer ${spmtToken}` },
@@ -456,6 +463,25 @@ export default function App() {
   // Trigger Action / Generate points inside SQLite Database
   const handleTriggerAction = async (toolId: string) => {
     const pointsIncrement = 5;
+
+    // Push points to DSH
+    const cachedUser = localStorage.getItem('spmtIdentity');
+    if (cachedUser) {
+      try {
+        const user = JSON.parse(cachedUser);
+        const lookup = await fetch(`https://spmt.live/api/user/lookup?username=${encodeURIComponent(user.username)}`);
+        if (lookup.ok) {
+          const spmtUser = await lookup.json();
+          if (spmtUser?.discord_id) {
+            await fetch('https://discord-stream-hub-new.fly.dev/api/points/add', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer 1234' },
+              body: JSON.stringify({ userId: spmtUser.discord_id, username: user.username, displayName: user.displayName, points: pointsIncrement }),
+            });
+          }
+        }
+      } catch {}
+    }
     
     // Trigger floating popup indicator
     const randomX = Math.floor(Math.random() * 200) + 400;
