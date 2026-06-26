@@ -205,6 +205,38 @@ async function getHydratedTools() {
   }));
 }
 
+function normalizeForwardedForumPost(body: any) {
+  const sourceApp = String(body?.sourceApp || body?.source_app || 'discord-stream-hub');
+  const sourceServerId = body?.sourceServerId || body?.source_server_id || body?.guildId || body?.serverId || null;
+  const sourceChannelId = body?.sourceChannelId || body?.source_channel_id || body?.channelId || null;
+  const sourceChannelName = body?.sourceChannelName || body?.source_channel_name || body?.channelName || null;
+  const sourceMessageId = body?.sourceMessageId || body?.source_message_id || body?.messageId || null;
+  const sourceMessageUrl = body?.sourceMessageUrl || body?.source_message_url || body?.messageUrl || body?.url || null;
+  const authorId = body?.authorId || body?.author_id || body?.userId || null;
+  const authorName = String(body?.authorName || body?.author_name || body?.username || body?.displayName || 'Discord');
+  const rawContent = String(body?.content || body?.body || body?.message || '').trim();
+  const title = String(body?.title || `${sourceChannelName || 'Discord'} from ${authorName}`).trim().slice(0, 180);
+  const category = String(body?.category || 'Discord Forward').trim().slice(0, 80);
+  const postedAt = String(body?.postedAt || body?.posted_at || body?.timestamp || new Date().toISOString());
+
+  return {
+    id: String(body?.id || body?.forwardId || `ff_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`),
+    sourceApp,
+    sourceServerId: sourceServerId ? String(sourceServerId) : null,
+    sourceChannelId: sourceChannelId ? String(sourceChannelId) : null,
+    sourceChannelName: sourceChannelName ? String(sourceChannelName) : null,
+    sourceMessageId: sourceMessageId ? String(sourceMessageId) : null,
+    sourceMessageUrl: sourceMessageUrl ? String(sourceMessageUrl) : null,
+    authorId: authorId ? String(authorId) : null,
+    authorName,
+    title: title || 'Discord forwarded post',
+    content: rawContent,
+    category,
+    postedAt,
+    createdAt: new Date().toISOString(),
+  };
+}
+
 async function startServer() {
   const app = express();
   app.use(express.json());
@@ -477,41 +509,103 @@ async function startServer() {
     }
   });
 
-  app.get('/api/integrations/dsh/forum-forwarding', async (req, res) => {
-    const sourceServerId = String(req.query.sourceServerId || '').trim();
-    if (!sourceServerId) {
-      return res.status(400).json({ error: 'sourceServerId is required' });
-    }
+  app.get('/api/forum/forwarded', (req, res) => {
     try {
-      const url = `https://discord-stream-hub-new.fly.dev/api/settings/forwarding-forums?sourceServerId=${encodeURIComponent(sourceServerId)}`;
-      const result = await fetchJsonFromApp(url);
-      res.status(result.status).json(result.payload);
+      const rows = sqlite.prepare(`
+        SELECT
+          id,
+          source_app as sourceApp,
+          source_server_id as sourceServerId,
+          source_channel_id as sourceChannelId,
+          source_channel_name as sourceChannelName,
+          source_message_id as sourceMessageId,
+          source_message_url as sourceMessageUrl,
+          author_id as authorId,
+          author_name as authorName,
+          title,
+          content,
+          category,
+          posted_at as postedAt,
+          created_at as createdAt
+        FROM forwarded_forum_posts
+        ORDER BY datetime(created_at) DESC
+        LIMIT 100
+      `).all();
+      res.json({ posts: rows });
     } catch (err) {
-      res.status(502).json({ error: 'Could not reach Discord Stream Hub forum forwarding settings' });
+      res.status(500).json({ error: 'Could not load forwarded forum posts' });
     }
   });
 
-  app.post('/api/integrations/dsh/forum-forwarding', async (req, res) => {
-    try {
-      const result = await fetchJsonFromApp('https://discord-stream-hub-new.fly.dev/api/settings/forwarding-forums', {
-        method: 'POST',
-        body: JSON.stringify(req.body || {}),
-      });
-      res.status(result.status).json(result.payload);
-    } catch (err) {
-      res.status(502).json({ error: 'Could not save Discord Stream Hub forum forwarding settings' });
+  app.post(['/api/forum/forward', '/api/integrations/dsh/forum-forward'], async (req, res) => {
+    const expectedToken = process.env.FORUM_FORWARD_TOKEN;
+    const bearerToken = String(req.get('authorization') || '').replace(/^Bearer\s+/i, '').trim();
+    if (expectedToken && bearerToken !== expectedToken) {
+      return res.status(401).json({ error: 'Invalid forum forward token' });
     }
-  });
 
-  app.delete('/api/integrations/dsh/forum-forwarding', async (req, res) => {
+    const post = normalizeForwardedForumPost(req.body);
+    if (!post.content) {
+      return res.status(400).json({ error: 'content is required' });
+    }
+
     try {
-      const result = await fetchJsonFromApp('https://discord-stream-hub-new.fly.dev/api/settings/forwarding-forums', {
-        method: 'DELETE',
-        body: JSON.stringify(req.body || {}),
-      });
-      res.status(result.status).json(result.payload);
+      sqlite.prepare(`
+        INSERT OR REPLACE INTO forwarded_forum_posts (
+          id,
+          source_app,
+          source_server_id,
+          source_channel_id,
+          source_channel_name,
+          source_message_id,
+          source_message_url,
+          author_id,
+          author_name,
+          title,
+          content,
+          category,
+          posted_at,
+          created_at
+        ) VALUES (
+          @id,
+          @sourceApp,
+          @sourceServerId,
+          @sourceChannelId,
+          @sourceChannelName,
+          @sourceMessageId,
+          @sourceMessageUrl,
+          @authorId,
+          @authorName,
+          @title,
+          @content,
+          @category,
+          @postedAt,
+          @createdAt
+        )
+      `).run(post);
+
+      let mirroredToSpmt = false;
+      const spmtForumToken = process.env.SPMT_FORUM_FORWARD_TOKEN;
+      if (spmtForumToken) {
+        try {
+          const mirror = await fetchJsonFromApp('https://spmt.live/api/forum/threads', {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${spmtForumToken}` },
+            body: JSON.stringify({
+              title: post.title,
+              category: post.category,
+              body: `${post.content}${post.sourceMessageUrl ? `\n\nSource: ${post.sourceMessageUrl}` : ''}`,
+            }),
+          });
+          mirroredToSpmt = mirror.ok;
+        } catch {
+          mirroredToSpmt = false;
+        }
+      }
+
+      res.status(201).json({ success: true, post, mirroredToSpmt });
     } catch (err) {
-      res.status(502).json({ error: 'Could not delete Discord Stream Hub forum forwarding settings' });
+      res.status(500).json({ error: 'Could not store forwarded forum post' });
     }
   });
 

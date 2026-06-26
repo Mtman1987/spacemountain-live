@@ -278,6 +278,8 @@ export default function App() {
   const [newThreadCategory, setNewThreadCategory] = useState('Technical Support');
   const [newThreadBody, setNewThreadBody] = useState('');
   const [isCreatingThread, setIsCreatingThread] = useState(false);
+  const [forwardedForumPosts, setForwardedForumPosts] = useState<any[]>([]);
+  const [forwardedForumLoading, setForwardedForumLoading] = useState(false);
 
   // Voice rooms state
   const [voiceRoomActive, setVoiceRoomActive] = useState(false);
@@ -289,16 +291,6 @@ export default function App() {
   // ChatTag tracker state
   const [chatTagState, setChatTagState] = useState<ChatTagState | null>(null);
   const [chatTagLoading, setChatTagLoading] = useState(false);
-
-  // Discord Stream Hub forum-forward state
-  const [dshRuleLabel, setDshRuleLabel] = useState('');
-  const [dshSourceServerId, setDshSourceServerId] = useState('');
-  const [dshDestinationServerId, setDshDestinationServerId] = useState('');
-  const [dshForumChannelId, setDshForumChannelId] = useState('');
-  const [dshSharedThreadId, setDshSharedThreadId] = useState('');
-  const [dshForwardingMode, setDshForwardingMode] = useState<'per-source-thread' | 'single-thread'>('per-source-thread');
-  const [dshStatus, setDshStatus] = useState('');
-  const [dshSaving, setDshSaving] = useState(false);
 
   // MountainView QR HUD Seed state
   const [qrHUDSeed, setQrHUDSeed] = useState('https://spacemountain.live/invite/novastar');
@@ -334,61 +326,17 @@ export default function App() {
     }
   };
 
-  const loadDshForwardingRule = async () => {
-    const sourceServerId = dshSourceServerId.trim();
-    if (!sourceServerId) {
-      setDshStatus('Enter a source server ID first.');
-      return;
-    }
-    setDshStatus('Loading DSH forum-forwarding rule...');
+  const refreshForwardedForumPosts = async () => {
+    setForwardedForumLoading(true);
     try {
-      const res = await fetch(`/api/integrations/dsh/forum-forwarding?sourceServerId=${encodeURIComponent(sourceServerId)}`);
+      const res = await fetch('/api/forum/forwarded');
       const data = await res.json();
-      if (!res.ok) throw new Error(data?.error || 'Could not load forwarding rule');
-      setDshRuleLabel(data.ruleLabel || '');
-      setDshDestinationServerId(data.destinationServerId || '');
-      setDshForumChannelId(data.forumChannelId || '');
-      setDshSharedThreadId(data.sharedThreadId || '');
-      setDshForwardingMode(data.forwardingMode === 'single-thread' ? 'single-thread' : 'per-source-thread');
-      setDshStatus(`Loaded rule for ${sourceServerId}.`);
+      setForwardedForumPosts(Array.isArray(data?.posts) ? data.posts : []);
     } catch (err) {
-      setDshStatus(err instanceof Error ? err.message : 'Could not load DSH forwarding rule.');
-    }
-  };
-
-  const saveDshForwardingRule = async () => {
-    const sourceServerId = dshSourceServerId.trim();
-    const destinationServerId = dshDestinationServerId.trim();
-    if (!sourceServerId || !destinationServerId) {
-      setDshStatus('Source and destination server IDs are required.');
-      return;
-    }
-    setDshSaving(true);
-    setDshStatus('Saving DSH forum-forwarding rule...');
-    try {
-      const res = await fetch('/api/integrations/dsh/forum-forwarding', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ruleLabel: dshRuleLabel.trim() || `${sourceServerId} to ${destinationServerId}`,
-          sourceServerId,
-          destinationServerId,
-          forumChannelId: dshForwardingMode === 'per-source-thread' ? dshForumChannelId.trim() : '',
-          forwardingMode: dshForwardingMode,
-          sharedThreadId: dshForwardingMode === 'single-thread' ? dshSharedThreadId.trim() : '',
-          restrictToWhitelist: false,
-          sourceChannelWhitelist: [],
-          mappings: {},
-          labels: {},
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data?.error || 'Could not save forwarding rule');
-      setDshStatus('Saved. DSH will forward allowed source channels into the configured forum target.');
-    } catch (err) {
-      setDshStatus(err instanceof Error ? err.message : 'Could not save DSH forwarding rule.');
+      console.warn('Forwarded forum posts fetch failed', err);
+      setForwardedForumPosts([]);
     } finally {
-      setDshSaving(false);
+      setForwardedForumLoading(false);
     }
   };
 
@@ -453,6 +401,7 @@ export default function App() {
 
     refreshHearMeOutRooms();
     refreshChatTagState();
+    refreshForwardedForumPosts();
 
     // 4. Fetch inbox from spmt.live if logged in
     const spmtToken = localStorage.getItem('spmtToken');
@@ -956,7 +905,7 @@ export default function App() {
                   </p>
 
                   <p className="text-xs text-zinc-400 font-sans max-w-md mx-auto leading-relaxed mb-6">
-                    This is the SpaceMountain hub: open the apps, learn what each one does, join HearMeOut rooms, track ChatTag, and connect DSH forum forwarding to the community forum.
+                    This is the SpaceMountain hub: open the apps, learn what each one does, join HearMeOut rooms, track ChatTag, and read DSH-forwarded posts in the website forum.
                   </p>
 
                   {/* Core CTAs */}
@@ -984,7 +933,7 @@ export default function App() {
                   {[
                     { label: 'HearMeOut Rooms', value: `${hearmeoutRooms.length} open`, action: 'rooms', tone: 'text-emerald-400' },
                     { label: 'ChatTag Tracker', value: currentItPlayer?.displayName || currentItPlayer?.twitchUsername || currentItPlayer?.username || currentItPlayer?.name || 'No one tagged', action: 'apps', tone: 'text-amber-400' },
-                    { label: 'DSH Forum Forward', value: 'Configure routing', action: 'forums', tone: 'text-purple-400' },
+                    { label: 'DSH Forum Posts', value: `${forwardedForumPosts.length} forwarded`, action: 'forums', tone: 'text-purple-400' },
                   ].map((item) => (
                     <button
                       key={item.label}
@@ -1225,9 +1174,9 @@ export default function App() {
                   <div>
                     <h2 className="text-xl font-sans font-bold text-white flex items-center gap-2">
                       <MessageSquare className="text-purple-400" size={20} />
-                      Forums + Discord Stream Hub Forwarding
+                      Website Forum
                     </h2>
-                    <p className="text-xs text-zinc-400 font-sans mt-0.5">Read forum posts and wire DSH so Discord channels can forward into forum threads</p>
+                    <p className="text-xs text-zinc-400 font-sans mt-0.5">Forum posts created here plus forwarded Discord Stream Hub posts that land on the website</p>
                   </div>
                   <button
                     onClick={() => setIsCreatingThread(!isCreatingThread)}
@@ -1238,84 +1187,71 @@ export default function App() {
                 </div>
 
                 <div className="rounded-2xl border border-purple-500/15 bg-purple-500/[0.04] p-4">
-                  <div className="flex flex-col gap-1 mb-4">
-                    <span className="text-xs font-bold text-white">DSH Forum Forwarding</span>
-                    <span className="text-xs text-zinc-400">
-                      This calls Discord Stream Hub's real forwarding-forums API. Per-source mode auto-creates or reuses a forum thread per source channel; shared-thread mode sends allowed channels into one destination thread.
-                    </span>
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                    <input
-                      value={dshRuleLabel}
-                      onChange={(e) => setDshRuleLabel(e.target.value)}
-                      placeholder="Rule label"
-                      className="bg-black/30 border border-white/10 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-purple-400"
-                    />
-                    <input
-                      value={dshSourceServerId}
-                      onChange={(e) => setDshSourceServerId(e.target.value)}
-                      placeholder="Source Discord server ID"
-                      className="bg-black/30 border border-white/10 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-purple-400"
-                    />
-                    <input
-                      value={dshDestinationServerId}
-                      onChange={(e) => setDshDestinationServerId(e.target.value)}
-                      placeholder="Destination Discord server ID"
-                      className="bg-black/30 border border-white/10 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-purple-400"
-                    />
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-3">
-                    <select
-                      value={dshForwardingMode}
-                      onChange={(e) => setDshForwardingMode(e.target.value as 'per-source-thread' | 'single-thread')}
-                      className="bg-black/30 border border-white/10 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-purple-400"
-                    >
-                      <option value="per-source-thread">One forum thread per source channel</option>
-                      <option value="single-thread">One shared destination thread</option>
-                    </select>
-                    {dshForwardingMode === 'per-source-thread' ? (
-                      <input
-                        value={dshForumChannelId}
-                        onChange={(e) => setDshForumChannelId(e.target.value)}
-                        placeholder="Destination forum parent channel ID"
-                        className="bg-black/30 border border-white/10 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-purple-400 md:col-span-2"
-                      />
-                    ) : (
-                      <input
-                        value={dshSharedThreadId}
-                        onChange={(e) => setDshSharedThreadId(e.target.value)}
-                        placeholder="Shared destination thread ID"
-                        className="bg-black/30 border border-white/10 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-purple-400 md:col-span-2"
-                      />
-                    )}
-                  </div>
-                  <div className="flex flex-wrap items-center gap-2 mt-4">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="flex flex-col gap-1">
+                      <span className="text-xs font-bold text-white">Discord Stream Hub forwards into this forum</span>
+                      <span className="text-xs text-zinc-400">
+                        DSH should post forum-forwarded messages to <span className="font-mono text-purple-200">/api/forum/forward</span>. Those posts are stored on this website and shown below.
+                      </span>
+                    </div>
                     <button
                       type="button"
-                      onClick={loadDshForwardingRule}
-                      className="px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-xs font-bold text-zinc-200 hover:bg-white/10"
+                      onClick={refreshForwardedForumPosts}
+                      disabled={forwardedForumLoading}
+                      className="px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-xs font-bold text-zinc-200 hover:bg-white/10 disabled:opacity-50"
                     >
-                      Load Existing Rule
+                      {forwardedForumLoading ? 'Refreshing...' : 'Refresh Forwarded Posts'}
                     </button>
-                    <button
-                      type="button"
-                      onClick={saveDshForwardingRule}
-                      disabled={dshSaving}
-                      className="px-4 py-2 rounded-xl bg-purple-600 text-xs font-bold text-white hover:bg-purple-500 disabled:opacity-50"
-                    >
-                      {dshSaving ? 'Saving...' : 'Save DSH Forward'}
-                    </button>
-                    <a
-                      href="https://discord-stream-hub-new.fly.dev/settings"
-                      target="_blank"
-                      rel="noreferrer"
-                      className="px-4 py-2 rounded-xl bg-black/30 border border-white/10 text-xs font-bold text-zinc-300 hover:text-white no-underline"
-                    >
-                      Open DSH Settings
-                    </a>
-                    {dshStatus && <span className="text-[10px] text-zinc-400 font-mono">{dshStatus}</span>}
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-4">
+                    <div className="rounded-xl border border-white/5 bg-black/20 p-3">
+                      <span className="text-[10px] font-mono font-bold text-purple-300 uppercase">Destination</span>
+                      <span className="block text-xs text-white mt-1">Website forum</span>
+                    </div>
+                    <div className="rounded-xl border border-white/5 bg-black/20 p-3">
+                      <span className="text-[10px] font-mono font-bold text-purple-300 uppercase">Intake route</span>
+                      <span className="block text-xs text-white mt-1 font-mono">POST /api/forum/forward</span>
+                    </div>
+                    <div className="rounded-xl border border-white/5 bg-black/20 p-3">
+                      <span className="text-[10px] font-mono font-bold text-purple-300 uppercase">Forwarded posts</span>
+                      <span className="block text-xs text-white mt-1">{forwardedForumPosts.length}</span>
+                    </div>
                   </div>
                 </div>
+
+                {forwardedForumPosts.length > 0 && (
+                  <div className="rounded-2xl border border-white/5 bg-white/[0.02] p-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <span className="text-xs font-bold text-white">Forwarded From DSH</span>
+                      <span className="text-[10px] text-zinc-500 font-mono">Newest first</span>
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      {forwardedForumPosts.map((post) => (
+                        <div key={post.id} className="p-4 rounded-2xl border border-white/5" style={{ background: 'var(--chat-surface-bg)' }}>
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <div className="flex flex-col min-w-0">
+                              <span className="text-[10px] font-mono tracking-wider text-purple-400 font-semibold">{post.category || 'Discord Forward'}</span>
+                              <span className="text-xs font-bold text-white mt-0.5">{post.title}</span>
+                            </div>
+                            <span className="text-[10px] text-zinc-500 font-mono">
+                              {post.sourceChannelName || post.sourceChannelId || 'Discord channel'}
+                            </span>
+                          </div>
+                          <p className="text-xs text-zinc-400 leading-relaxed mt-2 whitespace-pre-wrap">{post.content}</p>
+                          <div className="flex flex-wrap items-center gap-2 mt-3 text-[10px] text-zinc-500 font-mono">
+                            <span>By {post.authorName || 'Discord'}</span>
+                            <span>{post.postedAt ? new Date(post.postedAt).toLocaleString() : ''}</span>
+                            {post.sourceMessageUrl && (
+                              <a href={post.sourceMessageUrl} target="_blank" rel="noreferrer" className="text-purple-300 hover:text-purple-200 no-underline">
+                                Source message
+                              </a>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 {isCreatingThread ? (
                   <form onSubmit={handleCreateThread} className="flex flex-col gap-4">
@@ -1574,7 +1510,7 @@ export default function App() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {[
                     ['ChatTag -> DSH', 'ChatTag forwards Twitch/chat game events into Discord Stream Hub so points and leaderboards stay connected.', 'Open tracker', 'apps'],
-                    ['DSH -> Forums', 'Forum Forwarding posts Discord source-channel activity into forum threads using saved DSH rules.', 'Configure forward', 'forums'],
+                    ['DSH -> Website Forum', 'Discord Stream Hub sends forwarded channel activity into the website forum through the forum intake endpoint.', 'View forum', 'forums'],
                     ['HearMeOut -> Rooms', 'Open HearMeOut rooms can be joined from the hub, with overlay links for watch, music, and now-playing views.', 'Join rooms', 'rooms'],
                     ['MountainView -> StreamWeaver', 'Glasses voice/image commands route through StreamWeaver for bot commands, visual context, overlays, and automation.', 'Pair glasses', 'mtnview'],
                   ].map(([title, body, label, tab]) => (
@@ -1671,7 +1607,7 @@ export default function App() {
                   <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/5">
                     <span className="text-xs font-bold text-white block mb-1">Where should I start?</span>
                     <p className="text-xs text-zinc-400 leading-relaxed">
-                      Use Apps for launch links and ChatTag status, Rooms to join HearMeOut, Forums to configure DSH forum forwarding, and Integration Map to see how the apps pass events between each other.
+                      Use Apps for launch links and ChatTag status, Rooms to join HearMeOut, Forums to read website posts forwarded from DSH, and Integration Map to see how the apps pass events between each other.
                     </p>
                   </div>
 

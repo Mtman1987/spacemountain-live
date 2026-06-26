@@ -19,8 +19,9 @@ try {
 
 let sqliteDbPath = DB_PATH;
 try {
-  // Test if we can open/create the database at /data/dashboard.db
+  // Test if we can open and write to the preferred database path.
   const testDb = new Database(sqliteDbPath);
+  testDb.exec('CREATE TABLE IF NOT EXISTS __write_test (id INTEGER); DROP TABLE __write_test;');
   testDb.close();
   console.log(`Successfully verified database file access at ${sqliteDbPath}`);
 } catch (err) {
@@ -68,6 +69,23 @@ sqlite.exec(`
     shooting_stars INTEGER NOT NULL DEFAULT 1,
     sidebar_collapsed INTEGER NOT NULL DEFAULT 0,
     FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+  );
+
+  CREATE TABLE IF NOT EXISTS forwarded_forum_posts (
+    id TEXT PRIMARY KEY,
+    source_app TEXT NOT NULL DEFAULT 'discord-stream-hub',
+    source_server_id TEXT,
+    source_channel_id TEXT,
+    source_channel_name TEXT,
+    source_message_id TEXT,
+    source_message_url TEXT,
+    author_id TEXT,
+    author_name TEXT,
+    title TEXT NOT NULL,
+    content TEXT NOT NULL,
+    category TEXT NOT NULL DEFAULT 'Discord Forward',
+    posted_at TEXT NOT NULL,
+    created_at TEXT NOT NULL
   );
 `);
 
