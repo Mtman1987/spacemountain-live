@@ -861,9 +861,7 @@ export default function App() {
                   {/* Core CTAs */}
                   <div className="flex items-center gap-3">
                     <a 
-                      href="https://spmt.live"
-                      target="_blank"
-                      rel="noopener noreferrer"
+                      href="/auth/login"
                       className="px-6 py-2.5 rounded-xl font-sans font-extrabold text-xs text-black transition-all transform hover:-translate-y-0.5 active:translate-y-0 cursor-pointer shadow-lg inline-block no-underline"
                       style={{
                         backgroundColor: currentTheme.glowHex,
