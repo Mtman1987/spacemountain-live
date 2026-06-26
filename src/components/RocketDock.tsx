@@ -105,7 +105,7 @@ const realAvatar = '/assets/astronaut-avatar.jpg';
             <>
               <img
                 src={realAvatar}
-                alt={identity?.displayName || 'NovaStar'}
+                alt={identity?.displayName || 'SpaceMountain account'}
                 className="w-[72px] h-[72px] rounded-full object-cover border border-black/60"
               />
               <span className="absolute bottom-2 right-5 w-3 h-3 bg-emerald-500 rounded-full border border-[#090b14]" />
@@ -170,7 +170,7 @@ const realAvatar = '/assets/astronaut-avatar.jpg';
             <div className="w-full h-full rounded-full overflow-hidden border border-black relative">
               <img 
                 src={realAvatar} 
-                alt={identity?.displayName || 'NovaStar'} 
+                alt={identity?.displayName || 'SpaceMountain account'}
                 className="w-full h-full object-cover"
                 referrerPolicy="no-referrer"
               />
@@ -181,7 +181,7 @@ const realAvatar = '/assets/astronaut-avatar.jpg';
           {/* Pilot details vertically stacked below avatar */}
           <div className="flex flex-col items-center leading-none min-w-0 select-none w-full">
             <span className="text-[10px] font-sans font-black text-white group-hover:text-amber-400 transition-colors truncate max-w-[100px] text-center">
-              {identity?.displayName || 'NovaStar'}
+              {identity?.displayName || 'Guest Captain'}
             </span>
             <span className="text-[7.5px] font-mono font-black text-emerald-400 mt-1 tracking-widest">
               ● ONLINE

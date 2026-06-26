@@ -560,7 +560,7 @@ export default function SettingsPanel({
                 />
               </div>
               <span className="text-[9px] font-bold text-white mt-2 font-mono">Mini HUD View</span>
-              <span className="text-[7px] text-zinc-500 font-mono mt-0.5">Mocking your layout options</span>
+              <span className="text-[7px] text-zinc-500 font-mono mt-0.5">Previewing your layout options</span>
             </div>
 
             <div className="flex items-center justify-between border-t border-white/5 pt-2 text-[7px] font-mono text-zinc-500">

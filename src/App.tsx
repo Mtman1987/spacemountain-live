@@ -5,7 +5,15 @@ import {
   Settings, HelpCircle, Rocket, Play, Activity, CheckCircle2, Sliders, 
   Send, Plus, Trash2, ArrowRight, Heart, RefreshCw, Star, Compass, Volume2, Gamepad2, Eye, Layout 
 } from 'lucide-react';
-import { CommunityTool, BrandingConfig, DashboardStats, UserProfile, UserPreferences } from './types';
+import {
+  CommunityTool,
+  BrandingConfig,
+  DashboardStats,
+  UserProfile,
+  UserPreferences,
+  HearMeOutRoom,
+  ChatTagState,
+} from './types';
 
 // Importing high-fidelity sub components
 import RocketDock from './components/RocketDock';
@@ -275,12 +283,114 @@ export default function App() {
   const [voiceRoomActive, setVoiceRoomActive] = useState(false);
   const [micState, setMicState] = useState<'muted' | 'listening'>('muted');
   const [speakingUsers, setSpeakingUsers] = useState<string[]>([]);
+  const [hearmeoutRooms, setHearmeoutRooms] = useState<HearMeOutRoom[]>([]);
+  const [hearmeoutLoading, setHearmeoutLoading] = useState(false);
+
+  // ChatTag tracker state
+  const [chatTagState, setChatTagState] = useState<ChatTagState | null>(null);
+  const [chatTagLoading, setChatTagLoading] = useState(false);
+
+  // Discord Stream Hub forum-forward state
+  const [dshRuleLabel, setDshRuleLabel] = useState('');
+  const [dshSourceServerId, setDshSourceServerId] = useState('');
+  const [dshDestinationServerId, setDshDestinationServerId] = useState('');
+  const [dshForumChannelId, setDshForumChannelId] = useState('');
+  const [dshSharedThreadId, setDshSharedThreadId] = useState('');
+  const [dshForwardingMode, setDshForwardingMode] = useState<'per-source-thread' | 'single-thread'>('per-source-thread');
+  const [dshStatus, setDshStatus] = useState('');
+  const [dshSaving, setDshSaving] = useState(false);
 
   // MountainView QR HUD Seed state
   const [qrHUDSeed, setQrHUDSeed] = useState('https://spacemountain.live/invite/novastar');
 
   // Interactive points animations list (floating points indicator!)
   const [pointPopups, setPointPopups] = useState<{ id: number; text: string; x: number; y: number }[]>([]);
+
+  const refreshHearMeOutRooms = async () => {
+    setHearmeoutLoading(true);
+    try {
+      const res = await fetch('/api/integrations/hearmeout/rooms');
+      const data = await res.json();
+      setHearmeoutRooms(Array.isArray(data?.rooms) ? data.rooms : []);
+    } catch (err) {
+      console.warn('HearMeOut rooms fetch failed', err);
+      setHearmeoutRooms([]);
+    } finally {
+      setHearmeoutLoading(false);
+    }
+  };
+
+  const refreshChatTagState = async () => {
+    setChatTagLoading(true);
+    try {
+      const res = await fetch('/api/integrations/chat-tag/state');
+      const data = await res.json();
+      setChatTagState(data || null);
+    } catch (err) {
+      console.warn('ChatTag state fetch failed', err);
+      setChatTagState(null);
+    } finally {
+      setChatTagLoading(false);
+    }
+  };
+
+  const loadDshForwardingRule = async () => {
+    const sourceServerId = dshSourceServerId.trim();
+    if (!sourceServerId) {
+      setDshStatus('Enter a source server ID first.');
+      return;
+    }
+    setDshStatus('Loading DSH forum-forwarding rule...');
+    try {
+      const res = await fetch(`/api/integrations/dsh/forum-forwarding?sourceServerId=${encodeURIComponent(sourceServerId)}`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || 'Could not load forwarding rule');
+      setDshRuleLabel(data.ruleLabel || '');
+      setDshDestinationServerId(data.destinationServerId || '');
+      setDshForumChannelId(data.forumChannelId || '');
+      setDshSharedThreadId(data.sharedThreadId || '');
+      setDshForwardingMode(data.forwardingMode === 'single-thread' ? 'single-thread' : 'per-source-thread');
+      setDshStatus(`Loaded rule for ${sourceServerId}.`);
+    } catch (err) {
+      setDshStatus(err instanceof Error ? err.message : 'Could not load DSH forwarding rule.');
+    }
+  };
+
+  const saveDshForwardingRule = async () => {
+    const sourceServerId = dshSourceServerId.trim();
+    const destinationServerId = dshDestinationServerId.trim();
+    if (!sourceServerId || !destinationServerId) {
+      setDshStatus('Source and destination server IDs are required.');
+      return;
+    }
+    setDshSaving(true);
+    setDshStatus('Saving DSH forum-forwarding rule...');
+    try {
+      const res = await fetch('/api/integrations/dsh/forum-forwarding', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ruleLabel: dshRuleLabel.trim() || `${sourceServerId} to ${destinationServerId}`,
+          sourceServerId,
+          destinationServerId,
+          forumChannelId: dshForwardingMode === 'per-source-thread' ? dshForumChannelId.trim() : '',
+          forwardingMode: dshForwardingMode,
+          sharedThreadId: dshForwardingMode === 'single-thread' ? dshSharedThreadId.trim() : '',
+          restrictToWhitelist: false,
+          sourceChannelWhitelist: [],
+          mappings: {},
+          labels: {},
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || 'Could not save forwarding rule');
+      setDshStatus('Saved. DSH will forward allowed source channels into the configured forum target.');
+    } catch (err) {
+      setDshStatus(err instanceof Error ? err.message : 'Could not save DSH forwarding rule.');
+    } finally {
+      setDshSaving(false);
+    }
+  };
 
   // Initialize: Check auth status and fetch data
   useEffect(() => {
@@ -340,6 +450,9 @@ export default function App() {
         setStats(data);
       })
       .catch(err => console.error('Stats fetch failed:', err));
+
+    refreshHearMeOutRooms();
+    refreshChatTagState();
 
     // 4. Fetch inbox from spmt.live if logged in
     const spmtToken = localStorage.getItem('spmtToken');
@@ -647,6 +760,10 @@ export default function App() {
     : preferences.uiDensity === 'spacious'
       ? { gap: '2rem', paddingTop: '6.75rem' }
       : { gap: '1.5rem', paddingTop: '6rem' };
+  const chatTagPlayers = Array.isArray(chatTagState?.players) ? chatTagState.players : [];
+  const currentItPlayer = chatTagPlayers.find((player) => player.isIt || player.id === chatTagState?.currentIt);
+  const sortedChatTagPlayers = [...chatTagPlayers].sort((a, b) => (b.score || b.points || b.tags || 0) - (a.score || a.points || a.tags || 0));
+  const recentTags = Array.isArray(chatTagState?.history) ? chatTagState.history.slice(0, 4) : [];
 
   return (
     <div 
@@ -835,11 +952,11 @@ export default function App() {
                   </h1>
 
                   <p className="text-[10px] md:text-xs font-mono font-extrabold tracking-[0.25em] uppercase mb-3" style={{ color: currentTheme.glowHex }}>
-                    ONE ACCOUNT. ONE UNIVERSE. ENDLESS POSSIBILITIES.
+                    LAUNCH, LEARN, JOIN, AND CONNECT THE APP SUITE.
                   </p>
 
                   <p className="text-xs text-zinc-400 font-sans max-w-md mx-auto leading-relaxed mb-6">
-                    spmt.live is your universal account for SpaceMountain apps and services. This dashboard checks the live app registry before showing service status.
+                    This is the SpaceMountain hub: open the apps, learn what each one does, join HearMeOut rooms, track ChatTag, and connect DSH forum forwarding to the community forum.
                   </p>
 
                   {/* Core CTAs */}
@@ -861,6 +978,23 @@ export default function App() {
                       Explore Apps ‣
                     </button>
                   </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  {[
+                    { label: 'HearMeOut Rooms', value: `${hearmeoutRooms.length} open`, action: 'rooms', tone: 'text-emerald-400' },
+                    { label: 'ChatTag Tracker', value: currentItPlayer?.displayName || currentItPlayer?.twitchUsername || currentItPlayer?.username || currentItPlayer?.name || 'No one tagged', action: 'apps', tone: 'text-amber-400' },
+                    { label: 'DSH Forum Forward', value: 'Configure routing', action: 'forums', tone: 'text-purple-400' },
+                  ].map((item) => (
+                    <button
+                      key={item.label}
+                      onClick={() => setActiveTab(item.action)}
+                      className="p-4 rounded-2xl border border-white/5 bg-white/[0.02] text-left hover:bg-white/[0.04] transition-all"
+                    >
+                      <span className={`text-[10px] font-mono font-bold uppercase ${item.tone}`}>{item.label}</span>
+                      <span className="block text-sm font-bold text-white mt-1">{item.value}</span>
+                    </button>
+                  ))}
                 </div>
 
                 {/* The dynamic 8 Glossy app cards rows */}
@@ -903,6 +1037,80 @@ export default function App() {
                   preferences={preferences}
                   stats={stats}
                 />
+
+                <div className="dynamic-cosmic-card rounded-3xl p-5 backdrop-blur-xl transition-all duration-300">
+                  <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/5 pb-4">
+                    <div>
+                      <h3 className="text-lg font-sans font-bold text-white flex items-center gap-2">
+                        <Gamepad2 className="text-amber-400" size={18} />
+                        ChatTag Live Tracker
+                      </h3>
+                      <p className="text-xs text-zinc-400 mt-0.5">Tracks the live ChatTag game and its DSH points handoff.</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={refreshChatTagState}
+                        disabled={chatTagLoading}
+                        className="px-3 py-1.5 rounded-xl bg-amber-500/10 border border-amber-500/25 text-xs font-bold text-amber-300 disabled:opacity-50"
+                      >
+                        {chatTagLoading ? 'Refreshing...' : 'Refresh'}
+                      </button>
+                      <a href="https://chat-tag-new.fly.dev" target="_blank" rel="noreferrer" className="px-3 py-1.5 rounded-xl bg-white/5 border border-white/10 text-xs font-bold text-zinc-300 hover:text-white no-underline">
+                        Open ChatTag
+                      </a>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mt-4">
+                    <div className="rounded-2xl border border-white/5 bg-white/[0.02] p-4">
+                      <span className="text-[10px] font-mono font-bold text-zinc-500 uppercase">Current It</span>
+                      <span className="block text-sm font-bold text-white mt-2">
+                        {currentItPlayer?.displayName || currentItPlayer?.twitchUsername || currentItPlayer?.username || currentItPlayer?.name || chatTagState?.currentIt || 'No active tagger'}
+                      </span>
+                      <span className="block text-[10px] text-zinc-500 mt-1">{chatTagPlayers.length} tracked players</span>
+                    </div>
+
+                    <div className="rounded-2xl border border-white/5 bg-white/[0.02] p-4">
+                      <span className="text-[10px] font-mono font-bold text-zinc-500 uppercase">Top Players</span>
+                      <div className="flex flex-col gap-2 mt-2">
+                        {sortedChatTagPlayers.slice(0, 3).map((player, index) => (
+                          <div key={player.id || player.username || index} className="flex items-center justify-between text-xs">
+                            <span className="text-zinc-300">{index + 1}. {player.displayName || player.twitchUsername || player.username || player.name || player.id}</span>
+                            <span className="font-mono font-bold text-amber-300">{player.score || player.points || player.tags || 0}</span>
+                          </div>
+                        ))}
+                        {sortedChatTagPlayers.length === 0 && <span className="text-xs text-zinc-500">No player list returned yet.</span>}
+                      </div>
+                    </div>
+
+                    <div className="rounded-2xl border border-white/5 bg-white/[0.02] p-4">
+                      <span className="text-[10px] font-mono font-bold text-zinc-500 uppercase">Chat Commands</span>
+                      <div className="flex flex-wrap gap-1.5 mt-2">
+                        {['spmt join', 'spmt tag @user', 'spmt score', 'spmt rank', 'spmt discord name'].map((command) => (
+                          <span key={command} className="px-2 py-1 rounded-lg bg-black/30 border border-white/10 text-[10px] font-mono text-zinc-300">
+                            {command}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 rounded-2xl border border-amber-500/15 bg-amber-500/[0.03] p-4">
+                    <span className="text-xs font-bold text-white">Integration path</span>
+                    <p className="text-xs text-zinc-400 mt-1 leading-relaxed">
+                      ChatTag sends game events to Discord Stream Hub for leaderboard points, while the hub keeps the live state visible here for players learning the commands.
+                    </p>
+                    {recentTags.length > 0 && (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-3">
+                        {recentTags.map((tag, index) => (
+                          <div key={tag.id || index} className="text-[10px] font-mono text-zinc-400 bg-black/20 rounded-xl px-3 py-2">
+                            {(tag.tagger || 'Someone')} tagged {(tag.target || tag.tagged || 'someone')}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
               </motion.div>
             )}
 
@@ -1017,9 +1225,9 @@ export default function App() {
                   <div>
                     <h2 className="text-xl font-sans font-bold text-white flex items-center gap-2">
                       <MessageSquare className="text-purple-400" size={20} />
-                      Community Forums
+                      Forums + Discord Stream Hub Forwarding
                     </h2>
-                    <p className="text-xs text-zinc-400 font-sans mt-0.5">Explore guides, alerts, and community posts</p>
+                    <p className="text-xs text-zinc-400 font-sans mt-0.5">Read forum posts and wire DSH so Discord channels can forward into forum threads</p>
                   </div>
                   <button
                     onClick={() => setIsCreatingThread(!isCreatingThread)}
@@ -1027,6 +1235,86 @@ export default function App() {
                   >
                     <Plus size={14} /> {isCreatingThread ? 'VIEW THREADS' : 'NEW DISCUSSION THREAD'}
                   </button>
+                </div>
+
+                <div className="rounded-2xl border border-purple-500/15 bg-purple-500/[0.04] p-4">
+                  <div className="flex flex-col gap-1 mb-4">
+                    <span className="text-xs font-bold text-white">DSH Forum Forwarding</span>
+                    <span className="text-xs text-zinc-400">
+                      This calls Discord Stream Hub's real forwarding-forums API. Per-source mode auto-creates or reuses a forum thread per source channel; shared-thread mode sends allowed channels into one destination thread.
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <input
+                      value={dshRuleLabel}
+                      onChange={(e) => setDshRuleLabel(e.target.value)}
+                      placeholder="Rule label"
+                      className="bg-black/30 border border-white/10 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-purple-400"
+                    />
+                    <input
+                      value={dshSourceServerId}
+                      onChange={(e) => setDshSourceServerId(e.target.value)}
+                      placeholder="Source Discord server ID"
+                      className="bg-black/30 border border-white/10 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-purple-400"
+                    />
+                    <input
+                      value={dshDestinationServerId}
+                      onChange={(e) => setDshDestinationServerId(e.target.value)}
+                      placeholder="Destination Discord server ID"
+                      className="bg-black/30 border border-white/10 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-purple-400"
+                    />
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-3">
+                    <select
+                      value={dshForwardingMode}
+                      onChange={(e) => setDshForwardingMode(e.target.value as 'per-source-thread' | 'single-thread')}
+                      className="bg-black/30 border border-white/10 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-purple-400"
+                    >
+                      <option value="per-source-thread">One forum thread per source channel</option>
+                      <option value="single-thread">One shared destination thread</option>
+                    </select>
+                    {dshForwardingMode === 'per-source-thread' ? (
+                      <input
+                        value={dshForumChannelId}
+                        onChange={(e) => setDshForumChannelId(e.target.value)}
+                        placeholder="Destination forum parent channel ID"
+                        className="bg-black/30 border border-white/10 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-purple-400 md:col-span-2"
+                      />
+                    ) : (
+                      <input
+                        value={dshSharedThreadId}
+                        onChange={(e) => setDshSharedThreadId(e.target.value)}
+                        placeholder="Shared destination thread ID"
+                        className="bg-black/30 border border-white/10 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-purple-400 md:col-span-2"
+                      />
+                    )}
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2 mt-4">
+                    <button
+                      type="button"
+                      onClick={loadDshForwardingRule}
+                      className="px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-xs font-bold text-zinc-200 hover:bg-white/10"
+                    >
+                      Load Existing Rule
+                    </button>
+                    <button
+                      type="button"
+                      onClick={saveDshForwardingRule}
+                      disabled={dshSaving}
+                      className="px-4 py-2 rounded-xl bg-purple-600 text-xs font-bold text-white hover:bg-purple-500 disabled:opacity-50"
+                    >
+                      {dshSaving ? 'Saving...' : 'Save DSH Forward'}
+                    </button>
+                    <a
+                      href="https://discord-stream-hub-new.fly.dev/settings"
+                      target="_blank"
+                      rel="noreferrer"
+                      className="px-4 py-2 rounded-xl bg-black/30 border border-white/10 text-xs font-bold text-zinc-300 hover:text-white no-underline"
+                    >
+                      Open DSH Settings
+                    </a>
+                    {dshStatus && <span className="text-[10px] text-zinc-400 font-mono">{dshStatus}</span>}
+                  </div>
                 </div>
 
                 {isCreatingThread ? (
@@ -1115,98 +1403,76 @@ export default function App() {
                       <p className="text-xs text-zinc-400 mt-0.5">HearMeOut room and watch-party entry points</p>
                   </div>
                   <button
-                    onClick={() => {
-                      setVoiceRoomActive(!voiceRoomActive);
-                      alert(voiceRoomActive ? 'Muted station speakers.' : 'Station audio receiver connected.');
-                    }}
-                    className={`px-4 py-1.5 rounded-xl font-mono text-xs font-bold transition-all border ${
-                      voiceRoomActive 
-                        ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' 
-                        : 'bg-zinc-800 border-zinc-700 text-zinc-400'
-                    }`}
+                    onClick={refreshHearMeOutRooms}
+                    disabled={hearmeoutLoading}
+                    className="px-4 py-1.5 rounded-xl font-mono text-xs font-bold transition-all border bg-emerald-500/10 border-emerald-500/30 text-emerald-400 disabled:opacity-50"
                   >
-                    {voiceRoomActive ? 'CONNECTED ●' : 'DISCONNECTED'}
+                    {hearmeoutLoading ? 'CHECKING...' : `${hearmeoutRooms.length} ROOMS`}
                   </button>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-2">
-                  
-                  {/* EQ Equalizer Waveform animations */}
-                  <div className="rounded-2xl border border-white/5 bg-white/[0.01] p-5 flex flex-col items-center justify-center text-center relative overflow-hidden min-h-[220px]">
-                    <span className="text-[10px] font-mono font-bold text-zinc-500 block mb-6">LIVE FREQUENCY ANALYSIS</span>
-                    
-                    {/* Pulsing visual synth bars */}
-                    <div className="flex items-end gap-1.5 h-20 mb-6">
-                      {Array.from({ length: 16 }).map((_, index) => {
-                        const heights = ['h-4', 'h-10', 'h-16', 'h-20', 'h-8', 'h-14', 'h-18', 'h-12'];
-                        const h = heights[index % heights.length];
-                        const animDuration = `${1 + (index % 4) * 0.3}s`;
-                        
-                        return (
-                          <div 
-                            key={index}
-                            className={`w-1.5 bg-gradient-to-t from-emerald-500 to-teal-400 rounded-full transition-all duration-300`}
-                            style={{ 
-                              height: voiceRoomActive ? undefined : '4px',
-                              animation: voiceRoomActive ? `Floating ${animDuration} ease-in-out infinite` : 'none'
-                            }}
-                          />
-                        );
-                      })}
-                    </div>
-
-                    <span className="text-xs font-bold text-white">HearMeOut service route</span>
-                    <span className="text-[9px] font-mono text-emerald-400 mt-1 font-bold">Open the app card for live rooms</span>
-                  </div>
-
-                  {/* Speakers list in room */}
-                  <div className="rounded-2xl border border-white/5 bg-white/[0.01] p-5 flex flex-col justify-between">
-                    <div>
-                      <span className="text-[10px] font-mono font-bold text-zinc-500 block mb-4">CAPTAINS SPEAKING IN HARMONY</span>
-                      <div className="flex flex-col gap-3">
-                        {[(identity?.displayName || identity?.username || 'Signed-in user')].map((user) => {
-                          const isSpeaking = speakingUsers.includes(user);
-                          return (
-                            <div key={user} className="flex items-center justify-between">
-                              <div className="flex items-center gap-2.5">
-                                <div className={`w-8 h-8 rounded-full border flex items-center justify-center text-xs font-bold bg-zinc-900 ${
-                                  isSpeaking ? 'border-emerald-500 shadow-[0_0_8px_#10b981]' : 'border-white/10'
-                                }`}>
-                                  👤
-                                </div>
-                                <span className="text-xs font-sans font-bold text-white">{user}</span>
-                              </div>
-                              {isSpeaking ? (
-                                <span className="text-[9px] font-mono font-semibold text-emerald-400 uppercase animate-pulse">SPEAKING</span>
-                              ) : (
-                                <span className="text-[9px] font-mono text-zinc-600 uppercase">MUTED</span>
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-
-                    {/* Microphone control toggle */}
-                    <div className="mt-5 pt-4 border-t border-white/5 flex items-center justify-between">
-                      <span className="text-xs text-zinc-400 font-sans">Push to Talk micro-controls</span>
-                      <button
-                        onClick={() => {
-                          setMicState(prev => prev === 'muted' ? 'listening' : 'muted');
-                          alert(micState === 'listening' ? 'Microphone muted.' : 'Microphone unmuted.');
-                        }}
-                        className={`px-3 py-1.5 rounded-xl text-[10px] font-mono font-bold transition-all ${
-                          micState === 'listening' 
-                            ? 'bg-red-500/10 border border-red-500/20 text-red-400' 
-                            : 'bg-zinc-800 border border-zinc-700 text-zinc-400'
-                        }`}
-                      >
-                        {micState === 'listening' ? '🎙️ MIC ON' : '🔇 MUTED'}
-                      </button>
-                    </div>
-                  </div>
-
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={refreshHearMeOutRooms}
+                    disabled={hearmeoutLoading}
+                    className="px-4 py-2 rounded-xl bg-emerald-500/10 border border-emerald-500/25 text-xs font-bold text-emerald-300 hover:bg-emerald-500/15 disabled:opacity-50"
+                  >
+                    {hearmeoutLoading ? 'Refreshing...' : 'Refresh Rooms'}
+                  </button>
+                  <a
+                    href="https://hearmeout-main.fly.dev"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-xs font-bold text-zinc-300 hover:text-white no-underline"
+                  >
+                    Open HearMeOut
+                  </a>
                 </div>
+
+                {hearmeoutRooms.length === 0 ? (
+                  <div className="rounded-2xl border border-white/5 bg-white/[0.02] p-5">
+                    <span className="text-xs font-bold text-white">No open rooms returned right now.</span>
+                    <p className="text-xs text-zinc-400 mt-1 leading-relaxed">
+                      The hub is calling HearMeOut's live room API. Create a room in HearMeOut, then refresh here to join it from the hub.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
+                    {hearmeoutRooms.map((room) => (
+                      <div key={room.id} className="rounded-2xl border border-emerald-500/15 bg-emerald-500/[0.03] p-5">
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <span className="text-xs font-bold text-white">{room.name || room.id}</span>
+                            <p className="text-xs text-zinc-400 mt-1 leading-relaxed">{room.description || 'HearMeOut live room'}</p>
+                          </div>
+                          <span className="text-[10px] font-mono font-bold text-emerald-300 bg-emerald-500/10 border border-emerald-500/20 rounded-full px-2 py-1">
+                            {room.activeCount || 0} active
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-4">
+                          {room.roomUrl && (
+                            <a href={room.roomUrl} target="_blank" rel="noreferrer" className="px-3 py-2 rounded-xl bg-emerald-500 text-xs font-bold text-black text-center no-underline">
+                              Join Room
+                            </a>
+                          )}
+                          {room.overlayUrl && (
+                            <a href={room.overlayUrl} target="_blank" rel="noreferrer" className="px-3 py-2 rounded-xl bg-black/30 border border-white/10 text-xs font-bold text-zinc-200 text-center no-underline">
+                              Open Overlay
+                            </a>
+                          )}
+                        </div>
+                        {(room.watchMovieSessionId || room.watchMusicSessionId) && (
+                          <div className="mt-3 text-[10px] text-zinc-500 font-mono">
+                            {room.watchMovieSessionId ? `movie: ${room.watchMovieSessionId}` : ''}
+                            {room.watchMovieSessionId && room.watchMusicSessionId ? ' | ' : ''}
+                            {room.watchMusicSessionId ? `music: ${room.watchMusicSessionId}` : ''}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </motion.div>
             )}
 
@@ -1298,57 +1564,32 @@ export default function App() {
                 <div className="flex items-center justify-between border-b border-white/5 pb-4">
                   <div>
                     <h2 className="text-xl font-sans font-bold text-white flex items-center gap-2">
-                      <Rocket className="text-orange-400 animate-pulse" size={20} />
-                      Workflow Builder Studio
+                      <Rocket className="text-orange-400" size={20} />
+                      Integration Map
                     </h2>
-                     <p className="text-xs text-zinc-400 mt-0.5">Registry view for connected SpaceMountain workflows</p>
+                     <p className="text-xs text-zinc-400 mt-0.5">How the SpaceMountain apps hand work to each other</p>
                   </div>
                 </div>
 
-                <div className="rounded-2xl border border-white/5 bg-black/40 min-h-[250px] p-6 relative overflow-hidden flex flex-col md:flex-row gap-4 items-center justify-center">
-                  {/* Connected app workflow overview */}
-                  <div className="flex flex-col md:flex-row items-center gap-4 relative z-10">
-                    
-                    {/* Node 1 */}
-                    <div className="bg-zinc-950 border border-orange-500/30 p-4 rounded-xl min-w-[140px] text-center shadow-lg">
-                      <span className="text-[10px] font-mono font-bold text-orange-400">TRIGGER</span>
-                      <span className="text-xs font-bold text-white block mt-1.5">MountainView seed</span>
-                      <span className="text-[9px] text-zinc-500 block font-mono mt-0.5">ID: mtnview_scan</span>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {[
+                    ['ChatTag -> DSH', 'ChatTag forwards Twitch/chat game events into Discord Stream Hub so points and leaderboards stay connected.', 'Open tracker', 'apps'],
+                    ['DSH -> Forums', 'Forum Forwarding posts Discord source-channel activity into forum threads using saved DSH rules.', 'Configure forward', 'forums'],
+                    ['HearMeOut -> Rooms', 'Open HearMeOut rooms can be joined from the hub, with overlay links for watch, music, and now-playing views.', 'Join rooms', 'rooms'],
+                    ['MountainView -> StreamWeaver', 'Glasses voice/image commands route through StreamWeaver for bot commands, visual context, overlays, and automation.', 'Pair glasses', 'mtnview'],
+                  ].map(([title, body, label, tab]) => (
+                    <div key={title} className="rounded-2xl border border-white/5 bg-white/[0.02] p-5">
+                      <span className="text-xs font-bold text-white">{title}</span>
+                      <p className="text-xs text-zinc-400 leading-relaxed mt-2">{body}</p>
+                      <button
+                        type="button"
+                        onClick={() => setActiveTab(tab)}
+                        className="mt-4 px-3 py-1.5 rounded-xl bg-orange-500/10 border border-orange-500/20 text-xs font-bold text-orange-300 hover:bg-orange-500/15"
+                      >
+                        {label}
+                      </button>
                     </div>
-
-                    {/* Arrow 1 */}
-                    <div className="text-zinc-600 font-bold animate-pulse">➔</div>
-
-                    {/* Node 2 */}
-                    <div className="bg-zinc-950 border border-purple-500/30 p-4 rounded-xl min-w-[140px] text-center shadow-lg">
-                      <span className="text-[10px] font-mono font-bold text-purple-400">ROUTER</span>
-                      <span className="text-xs font-bold text-white block mt-1.5">spmt.live Gateway</span>
-                      <span className="text-[9px] text-zinc-500 block font-mono mt-0.5">ID: gateway_dns</span>
-                    </div>
-
-                    {/* Arrow 2 */}
-                    <div className="text-zinc-600 font-bold animate-pulse">➔</div>
-
-                    {/* Node 3 */}
-                    <div className="bg-zinc-950 border border-emerald-500/30 p-4 rounded-xl min-w-[140px] text-center shadow-lg">
-                      <span className="text-[10px] font-mono font-bold text-emerald-400">ACTION</span>
-                      <span className="text-xs font-bold text-white block mt-1.5">StreamWeaver</span>
-                      <span className="text-[9px] text-zinc-500 block font-mono mt-0.5">ID: streamweaver_api</span>
-                    </div>
-
-                  </div>
-
-                  <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_rgba(255,255,255,0.015)_1px,_transparent_1px)] bg-[size:16px_16px] pointer-events-none" />
-                </div>
-
-                <div className="p-4 rounded-2xl bg-white/[0.01] border border-white/5 flex items-center justify-between text-xs font-sans text-zinc-400 mt-2">
-                  <span>Workflow editing needs a real workflow API before new steps can be saved.</span>
-                  <button 
-                    disabled
-                    className="px-3 py-1.5 rounded-xl bg-orange-500/10 hover:bg-orange-500/20 text-orange-400 hover:text-white border border-orange-500/20 text-xs font-bold transition-all"
-                  >
-                    API NOT CONNECTED
-                  </button>
+                  ))}
                 </div>
               </motion.div>
             )}
@@ -1428,22 +1669,22 @@ export default function App() {
                   </div>
 
                   <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/5">
-                    <span className="text-xs font-bold text-white block mb-1">How do I bind custom themes?</span>
+                    <span className="text-xs font-bold text-white block mb-1">Where should I start?</span>
                     <p className="text-xs text-zinc-400 leading-relaxed">
-                      Simply toggle our customized visual customizer presets (Solar Flare, Nebula Purple, Oceanic Blue, or Aurora Green) or adjust the slider parameters like star densities and blur intensities dynamically.
+                      Use Apps for launch links and ChatTag status, Rooms to join HearMeOut, Forums to configure DSH forum forwarding, and Integration Map to see how the apps pass events between each other.
                     </p>
                   </div>
 
                   <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/5">
-                    <span className="text-xs font-bold text-white block mb-1">System Architecture Status</span>
+                    <span className="text-xs font-bold text-white block mb-1">Live Hub Status</span>
                     <div className="grid grid-cols-2 gap-4 mt-2.5">
                       <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 font-mono text-[10px] flex items-center justify-between">
-                        <span>PERSISTENCE DATABASE:</span>
-                        <span className="font-extrabold">SQLITE ONLINE</span>
+                        <span>ONLINE APPS:</span>
+                        <span className="font-extrabold">{stats.onlineApps}/{stats.checkedApps}</span>
                       </div>
                       <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 font-mono text-[10px] flex items-center justify-between">
-                        <span>BACKEND HOST SERVER:</span>
-                        <span className="font-extrabold">EXPRESS PORT:3000</span>
+                        <span>JOINABLE ROOMS:</span>
+                        <span className="font-extrabold">{hearmeoutRooms.length}</span>
                       </div>
                     </div>
                   </div>
@@ -1464,38 +1705,51 @@ export default function App() {
                   <div>
                     <h2 className="text-xl font-sans font-bold text-white flex items-center gap-2">
                       <Users className="text-blue-400" size={20} />
-                      Crew Desk
+                      App Crew Desk
                     </h2>
-                    <p className="text-xs text-zinc-400 mt-0.5">Explore station captains and active users on network</p>
+                    <p className="text-xs text-zinc-400 mt-0.5">Operational entry points for the apps that support the hub</p>
                   </div>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-2">
-                  {[
-                    { name: 'NovaStar', email: 'novastar@spmt.live', role: 'Station Creator', status: 'Online', emoji: '👽' },
-                    { name: 'LunaVibes', email: 'luna@spmt.live', role: 'System Admin', status: 'In voice room', emoji: '👩‍🚀' },
-                    { name: 'EchoPulse', email: 'echo@spmt.live', role: 'Hardware Tech', status: 'Offline', emoji: '🤖' }
-                  ].map((crew, index) => (
-                    <div key={index} className="p-4 rounded-2xl bg-white/[0.02] border border-white/5 flex flex-col justify-between">
+                  {tools.filter((tool) => ['streamweaver', 'hearmeout', 'discord-hub', 'chat-tag', 'mountainview', 'forums'].includes(tool.id)).map((tool) => (
+                    <div key={tool.id} className="p-4 rounded-2xl bg-white/[0.02] border border-white/5 flex flex-col justify-between">
                       <div className="flex items-center gap-3 mb-4">
                         {preferences.showAvatars && (
                           <div className="w-10 h-10 rounded-full bg-zinc-900 border border-white/10 flex items-center justify-center text-lg">
-                            {crew.emoji}
+                            {tool.badge.slice(0, 2)}
                           </div>
                         )}
                         <div className="flex flex-col">
-                          <span className="text-xs font-bold text-white">{crew.name}</span>
-                          <span className="text-[10px] text-zinc-500 font-mono mt-0.5">{crew.email}</span>
+                          <span className="text-xs font-bold text-white">{tool.name}</span>
+                          <span className="text-[10px] text-zinc-500 font-mono mt-0.5">{tool.appUrl || tool.route}</span>
                         </div>
                       </div>
                       <div className="flex items-center justify-between text-[10px] font-mono pt-3 border-t border-white/5">
-                        <span className="text-zinc-400">{crew.role}</span>
-                        <span className={`font-bold ${crew.status === 'Offline' ? 'text-zinc-500' : 'text-emerald-400'}`}>
-                          ● {crew.status}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (tool.id === 'hearmeout') setActiveTab('rooms');
+                            else if (tool.id === 'discord-hub' || tool.id === 'forums') setActiveTab('forums');
+                            else if (tool.id === 'chat-tag') setActiveTab('apps');
+                            else if (tool.id === 'mountainview') setActiveTab('mtnview');
+                            else window.open(tool.appUrl || tool.route, '_blank');
+                          }}
+                          className="text-zinc-300 hover:text-white"
+                        >
+                          Open
+                        </button>
+                        <span className={`font-bold ${tool.statusType === 'live' ? 'text-emerald-400' : 'text-zinc-500'}`}>
+                          ● {tool.statusText}
                         </span>
                       </div>
                     </div>
                   ))}
+                  {tools.length === 0 && (
+                    <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/5 text-xs text-zinc-400">
+                      Loading app registry...
+                    </div>
+                  )}
                 </div>
               </motion.div>
             )}
@@ -1517,11 +1771,11 @@ export default function App() {
         <span className="inline-flex items-center justify-center gap-2">
           <img
             src="/assets/astronaut-avatar.jpg"
-            alt="NovaStar"
+            alt="SpaceMountain account"
             className="w-5 h-5 rounded-full object-cover border border-white/10"
             referrerPolicy="no-referrer"
           />
-          <span>One Login. Infinite Universe. SpaceMountain Ecosystem Sync • Spmt.live</span>
+          <span>One login for the SpaceMountain app hub • Spmt.live</span>
         </span>
       </footer>
 

@@ -24,6 +24,48 @@ export interface DashboardStats {
   mediaJobsCount: number;
 }
 
+export interface HearMeOutRoom {
+  index?: number;
+  id: string;
+  name: string;
+  description?: string;
+  activeCount?: number;
+  roomUrl?: string;
+  overlayUrl?: string;
+  watchMovieSessionId?: string;
+  watchMusicSessionId?: string;
+}
+
+export interface ChatTagPlayer {
+  id?: string;
+  username?: string;
+  twitchUsername?: string;
+  displayName?: string;
+  name?: string;
+  score?: number;
+  points?: number;
+  tags?: number;
+  isIt?: boolean;
+}
+
+export interface ChatTagHistoryItem {
+  id?: string;
+  tagger?: string;
+  target?: string;
+  tagged?: string;
+  timestamp?: string | number;
+  createdAt?: string;
+}
+
+export interface ChatTagState {
+  players?: ChatTagPlayer[];
+  currentIt?: string | null;
+  lastTagTime?: number | string | null;
+  history?: ChatTagHistoryItem[];
+  adminHistory?: ChatTagHistoryItem[];
+  monthlyWinners?: ChatTagPlayer[];
+}
+
 export interface BrandingConfig {
   domain: string;
   title: string;

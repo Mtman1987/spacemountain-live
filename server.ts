@@ -156,6 +156,27 @@ async function probeUrl(url: string | null) {
   }
 }
 
+async function fetchJsonFromApp(url: string, init: RequestInit = {}) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 8000);
+  try {
+    const response = await fetch(url, {
+      ...init,
+      signal: controller.signal,
+      headers: {
+        Accept: 'application/json',
+        ...(init.body ? { 'Content-Type': 'application/json' } : {}),
+        ...(init.headers || {}),
+      },
+    });
+    const text = await response.text();
+    const payload = text ? JSON.parse(text) : null;
+    return { ok: response.ok, status: response.status, payload };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 async function getHydratedTools() {
   const storedTools = db.select().from(communityTools).all();
   const storedById = new Map(storedTools.map((tool) => [tool.id, tool]));
@@ -422,6 +443,75 @@ async function startServer() {
       });
     } catch (err) {
       res.status(500).json({ error: 'Failed to retrieve stats' });
+    }
+  });
+
+  // ─── Integration Hub Routes ───
+  app.get('/api/integrations/hearmeout/rooms', async (req, res) => {
+    try {
+      const result = await fetchJsonFromApp('https://hearmeout-main.fly.dev/api/voice/hearmeout');
+      res.status(result.status).json(result.payload);
+    } catch (err) {
+      res.status(502).json({ error: 'Could not reach HearMeOut room list' });
+    }
+  });
+
+  app.post('/api/integrations/hearmeout/voice', async (req, res) => {
+    try {
+      const result = await fetchJsonFromApp('https://hearmeout-main.fly.dev/api/voice/hearmeout', {
+        method: 'POST',
+        body: JSON.stringify(req.body || {}),
+      });
+      res.status(result.status).json(result.payload);
+    } catch (err) {
+      res.status(502).json({ error: 'Could not reach HearMeOut voice command route' });
+    }
+  });
+
+  app.get('/api/integrations/chat-tag/state', async (req, res) => {
+    try {
+      const result = await fetchJsonFromApp('https://chat-tag-new.fly.dev/api/tag');
+      res.status(result.status).json(result.payload);
+    } catch (err) {
+      res.status(502).json({ error: 'Could not reach ChatTag state' });
+    }
+  });
+
+  app.get('/api/integrations/dsh/forum-forwarding', async (req, res) => {
+    const sourceServerId = String(req.query.sourceServerId || '').trim();
+    if (!sourceServerId) {
+      return res.status(400).json({ error: 'sourceServerId is required' });
+    }
+    try {
+      const url = `https://discord-stream-hub-new.fly.dev/api/settings/forwarding-forums?sourceServerId=${encodeURIComponent(sourceServerId)}`;
+      const result = await fetchJsonFromApp(url);
+      res.status(result.status).json(result.payload);
+    } catch (err) {
+      res.status(502).json({ error: 'Could not reach Discord Stream Hub forum forwarding settings' });
+    }
+  });
+
+  app.post('/api/integrations/dsh/forum-forwarding', async (req, res) => {
+    try {
+      const result = await fetchJsonFromApp('https://discord-stream-hub-new.fly.dev/api/settings/forwarding-forums', {
+        method: 'POST',
+        body: JSON.stringify(req.body || {}),
+      });
+      res.status(result.status).json(result.payload);
+    } catch (err) {
+      res.status(502).json({ error: 'Could not save Discord Stream Hub forum forwarding settings' });
+    }
+  });
+
+  app.delete('/api/integrations/dsh/forum-forwarding', async (req, res) => {
+    try {
+      const result = await fetchJsonFromApp('https://discord-stream-hub-new.fly.dev/api/settings/forwarding-forums', {
+        method: 'DELETE',
+        body: JSON.stringify(req.body || {}),
+      });
+      res.status(result.status).json(result.payload);
+    } catch (err) {
+      res.status(502).json({ error: 'Could not delete Discord Stream Hub forum forwarding settings' });
     }
   });
 

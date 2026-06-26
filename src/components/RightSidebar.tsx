@@ -48,7 +48,7 @@ export default function RightSidebar({
             >
               <img 
                 src="/assets/astronaut-avatar.jpg" 
-                alt="NovaStar"
+                alt="SpaceMountain account"
                 className="w-full h-full object-cover rounded-full"
                 referrerPolicy="no-referrer"
               />
@@ -62,12 +62,12 @@ export default function RightSidebar({
           <div className="flex flex-col min-w-0">
             <div className="flex items-center gap-1.5">
               <span className="text-sm font-sans font-extrabold text-white truncate">
-                {identity?.displayName || 'NovaStar'}
+                {identity?.displayName || 'Guest Captain'}
               </span>
               <span className="w-2.5 h-2.5 bg-blue-500 rounded-full flex items-center justify-center text-[7px] text-white font-bold font-mono">✓</span>
             </div>
             <span className="text-[10px] text-zinc-400 font-mono truncate">
-              {identity ? `${identity.username}@spmt.live` : 'novastar@spmt.live'}
+              {identity ? `${identity.username}@spmt.live` : 'Sign in with spmt.live'}
             </span>
           </div>
         </div>
