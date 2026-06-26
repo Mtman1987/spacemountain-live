@@ -1392,7 +1392,7 @@ export default function App() {
                 exit={{ opacity: 0, y: -15 }}
                 transition={{ duration: 0.3 }}
               >
-                <Arena accentColor={currentTheme.glowHex} />
+                <Arena accentColor={currentTheme.glowHex} points={identity?.points || 0} />
               </motion.div>
             )}
 

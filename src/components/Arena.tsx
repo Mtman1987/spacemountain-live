@@ -15,20 +15,24 @@ interface Player {
 
 interface ArenaProps {
   accentColor: string;
+  points: number;
 }
 
-export default function Arena({ accentColor }: ArenaProps) {
+export default function Arena({ accentColor, points }: ArenaProps) {
   const [players, setPlayers] = useState<Player[]>([]);
   const [myId, setMyId] = useState<string>('');
   const [joined, setJoined] = useState(false);
   const [leaderboard, setLeaderboard] = useState<any[]>([]);
   const [showShop, setShowShop] = useState(false);
-  const [balance, setBalance] = useState(0);
+  const [balance, setBalance] = useState(points);
   const [hitFeedback, setHitFeedback] = useState('');
   const arenaRef = useRef<HTMLDivElement>(null);
   const posRef = useRef({ x: 400, y: 300, angle: 0 });
   const mouseRef = useRef({ x: 400, y: 300 });
   const token = localStorage.getItem('spmtToken');
+
+  // Keep balance synced with points from parent
+  useEffect(() => { setBalance(points); }, [points]);
 
   const apiCall = useCallback(async (path: string, opts?: any) => {
     return fetch(`https://spmt.live${path}`, {
@@ -46,9 +50,6 @@ export default function Arena({ accentColor }: ArenaProps) {
       setJoined(true);
       const me = await apiCall('/api/auth/me');
       if (me.ok) { const d = await me.json(); setMyId(d.user.id); }
-      // Fetch balance
-      const shopRes = await apiCall('/api/arena/shop');
-      if (shopRes.ok) { const d = await shopRes.json(); setBalance(d.balance || 0); }
     }
   };
 
