@@ -134,13 +134,8 @@ async function startServer() {
 
   // OAuth2 login redirect - sends user to spmt.live to authenticate
   app.get('/auth/login', (req, res) => {
-    const spmtUrl = 'https://spmt.live/api/oauth/authorize';
-    const params = new URLSearchParams({
-      client_id: 'spacemountain-live',
-      redirect_uri: 'https://spacemountain.live/auth/callback',
-      state: Math.random().toString(36).slice(2),
-    });
-    res.redirect(`${spmtUrl}?${params}`);
+    const returnUrl = `/api/oauth/authorize?client_id=spacemountain-live&redirect_uri=${encodeURIComponent('https://spacemountain.live/auth/callback')}&state=${Math.random().toString(36).slice(2)}`;
+    res.redirect(`https://spmt.live/?return=${encodeURIComponent(returnUrl)}`);
   });
 
   // API Route: Domain-specific branding
