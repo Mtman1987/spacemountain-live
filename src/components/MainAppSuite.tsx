@@ -1,8 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { 
-  Volume2, Gamepad2, Compass, Headphones, Eye, Mail, MessageSquare, LayoutGrid, Play, Activity 
-} from 'lucide-react';
+import { Download } from 'lucide-react';
 import { CommunityTool, DashboardStats } from '../types';
 import { UserPreferences } from '../types';
 
@@ -18,6 +16,7 @@ export default function MainAppSuite({ tools, onTriggerAction, accentColor, pref
   const [clickCount, setClickCount] = useState(0);
   const [cooldownEnd, setCooldownEnd] = useState<number>(0);
   const [cooldownText, setCooldownText] = useState('');
+  const [installPrompt, setInstallPrompt] = useState<any>(null);
 
   // Cooldown timer display
   useEffect(() => {
@@ -32,6 +31,15 @@ export default function MainAppSuite({ tools, onTriggerAction, accentColor, pref
     return () => clearInterval(interval);
   }, [cooldownEnd]);
 
+  useEffect(() => {
+    const onBeforeInstallPrompt = (event: Event) => {
+      event.preventDefault();
+      setInstallPrompt(event);
+    };
+    window.addEventListener('beforeinstallprompt', onBeforeInstallPrompt);
+    return () => window.removeEventListener('beforeinstallprompt', onBeforeInstallPrompt);
+  }, []);
+
   const handleTileClick = (toolId: string, isInternal: boolean, isComingSoon: boolean) => {
     if (!isInternal && !isComingSoon) return; // external apps don't award XP
     if (cooldownEnd > Date.now()) return; // on cooldown
@@ -42,6 +50,16 @@ export default function MainAppSuite({ tools, onTriggerAction, accentColor, pref
       setCooldownEnd(Date.now() + 5 * 60 * 1000);
     }
     onTriggerAction(toolId);
+  };
+
+  const handleInstall = async (event: React.MouseEvent, appLink: string, isExternal: boolean) => {
+    event.stopPropagation();
+    if (!isExternal && installPrompt) {
+      await installPrompt.prompt();
+      setInstallPrompt(null);
+      return;
+    }
+    window.open(appLink, '_blank');
   };
   // Mapping tools to their unique unicode icons from testing.html
   const appIcons: Record<string, string> = {
@@ -191,6 +209,15 @@ export default function MainAppSuite({ tools, onTriggerAction, accentColor, pref
                   ⏳ {cooldownText}
                 </div>
               )}
+
+              <button
+                type="button"
+                onClick={(event) => handleInstall(event, appLink, isExternal)}
+                className="mt-2 w-full inline-flex items-center justify-center gap-1 rounded-lg border border-white/10 bg-black/25 px-2 py-1 text-[8px] font-mono font-bold text-zinc-300 hover:text-white hover:bg-white/10"
+                title={isExternal ? `Open ${tool.name} so your browser can install it as an app` : 'Install SpaceMountain hub as an app'}
+              >
+                <Download size={10} /> Download
+              </button>
             </motion.div>
           );
         })}

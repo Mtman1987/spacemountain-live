@@ -287,10 +287,12 @@ export default function App() {
   const [speakingUsers, setSpeakingUsers] = useState<string[]>([]);
   const [hearmeoutRooms, setHearmeoutRooms] = useState<HearMeOutRoom[]>([]);
   const [hearmeoutLoading, setHearmeoutLoading] = useState(false);
+  const [embeddedRoomUrl, setEmbeddedRoomUrl] = useState<string | null>(null);
 
   // ChatTag tracker state
   const [chatTagState, setChatTagState] = useState<ChatTagState | null>(null);
   const [chatTagLoading, setChatTagLoading] = useState(false);
+  const [embeddedAppUrl, setEmbeddedAppUrl] = useState<string | null>(null);
 
   // MountainView QR HUD Seed state
   const [qrHUDSeed, setQrHUDSeed] = useState('https://spacemountain.live/invite/novastar');
@@ -579,6 +581,51 @@ export default function App() {
       }
     } catch (err) {
       console.warn('Points sync failed', err);
+    }
+  };
+
+  const handleSpendDshPoints = async (amount: number) => {
+    const cachedUser = localStorage.getItem('spmtIdentity');
+    if (!cachedUser || amount <= 0) return false;
+
+    try {
+      const user = JSON.parse(cachedUser);
+      if (!user.username) return false;
+
+      const lookup = await fetch(`https://spmt.live/api/user/lookup?username=${encodeURIComponent(user.username)}`);
+      if (!lookup.ok) return false;
+      const spmtUser = await lookup.json();
+      if (!spmtUser?.discord_id) return false;
+
+      const balanceResponse = await fetch('https://discord-stream-hub-new.fly.dev/api/points/balance', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer 1234' },
+        body: JSON.stringify({ userId: spmtUser.discord_id, username: user.username, displayName: user.displayName }),
+      });
+      if (!balanceResponse.ok) return false;
+      const balanceData = await balanceResponse.json();
+      const currentPoints = Number(balanceData?.points || 0);
+      if (currentPoints < amount) return false;
+
+      const nextPoints = currentPoints - amount;
+      const setResponse = await fetch('https://discord-stream-hub-new.fly.dev/api/points/set', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer 1234' },
+        body: JSON.stringify({
+          userId: spmtUser.discord_id,
+          username: user.username,
+          displayName: user.displayName || user.username,
+          points: nextPoints,
+        }),
+      });
+      if (!setResponse.ok) return false;
+
+      setIdentity(prev => prev ? { ...prev, points: nextPoints } : prev);
+      localStorage.setItem('spmtIdentity', JSON.stringify({ ...user, points: nextPoints }));
+      return true;
+    } catch (err) {
+      console.warn('Discord Stream Hub points spend failed', err);
+      return false;
     }
   };
 
@@ -1060,6 +1107,61 @@ export default function App() {
                     )}
                   </div>
                 </div>
+
+                <div className="dynamic-cosmic-card rounded-3xl p-5 backdrop-blur-xl transition-all duration-300">
+                  <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/5 pb-4">
+                    <div>
+                      <h3 className="text-lg font-sans font-bold text-white flex items-center gap-2">
+                        <Sparkles className="text-cyan-400" size={18} />
+                        StreamWeaver Bots + Flow Library
+                      </h3>
+                      <p className="text-xs text-zinc-400 mt-0.5">Learn bot commands, browse installable community flows, and open builders inside the hub first.</p>
+                    </div>
+                    <a href="https://streamweaver-new.fly.dev" target="_blank" rel="noreferrer" className="px-3 py-1.5 rounded-xl bg-white/5 border border-white/10 text-xs font-bold text-zinc-300 hover:text-white no-underline">
+                      Pop Out StreamWeaver
+                    </a>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mt-4">
+                    {[
+                      ['Community Flows', 'Install shared flow packs', 'https://streamweaver-new.fly.dev/community'],
+                      ['Commands', 'Learn and make commands', 'https://streamweaver-new.fly.dev/commands'],
+                      ['Bot Integrations', 'Connect broadcaster, bot, and community bot', 'https://streamweaver-new.fly.dev/integrations'],
+                      ['Workflows', 'Build and edit action flows', 'https://streamweaver-new.fly.dev/active-commands'],
+                    ].map(([title, body, url]) => (
+                      <div key={title} className="rounded-2xl border border-white/5 bg-white/[0.02] p-4">
+                        <span className="text-xs font-bold text-white">{title}</span>
+                        <p className="text-xs text-zinc-400 mt-1 leading-relaxed">{body}</p>
+                        <div className="grid grid-cols-2 gap-2 mt-3">
+                          <button type="button" onClick={() => setEmbeddedAppUrl(url)} className="px-3 py-1.5 rounded-xl bg-cyan-500/10 border border-cyan-500/20 text-xs font-bold text-cyan-300">
+                            Embed
+                          </button>
+                          <a href={url} target="_blank" rel="noreferrer" className="px-3 py-1.5 rounded-xl bg-black/30 border border-white/10 text-xs font-bold text-zinc-300 text-center no-underline">
+                            Pop Out
+                          </a>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {embeddedAppUrl && (
+                    <div className="rounded-2xl border border-cyan-500/20 bg-black/50 overflow-hidden mt-4">
+                      <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
+                        <span className="text-xs font-bold text-white">Embedded app view</span>
+                        <div className="flex items-center gap-2">
+                          <a href={embeddedAppUrl} target="_blank" rel="noreferrer" className="text-[10px] font-bold text-cyan-300 no-underline">Pop out</a>
+                          <button type="button" onClick={() => setEmbeddedAppUrl(null)} className="text-[10px] font-bold text-zinc-400 hover:text-white">Close</button>
+                        </div>
+                      </div>
+                      <iframe
+                        src={embeddedAppUrl}
+                        title="Embedded SpaceMountain app"
+                        className="w-full h-[620px] bg-black"
+                        allow="autoplay; microphone; camera; fullscreen; clipboard-write"
+                      />
+                    </div>
+                  )}
+                </div>
               </motion.div>
             )}
 
@@ -1374,40 +1476,64 @@ export default function App() {
                     </p>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
-                    {hearmeoutRooms.map((room) => (
-                      <div key={room.id} className="rounded-2xl border border-emerald-500/15 bg-emerald-500/[0.03] p-5">
-                        <div className="flex items-start justify-between gap-3">
-                          <div>
-                            <span className="text-xs font-bold text-white">{room.name || room.id}</span>
-                            <p className="text-xs text-zinc-400 mt-1 leading-relaxed">{room.description || 'HearMeOut live room'}</p>
+                  <>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
+                      {hearmeoutRooms.map((room) => (
+                        <div key={room.id} className="rounded-2xl border border-emerald-500/15 bg-emerald-500/[0.03] p-5">
+                          <div className="flex items-start justify-between gap-3">
+                            <div>
+                              <span className="text-xs font-bold text-white">{room.name || room.id}</span>
+                              <p className="text-xs text-zinc-400 mt-1 leading-relaxed">{room.description || 'HearMeOut live room'}</p>
+                            </div>
+                            <span className="text-[10px] font-mono font-bold text-emerald-300 bg-emerald-500/10 border border-emerald-500/20 rounded-full px-2 py-1">
+                              {room.activeCount || 0} active
+                            </span>
                           </div>
-                          <span className="text-[10px] font-mono font-bold text-emerald-300 bg-emerald-500/10 border border-emerald-500/20 rounded-full px-2 py-1">
-                            {room.activeCount || 0} active
-                          </span>
-                        </div>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-4">
-                          {room.roomUrl && (
-                            <a href={room.roomUrl} target="_blank" rel="noreferrer" className="px-3 py-2 rounded-xl bg-emerald-500 text-xs font-bold text-black text-center no-underline">
-                              Join Room
-                            </a>
-                          )}
-                          {room.overlayUrl && (
-                            <a href={room.overlayUrl} target="_blank" rel="noreferrer" className="px-3 py-2 rounded-xl bg-black/30 border border-white/10 text-xs font-bold text-zinc-200 text-center no-underline">
-                              Open Overlay
-                            </a>
-                          )}
-                        </div>
-                        {(room.watchMovieSessionId || room.watchMusicSessionId) && (
-                          <div className="mt-3 text-[10px] text-zinc-500 font-mono">
-                            {room.watchMovieSessionId ? `movie: ${room.watchMovieSessionId}` : ''}
-                            {room.watchMovieSessionId && room.watchMusicSessionId ? ' | ' : ''}
-                            {room.watchMusicSessionId ? `music: ${room.watchMusicSessionId}` : ''}
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-4">
+                            {room.roomUrl && (
+                              <button type="button" onClick={() => setEmbeddedRoomUrl(room.roomUrl || null)} className="px-3 py-2 rounded-xl bg-emerald-500 text-xs font-bold text-black text-center">
+                                Embed Room
+                              </button>
+                            )}
+                            {room.roomUrl && (
+                              <a href={room.roomUrl} target="_blank" rel="noreferrer" className="px-3 py-2 rounded-xl bg-black/30 border border-white/10 text-xs font-bold text-zinc-200 text-center no-underline">
+                                Pop Out
+                              </a>
+                            )}
+                            {room.overlayUrl && (
+                              <button type="button" onClick={() => setEmbeddedRoomUrl(room.overlayUrl || null)} className="px-3 py-2 rounded-xl bg-black/30 border border-white/10 text-xs font-bold text-zinc-200 text-center">
+                                Embed Overlay
+                              </button>
+                            )}
                           </div>
-                        )}
+                          {(room.watchMovieSessionId || room.watchMusicSessionId) && (
+                            <div className="mt-3 text-[10px] text-zinc-500 font-mono">
+                              {room.watchMovieSessionId ? `movie: ${room.watchMovieSessionId}` : ''}
+                              {room.watchMovieSessionId && room.watchMusicSessionId ? ' | ' : ''}
+                              {room.watchMusicSessionId ? `music: ${room.watchMusicSessionId}` : ''}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                    {embeddedRoomUrl && (
+                      <div className="rounded-2xl border border-emerald-500/20 bg-black/50 overflow-hidden">
+                        <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
+                          <span className="text-xs font-bold text-white">Embedded HearMeOut view</span>
+                          <div className="flex items-center gap-2">
+                            <a href={embeddedRoomUrl} target="_blank" rel="noreferrer" className="text-[10px] font-bold text-emerald-300 no-underline">Pop out</a>
+                            <button type="button" onClick={() => setEmbeddedRoomUrl(null)} className="text-[10px] font-bold text-zinc-400 hover:text-white">Close</button>
+                          </div>
+                        </div>
+                        <iframe
+                          src={embeddedRoomUrl}
+                          title="Embedded HearMeOut room"
+                          className="w-full h-[520px] bg-black"
+                          allow="autoplay; microphone; camera; fullscreen; clipboard-write"
+                        />
                       </div>
-                    ))}
-                  </div>
+                    )}
+                  </>
                 )}
               </motion.div>
             )}
@@ -1555,7 +1681,13 @@ export default function App() {
                 exit={{ opacity: 0, y: -15 }}
                 transition={{ duration: 0.3 }}
               >
-                <Arena accentColor={currentTheme.glowHex} points={identity?.points || 0} />
+                <Arena
+                  accentColor={currentTheme.glowHex}
+                  points={identity?.points || 0}
+                  username={identity?.username}
+                  displayName={identity?.displayName}
+                  onSpendPoints={identity ? handleSpendDshPoints : undefined}
+                />
               </motion.div>
             )}
 

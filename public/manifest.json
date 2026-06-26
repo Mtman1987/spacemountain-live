@@ -1,0 +1,42 @@
+{
+  "name": "SpaceMountain.live",
+  "short_name": "SpaceMountain",
+  "description": "The SpaceMountain ecosystem hub for apps, forums, rooms, games, bots, and workflows.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#050505",
+  "theme_color": "#050505",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "/assets/space-logo-header.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/assets/space-logo-main.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Arena",
+      "url": "/arena",
+      "description": "Open Rocket Arena"
+    },
+    {
+      "name": "Rooms",
+      "url": "/rooms",
+      "description": "Open HearMeOut rooms"
+    },
+    {
+      "name": "Forums",
+      "url": "/forums",
+      "description": "Open website forums"
+    }
+  ]
+}
