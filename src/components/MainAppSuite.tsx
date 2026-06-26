@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { 
   Volume2, Gamepad2, Compass, Headphones, Eye, Mail, MessageSquare, LayoutGrid, Play, Activity 
@@ -14,6 +14,34 @@ interface MainAppSuiteProps {
 }
 
 export default function MainAppSuite({ tools, onTriggerAction, accentColor, preferences }: MainAppSuiteProps) {
+  const [clickCount, setClickCount] = useState(0);
+  const [cooldownEnd, setCooldownEnd] = useState<number>(0);
+  const [cooldownText, setCooldownText] = useState('');
+
+  // Cooldown timer display
+  useEffect(() => {
+    if (cooldownEnd <= Date.now()) { setCooldownText(''); return; }
+    const interval = setInterval(() => {
+      const remaining = Math.max(0, cooldownEnd - Date.now());
+      if (remaining <= 0) { setCooldownText(''); setClickCount(0); clearInterval(interval); return; }
+      const mins = Math.floor(remaining / 60000);
+      const secs = Math.floor((remaining % 60000) / 1000);
+      setCooldownText(`${mins}:${secs.toString().padStart(2, '0')}`);
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [cooldownEnd]);
+
+  const handleTileClick = (toolId: string, isInternal: boolean, isComingSoon: boolean) => {
+    if (!isInternal && !isComingSoon) return; // external apps don't award XP
+    if (cooldownEnd > Date.now()) return; // on cooldown
+
+    const newCount = clickCount + 1;
+    setClickCount(newCount);
+    if (newCount >= 5) {
+      setCooldownEnd(Date.now() + 5 * 60 * 1000);
+    }
+    onTriggerAction(toolId);
+  };
   // Mapping tools to their unique unicode icons from testing.html
   const appIcons: Record<string, string> = {
     'streamweaver': '◌',
@@ -38,10 +66,10 @@ export default function MainAppSuite({ tools, onTriggerAction, accentColor, pref
   };
 
   const appLinks: Record<string, string> = {
-    'streamweaver': '/streamweaver',
-    'chat-tag': '/chattag',
-    'discord-hub': '/discordstreamhub',
-    'hearmeout': '/hearmeout',
+    'streamweaver': 'https://streamweaver-new.fly.dev',
+    'chat-tag': 'https://chat-tag-new.fly.dev',
+    'discord-hub': 'https://discord-stream-hub-new.fly.dev',
+    'hearmeout': 'https://hearmeout-main.fly.dev',
     'mountainview': '/mtnview',
     'mail': '/inbox',
     'forums': '/forums',
@@ -117,11 +145,17 @@ export default function MainAppSuite({ tools, onTriggerAction, accentColor, pref
                 borderColor: `${accentColor}25`,
               }}
               onClick={() => {
-                onTriggerAction(tool.id);
-                if (appLinks[tool.id]) {
-                  if (appStatus[tool.id] === 'live') {
-                    window.location.href = appLinks[tool.id];
-                  }
+                const isExternal = appLinks[tool.id]?.startsWith('http');
+                const isComingSoon = appStatus[tool.id] === 'coming-soon';
+                const isInternal = !isExternal && appStatus[tool.id] === 'live';
+
+                if (isExternal) {
+                  window.open(appLinks[tool.id], '_blank');
+                } else if (isInternal) {
+                  handleTileClick(tool.id, true, false);
+                  window.location.href = appLinks[tool.id];
+                } else {
+                  handleTileClick(tool.id, false, true);
                 }
               }}
             >
@@ -170,6 +204,8 @@ export default function MainAppSuite({ tools, onTriggerAction, accentColor, pref
               <div className="mt-2 w-full flex items-center justify-between text-[8px] font-mono border-t border-white/5 pt-2 text-zinc-500">
                 {appStatus[tool.id] === 'coming-soon' ? (
                   <span className="text-amber-500/80 font-bold tracking-wide">SOON</span>
+                ) : appLinks[tool.id]?.startsWith('http') ? (
+                  <span className="text-emerald-400 font-bold">LIVE</span>
                 ) : (
                   <span className="text-emerald-400 font-bold">LIVE</span>
                 )}
@@ -181,6 +217,12 @@ export default function MainAppSuite({ tools, onTriggerAction, accentColor, pref
                   {(tool.pointsFlow || 0).toLocaleString()}
                 </span>
               </div>
+              {/* Cooldown indicator */}
+              {cooldownText && (appStatus[tool.id] === 'coming-soon' || !appLinks[tool.id]?.startsWith('http')) && (
+                <div className="w-full text-center text-[7px] font-mono text-amber-500/70 mt-1">
+                  ⏳ {cooldownText}
+                </div>
+              )}
             </motion.div>
           );
         })}

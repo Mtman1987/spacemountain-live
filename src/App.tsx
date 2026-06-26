@@ -318,15 +318,24 @@ export default function App() {
     // 4. Fetch inbox from spmt.live if logged in
     const spmtToken = localStorage.getItem('spmtToken');
     if (spmtToken) {
-      // Fetch user's DSH points for display
-      fetch('https://spmt.live/api/arena/shop', {
-        headers: { 'Authorization': `Bearer ${spmtToken}` },
-        credentials: 'include',
+      // Fetch user's points from DSH leaderboard
+      fetch('https://discord-stream-hub-new.fly.dev/api/leaderboard', {
+        headers: { 'Authorization': `Bearer 1234` },
       })
-        .then(r => r.ok ? r.json() : null)
-        .then(data => {
-          if (data?.balance) {
-            setIdentity(prev => prev ? { ...prev, points: data.balance } : prev);
+        .then(r => r.ok ? r.json() : [])
+        .then((leaderboard: any[]) => {
+          if (Array.isArray(leaderboard)) {
+            const cachedUser = localStorage.getItem('spmtIdentity');
+            if (cachedUser) {
+              const user = JSON.parse(cachedUser);
+              const match = leaderboard.find((e: any) => 
+                e.username?.toLowerCase() === user.username?.toLowerCase() ||
+                e.displayName?.toLowerCase() === user.displayName?.toLowerCase()
+              );
+              if (match?.points) {
+                setIdentity(prev => prev ? { ...prev, points: match.points } : prev);
+              }
+            }
           }
         })
         .catch(() => {});
@@ -446,7 +455,7 @@ export default function App() {
 
   // Trigger Action / Generate points inside SQLite Database
   const handleTriggerAction = async (toolId: string) => {
-    const pointsIncrement = Math.floor(Math.random() * 40) + 20;
+    const pointsIncrement = 5;
     
     // Trigger floating popup indicator
     const randomX = Math.floor(Math.random() * 200) + 400;
