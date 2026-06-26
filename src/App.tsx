@@ -5,7 +5,7 @@ import {
   Settings, HelpCircle, Rocket, Play, Activity, CheckCircle2, Sliders, 
   Send, Plus, Trash2, ArrowRight, Heart, RefreshCw, Star, Compass, Volume2, Gamepad2, Eye, Layout 
 } from 'lucide-react';
-import { CommunityTool, BrandingConfig, UserProfile, UserPreferences } from './types';
+import { CommunityTool, BrandingConfig, DashboardStats, UserProfile, UserPreferences } from './types';
 
 // Importing high-fidelity sub components
 import RocketDock from './components/RocketDock';
@@ -247,12 +247,14 @@ export default function App() {
 
   // Database-backed tools lists & aggregate stats
   const [tools, setTools] = useState<CommunityTool[]>([]);
-  const [stats, setStats] = useState({
-    totalUsers: 50420,
-    totalTools: 8,
-    pointsAwarded: 184999,
-    scansCount: 1284,
-    mediaJobsCount: 72,
+  const [stats, setStats] = useState<DashboardStats>({
+    totalUsers: 0,
+    totalTools: 0,
+    pointsAwarded: 0,
+    onlineApps: 0,
+    checkedApps: 0,
+    scansCount: 0,
+    mediaJobsCount: 0,
   });
 
   // Secure Inbox messages state - fetched from spmt.live
@@ -323,7 +325,7 @@ export default function App() {
       })
       .catch(err => console.error('Branding fetch failed:', err));
 
-    // 2. Fetch seeded SQLite tools
+    // 2. Fetch live app registry/tools
     fetch('/api/tools')
       .then(res => res.json())
       .then((data: CommunityTool[]) => {
@@ -335,10 +337,7 @@ export default function App() {
     fetch('/api/stats')
       .then(res => res.json())
       .then((data) => {
-        setStats({
-          ...data,
-          totalUsers: data.totalUsers > 1 ? data.totalUsers : 50420 // Keep realistic user count matching image
-        });
+        setStats(data);
       })
       .catch(err => console.error('Stats fetch failed:', err));
 
@@ -396,19 +395,6 @@ export default function App() {
     }
   }, []);
 
-  // Periodic visual simulation: increment points flow
-  useEffect(() => {
-    const timer = setInterval(() => {
-      // Slightly increment total points flow as an active dynamic dashboard
-      setStats(prev => ({
-        ...prev,
-        pointsAwarded: prev.pointsAwarded + Math.floor(Math.random() * 8) + 2
-      }));
-    }, 5000);
-
-    return () => clearInterval(timer);
-  }, []);
-
   // Update preferences local handler
   const handleUpdatePreferences = (updated: Partial<UserPreferences>) => {
     setPreferences(prev => {
@@ -464,7 +450,7 @@ export default function App() {
   const handleTriggerAction = async (toolId: string) => {
     const pointsIncrement = 5;
 
-    // Push points to DSH
+    // Push points to Discord Stream Hub using the existing DSH contract.
     const cachedUser = localStorage.getItem('spmtIdentity');
     if (cachedUser) {
       try {
@@ -475,12 +461,19 @@ export default function App() {
           if (spmtUser?.discord_id) {
             await fetch('https://discord-stream-hub-new.fly.dev/api/points/add', {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer 1234' },
-              body: JSON.stringify({ userId: spmtUser.discord_id, username: user.username, displayName: user.displayName, points: pointsIncrement }),
+              headers: { 'Content-Type': 'application/json', Authorization: 'Bearer 1234' },
+              body: JSON.stringify({
+                userId: spmtUser.discord_id,
+                username: user.username,
+                displayName: user.displayName,
+                points: pointsIncrement,
+              }),
             });
           }
         }
-      } catch {}
+      } catch (err) {
+        console.warn('Discord Stream Hub points sync failed', err);
+      }
     }
     
     // Trigger floating popup indicator
@@ -515,24 +508,15 @@ export default function App() {
           pointsAwarded: prev.pointsAwarded + pointsIncrement
         }));
 
-        // Send a dynamic system inbox alert
-        const matchedToolName = tools.find(t => t.id === toolId)?.name || 'System Module';
-        const newSystemMail = {
-          id: `sys-${Date.now()}`,
-          folder: 'inbox',
-          from: 'athena@spmt.live',
-          to: identity ? `${identity.username}@spmt.live` : 'novastar@spmt.live',
-          subject: `${matchedToolName} execution logged`,
-          preview: `Points stream refreshed (+${pointsIncrement} XP).`,
-          body: `Secure trigger handshake verified. The SQLite row community_tools has been updated. Flow points saved successfully in database schema.`,
-          time: 'Just now',
-          tag: 'SQL Log'
-        };
-        setMails(prev => [newSystemMail, ...prev]);
+        fetch('/api/stats')
+          .then(res => res.ok ? res.json() : null)
+          .then(data => {
+            if (data) setStats(data);
+          })
+          .catch(() => {});
       }
     } catch (err) {
-      console.warn('SQLite points sync failed, falling back locally', err);
-      setTools(prev => prev.map(t => t.id === toolId ? { ...t, pointsFlow: t.pointsFlow + pointsIncrement } : t));
+      console.warn('Points sync failed', err);
     }
   };
 
@@ -855,7 +839,7 @@ export default function App() {
                   </p>
 
                   <p className="text-xs text-zinc-400 font-sans max-w-md mx-auto leading-relaxed mb-6">
-                    spmt.live is your universal account for all SpaceMountain apps and services. All system integrations saved cleanly in our local SQLite schema.
+                    spmt.live is your universal account for SpaceMountain apps and services. This dashboard checks the live app registry before showing service status.
                   </p>
 
                   {/* Core CTAs */}
@@ -885,6 +869,7 @@ export default function App() {
                   onTriggerAction={handleTriggerAction} 
                   accentColor={currentTheme.glowHex} 
                   preferences={preferences}
+                  stats={stats}
                 />
 
               </motion.div>
@@ -906,7 +891,7 @@ export default function App() {
                       App Suite Directory
                     </h2>
                     <p className="text-xs text-zinc-400 mt-1">
-                      Direct connection points flow, synced to local SQLite.
+                      Live app links and service checks from the SpaceMountain registry.
                     </p>
                   </div>
                 </div>
@@ -916,6 +901,7 @@ export default function App() {
                   onTriggerAction={handleTriggerAction} 
                   accentColor={currentTheme.glowHex} 
                   preferences={preferences}
+                  stats={stats}
                 />
               </motion.div>
             )}
@@ -1126,7 +1112,7 @@ export default function App() {
                       <Headphones className="text-emerald-400" size={20} />
                       HearMeOut Voice Rooms
                     </h2>
-                    <p className="text-xs text-zinc-400 mt-0.5">Real-time dynamic watch party audio nodes</p>
+                      <p className="text-xs text-zinc-400 mt-0.5">HearMeOut room and watch-party entry points</p>
                   </div>
                   <button
                     onClick={() => {
@@ -1169,8 +1155,8 @@ export default function App() {
                       })}
                     </div>
 
-                    <span className="text-xs font-bold text-white">Deep Space Synthwaves — Episode 42</span>
-                    <span className="text-[9px] font-mono text-emerald-400 mt-1 font-bold">Bitrate: 320kbps synced</span>
+                    <span className="text-xs font-bold text-white">HearMeOut service route</span>
+                    <span className="text-[9px] font-mono text-emerald-400 mt-1 font-bold">Open the app card for live rooms</span>
                   </div>
 
                   {/* Speakers list in room */}
@@ -1178,7 +1164,7 @@ export default function App() {
                     <div>
                       <span className="text-[10px] font-mono font-bold text-zinc-500 block mb-4">CAPTAINS SPEAKING IN HARMONY</span>
                       <div className="flex flex-col gap-3">
-                        {['NovaStar', 'LunaVibes', 'EchoPulse'].map((user) => {
+                        {[(identity?.displayName || identity?.username || 'Signed-in user')].map((user) => {
                           const isSpeaking = speakingUsers.includes(user);
                           return (
                             <div key={user} className="flex items-center justify-between">
@@ -1239,7 +1225,7 @@ export default function App() {
                       <Glasses className="text-cyan-400" size={20} />
                       MountainView AI Smart Glasses
                     </h2>
-                    <p className="text-xs text-zinc-400 mt-0.5">Augmented HUD scan, pairing macro matrix</p>
+                    <p className="text-xs text-zinc-400 mt-0.5">Pairing utilities for MountainView mobile and glasses flows</p>
                   </div>
                 </div>
 
@@ -1253,15 +1239,15 @@ export default function App() {
                     <div className="absolute bottom-4 left-4 w-4 h-4 border-b-2 border-l-2 border-cyan-400" />
                     <div className="absolute bottom-4 right-4 w-4 h-4 border-b-2 border-r-2 border-cyan-400" />
 
-                    <span className="text-[9px] font-mono font-bold text-cyan-400 tracking-[0.2em] block mb-4 animate-pulse">HUD VIEWPAIRED</span>
+                    <span className="text-[9px] font-mono font-bold text-cyan-400 tracking-[0.2em] block mb-4">PAIRING TARGET</span>
                     
                     {/* Holographic glowing display representation */}
                     <div className="w-20 h-20 rounded-full border border-dashed border-cyan-500/30 flex items-center justify-center mb-4">
                       <span className="text-3xl text-cyan-400 animate-bounce">👓</span>
                     </div>
 
-                    <span className="text-xs font-bold text-white">Target Anchor: Spatials Calibrated</span>
-                    <span className="text-[10px] text-zinc-500 mt-1 font-mono">Distance: 1.45m • Yaw: 14.2° • Pitch: -2.8°</span>
+                    <span className="text-xs font-bold text-white">Target Anchor: SpaceMountain account</span>
+                    <span className="text-[10px] text-zinc-500 mt-1 font-mono">Use the seed below for pairing links</span>
                   </div>
 
                   {/* Pairing utilities */}
@@ -1269,7 +1255,7 @@ export default function App() {
                     <div>
                       <span className="text-[10px] font-mono font-bold text-zinc-500 block mb-3">CUSTOM QR MACRO SEED</span>
                       <p className="text-xs text-zinc-400 leading-relaxed mb-4">
-                        Generate instant spatial coordinates mapped inside SQLite table. Point your glasses camera at the display.
+                        Generate a pairing seed you can point your glasses camera at. This value is kept local until a device endpoint is connected.
                       </p>
 
                       <div className="flex flex-col gap-3">
@@ -1286,12 +1272,12 @@ export default function App() {
                     </div>
 
                     <div className="mt-5 pt-4 border-t border-white/5 flex items-center justify-between">
-                      <span className="text-xs font-mono text-cyan-400 font-bold">CALIBRATION ENGINE OK</span>
+                      <span className="text-xs font-mono text-cyan-400 font-bold">PAIRING SEED READY</span>
                       <button 
-                        onClick={() => alert(`Macro compiled successfully! Seed linked to route.`)}
+                        onClick={() => navigator.clipboard?.writeText(qrHUDSeed)}
                         className="px-4 py-1.5 rounded-xl bg-cyan-500 text-xs font-bold text-black font-sans hover:bg-cyan-400 transition-all"
                       >
-                        COMPILE SEED
+                        COPY SEED
                       </button>
                     </div>
                   </div>
@@ -1315,18 +1301,18 @@ export default function App() {
                       <Rocket className="text-orange-400 animate-pulse" size={20} />
                       Workflow Builder Studio
                     </h2>
-                    <p className="text-xs text-zinc-400 mt-0.5">Drag-and-drop simulated pipeline connections</p>
+                     <p className="text-xs text-zinc-400 mt-0.5">Registry view for connected SpaceMountain workflows</p>
                   </div>
                 </div>
 
                 <div className="rounded-2xl border border-white/5 bg-black/40 min-h-[250px] p-6 relative overflow-hidden flex flex-col md:flex-row gap-4 items-center justify-center">
-                  {/* Embedded nodes mock connectors */}
+                  {/* Connected app workflow overview */}
                   <div className="flex flex-col md:flex-row items-center gap-4 relative z-10">
                     
                     {/* Node 1 */}
                     <div className="bg-zinc-950 border border-orange-500/30 p-4 rounded-xl min-w-[140px] text-center shadow-lg">
                       <span className="text-[10px] font-mono font-bold text-orange-400">TRIGGER</span>
-                      <span className="text-xs font-bold text-white block mt-1.5">Glasses scan QR</span>
+                      <span className="text-xs font-bold text-white block mt-1.5">MountainView seed</span>
                       <span className="text-[9px] text-zinc-500 block font-mono mt-0.5">ID: mtnview_scan</span>
                     </div>
 
@@ -1336,7 +1322,7 @@ export default function App() {
                     {/* Node 2 */}
                     <div className="bg-zinc-950 border border-purple-500/30 p-4 rounded-xl min-w-[140px] text-center shadow-lg">
                       <span className="text-[10px] font-mono font-bold text-purple-400">ROUTER</span>
-                      <span className="text-xs font-bold text-white block mt-1.5">Station Gateway</span>
+                      <span className="text-xs font-bold text-white block mt-1.5">spmt.live Gateway</span>
                       <span className="text-[9px] text-zinc-500 block font-mono mt-0.5">ID: gateway_dns</span>
                     </div>
 
@@ -1346,7 +1332,7 @@ export default function App() {
                     {/* Node 3 */}
                     <div className="bg-zinc-950 border border-emerald-500/30 p-4 rounded-xl min-w-[140px] text-center shadow-lg">
                       <span className="text-[10px] font-mono font-bold text-emerald-400">ACTION</span>
-                      <span className="text-xs font-bold text-white block mt-1.5">Stream Overlay</span>
+                      <span className="text-xs font-bold text-white block mt-1.5">StreamWeaver</span>
                       <span className="text-[9px] text-zinc-500 block font-mono mt-0.5">ID: streamweaver_api</span>
                     </div>
 
@@ -1356,12 +1342,12 @@ export default function App() {
                 </div>
 
                 <div className="p-4 rounded-2xl bg-white/[0.01] border border-white/5 flex items-center justify-between text-xs font-sans text-zinc-400 mt-2">
-                  <span>Interactive node creation completely compiled inside schema structure.</span>
+                  <span>Workflow editing needs a real workflow API before new steps can be saved.</span>
                   <button 
-                    onClick={() => alert('New workflow anchor linked successfully!')}
+                    disabled
                     className="px-3 py-1.5 rounded-xl bg-orange-500/10 hover:bg-orange-500/20 text-orange-400 hover:text-white border border-orange-500/20 text-xs font-bold transition-all"
                   >
-                    + ADD STEP
+                    API NOT CONNECTED
                   </button>
                 </div>
               </motion.div>
@@ -1437,7 +1423,7 @@ export default function App() {
                   <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/5">
                     <span className="text-xs font-bold text-white block mb-1">What is SPACEMOUNTAIN.LIVE?</span>
                     <p className="text-xs text-zinc-400 leading-relaxed">
-                      It is a cohesive suite of stream overlay widgets, watch party voice networks, AI smart glasses pipelines, and secure messaging protocols. We utilize the lightning-fast, persistent SQLite database engine inside Cloud Run.
+                      It is a shared account and launch surface for the SpaceMountain app suite, including StreamWeaver, HearMeOut, Discord Stream Hub, ChatTag, MountainView, mail, and forums.
                     </p>
                   </div>
 

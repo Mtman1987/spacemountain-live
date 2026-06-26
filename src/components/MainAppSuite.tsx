@@ -3,7 +3,7 @@ import { motion } from 'motion/react';
 import { 
   Volume2, Gamepad2, Compass, Headphones, Eye, Mail, MessageSquare, LayoutGrid, Play, Activity 
 } from 'lucide-react';
-import { CommunityTool } from '../types';
+import { CommunityTool, DashboardStats } from '../types';
 import { UserPreferences } from '../types';
 
 interface MainAppSuiteProps {
@@ -11,9 +11,10 @@ interface MainAppSuiteProps {
   onTriggerAction: (toolId: string) => void;
   accentColor: string; // The selected theme's glow/accent hex color!
   preferences: UserPreferences;
+  stats: DashboardStats;
 }
 
-export default function MainAppSuite({ tools, onTriggerAction, accentColor, preferences }: MainAppSuiteProps) {
+export default function MainAppSuite({ tools, onTriggerAction, accentColor, preferences, stats }: MainAppSuiteProps) {
   const [clickCount, setClickCount] = useState(0);
   const [cooldownEnd, setCooldownEnd] = useState<number>(0);
   const [cooldownText, setCooldownText] = useState('');
@@ -52,39 +53,6 @@ export default function MainAppSuite({ tools, onTriggerAction, accentColor, pref
     'mail': '✉',
     'forums': '☷',
     'builder': '⌗',
-  };
-
-  const appSublabels: Record<string, string> = {
-    'streamweaver': 'Streaming & Tools',
-    'chat-tag': 'Game System',
-    'discord-hub': 'Auth & Shoutouts',
-    'hearmeout': 'Voice & Rooms',
-    'mountainview': 'Smart Glasses Hub',
-    'mail': 'Secure Messaging',
-    'forums': 'Community Hub',
-    'builder': 'Pages & QR Codes',
-  };
-
-  const appLinks: Record<string, string> = {
-    'streamweaver': 'https://streamweaver-new.fly.dev',
-    'chat-tag': 'https://chat-tag-new.fly.dev',
-    'discord-hub': 'https://discord-stream-hub-new.fly.dev',
-    'hearmeout': 'https://hearmeout-main.fly.dev',
-    'mountainview': '/mtnview',
-    'mail': '/inbox',
-    'forums': '/forums',
-    'builder': '/builder',
-  };
-
-  const appStatus: Record<string, 'live' | 'coming-soon'> = {
-    'streamweaver': 'live',
-    'chat-tag': 'live',
-    'discord-hub': 'live',
-    'hearmeout': 'live',
-    'mountainview': 'coming-soon',
-    'mail': 'live',
-    'forums': 'live',
-    'builder': 'coming-soon',
   };
 
   const realLogos: Record<string, string> = {
@@ -130,7 +98,11 @@ export default function MainAppSuite({ tools, onTriggerAction, accentColor, pref
       <div className={`grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-8 ${densityClass}`}>
         {tools.map((tool) => {
           const icon = appIcons[tool.id] || '✦';
-          const label = appSublabels[tool.id] || tool.miniLabel || 'Sub Module';
+          const label = tool.miniLabel || 'Sub Module';
+          const appLink = tool.appUrl || tool.route;
+          const isExternal = Boolean(tool.appUrl);
+          const isLive = tool.statusType === 'live';
+          const isAvailable = isLive || !tool.healthUrl;
 
           return (
             <motion.div
@@ -145,15 +117,11 @@ export default function MainAppSuite({ tools, onTriggerAction, accentColor, pref
                 borderColor: `${accentColor}25`,
               }}
               onClick={() => {
-                const isExternal = appLinks[tool.id]?.startsWith('http');
-                const isComingSoon = appStatus[tool.id] === 'coming-soon';
-                const isInternal = !isExternal && appStatus[tool.id] === 'live';
-
                 if (isExternal) {
-                  window.open(appLinks[tool.id], '_blank');
-                } else if (isInternal) {
+                  window.open(appLink, '_blank');
+                } else if (isAvailable) {
                   handleTileClick(tool.id, true, false);
-                  window.location.href = appLinks[tool.id];
+                  window.location.href = appLink;
                 } else {
                   handleTileClick(tool.id, false, true);
                 }
@@ -202,23 +170,23 @@ export default function MainAppSuite({ tools, onTriggerAction, accentColor, pref
 
               {/* Status badge + flow indicator */}
               <div className="mt-2 w-full flex items-center justify-between text-[8px] font-mono border-t border-white/5 pt-2 text-zinc-500">
-                {appStatus[tool.id] === 'coming-soon' ? (
-                  <span className="text-amber-500/80 font-bold tracking-wide">SOON</span>
-                ) : appLinks[tool.id]?.startsWith('http') ? (
+                {isLive ? (
                   <span className="text-emerald-400 font-bold">LIVE</span>
+                ) : tool.healthUrl ? (
+                  <span className="text-amber-500/80 font-bold tracking-wide">CHECK</span>
                 ) : (
-                  <span className="text-emerald-400 font-bold">LIVE</span>
+                  <span className="text-zinc-400 font-bold">LOCAL</span>
                 )}
                 <span className="text-zinc-300 font-bold flex items-center gap-1">
                   <span 
-                    className="w-1.5 h-1.5 rounded-full animate-ping inline-block" 
+                    className={`w-1.5 h-1.5 rounded-full inline-block ${isLive ? 'animate-ping' : ''}`}
                     style={{ backgroundColor: accentColor }}
                   />
-                  {(tool.pointsFlow || 0).toLocaleString()}
+                  {tool.statusText}
                 </span>
               </div>
               {/* Cooldown indicator */}
-              {cooldownText && (appStatus[tool.id] === 'coming-soon' || !appLinks[tool.id]?.startsWith('http')) && (
+              {cooldownText && !isExternal && (
                 <div className="w-full text-center text-[7px] font-mono text-amber-500/70 mt-1">
                   ⏳ {cooldownText}
                 </div>
@@ -242,8 +210,8 @@ export default function MainAppSuite({ tools, onTriggerAction, accentColor, pref
             🚀
           </div>
           <div className="flex flex-col">
-            <span className="text-xs font-bold text-white leading-none">12+</span>
-            <span className="text-[10px] text-zinc-400 mt-1 font-sans">Powerful Apps</span>
+            <span className="text-xs font-bold text-white leading-none">{stats.totalTools}</span>
+            <span className="text-[10px] text-zinc-400 mt-1 font-sans">Registered Apps</span>
           </div>
         </div>
 
@@ -259,8 +227,8 @@ export default function MainAppSuite({ tools, onTriggerAction, accentColor, pref
             👥
           </div>
           <div className="flex flex-col">
-            <span className="text-xs font-bold text-white leading-none">50K+</span>
-            <span className="text-[10px] text-zinc-400 mt-1 font-sans">Active Users</span>
+            <span className="text-xs font-bold text-white leading-none">{stats.totalUsers}</span>
+            <span className="text-[10px] text-zinc-400 mt-1 font-sans">Local Users</span>
           </div>
         </div>
 
@@ -276,8 +244,8 @@ export default function MainAppSuite({ tools, onTriggerAction, accentColor, pref
             ⚡
           </div>
           <div className="flex flex-col">
-            <span className="text-xs font-bold text-white leading-none">1M+</span>
-            <span className="text-[10px] text-zinc-400 mt-1 font-sans">Connections Made</span>
+            <span className="text-xs font-bold text-white leading-none">{stats.onlineApps}/{stats.checkedApps}</span>
+            <span className="text-[10px] text-zinc-400 mt-1 font-sans">Online Checks</span>
           </div>
         </div>
 
@@ -293,8 +261,8 @@ export default function MainAppSuite({ tools, onTriggerAction, accentColor, pref
             ∞
           </div>
           <div className="flex flex-col">
-            <span className="text-xs font-bold text-white leading-none">Infinite</span>
-            <span className="text-[10px] text-zinc-400 mt-1 font-sans">Possibilities</span>
+            <span className="text-xs font-bold text-white leading-none">{stats.pointsAwarded.toLocaleString()}</span>
+            <span className="text-[10px] text-zinc-400 mt-1 font-sans">Earned Points</span>
           </div>
         </div>
       </div>

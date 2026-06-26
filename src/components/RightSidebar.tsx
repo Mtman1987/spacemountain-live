@@ -11,6 +11,10 @@ interface RightSidebarProps {
   activeThemeName: string;
   activeThemeGlow: string;
   onNavigateSettings: () => void;
+  onNavigate: (tab: string) => void;
+  appCount: number;
+  messageCount: number;
+  onlineAppCount: number;
 }
 
 export default function RightSidebar({ 
@@ -18,14 +22,12 @@ export default function RightSidebar({
   preferences, 
   activeThemeName, 
   activeThemeGlow, 
-  onNavigateSettings 
+  onNavigateSettings,
+  onNavigate,
+  appCount,
+  messageCount,
+  onlineAppCount,
 }: RightSidebarProps) {
-  
-  // Custom mock alerts for interactive actions
-  const handleActionAlert = (actionName: string) => {
-    alert(`Station action dispatched: "${actionName}" is fully configured in current workspace.`);
-  };
-
   return (
     <div className="w-[280px] shrink-0 flex flex-col gap-4">
       
@@ -72,7 +74,7 @@ export default function RightSidebar({
 
         {/* View Profile Action button */}
         <button 
-          onClick={() => handleActionAlert('View Profile')}
+          onClick={() => onNavigate('settings')}
           className="w-full mt-3.5 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 text-[10px] font-mono font-bold text-zinc-300 hover:text-white transition-all uppercase"
         >
           View Profile
@@ -89,7 +91,7 @@ export default function RightSidebar({
           {[
             { label: 'Open Dashboard', icon: '㗊', action: 'dashboard' },
             { label: 'Manage Apps', icon: '㗊', action: 'apps' },
-            { label: 'Account Settings', icon: '👤', action: 'account' },
+            { label: 'Inbox', icon: '✉', action: 'inbox' },
             { label: 'Theme & Customization', icon: '🎨', action: 'theme', targetSettings: true }
           ].map((item, index) => (
             <button
@@ -98,7 +100,7 @@ export default function RightSidebar({
                 if (item.targetSettings) {
                   onNavigateSettings();
                 } else {
-                  handleActionAlert(item.label);
+                  onNavigate(item.action);
                 }
               }}
               className="w-full py-2 px-3 rounded-xl hover:bg-white/[0.04] border border-transparent hover:border-white/5 flex items-center justify-between text-zinc-400 hover:text-white transition-all group"
@@ -180,7 +182,7 @@ export default function RightSidebar({
               </div>
             </div>
             <span className="w-5 h-5 rounded-full bg-white/5 border border-white/10 text-[9px] font-mono font-bold text-zinc-300 flex items-center justify-center">
-              3
+              {messageCount}
             </span>
           </div>
 
@@ -194,7 +196,7 @@ export default function RightSidebar({
               </div>
             </div>
             <span className="w-5 h-5 rounded-full bg-white/5 border border-white/10 text-[9px] font-mono font-bold text-zinc-300 flex items-center justify-center">
-              8
+              {onlineAppCount}
             </span>
           </div>
 
@@ -208,7 +210,7 @@ export default function RightSidebar({
               </div>
             </div>
             <span className="text-[10px] font-mono font-bold text-zinc-300">
-              1.2 TB
+              {appCount}
             </span>
           </div>
         </div>
@@ -220,11 +222,11 @@ export default function RightSidebar({
           JOIN OUR COMMUNITY
         </span>
         <div className="flex items-center gap-3 text-zinc-500">
-          <button onClick={() => handleActionAlert('Discord Link')} className="hover:text-indigo-400 transition-colors"><Disc size={16} /></button>
-          <button onClick={() => handleActionAlert('Twitch Link')} className="hover:text-purple-400 transition-colors"><Twitch size={16} /></button>
-          <button onClick={() => handleActionAlert('Twitter Link')} className="hover:text-blue-400 transition-colors"><Twitter size={16} /></button>
-          <button onClick={() => handleActionAlert('YouTube Link')} className="hover:text-red-500 transition-colors"><Youtube size={16} /></button>
-          <button onClick={() => handleActionAlert('GitHub Link')} className="hover:text-white transition-colors"><Github size={16} /></button>
+          <a href="https://discord-stream-hub-new.fly.dev" target="_blank" rel="noopener noreferrer" className="hover:text-indigo-400 transition-colors"><Disc size={16} /></a>
+          <a href="https://twitch.tv/mtman1987" target="_blank" rel="noopener noreferrer" className="hover:text-purple-400 transition-colors"><Twitch size={16} /></a>
+          <a href="https://x.com/mtman1987" target="_blank" rel="noopener noreferrer" className="hover:text-blue-400 transition-colors"><Twitter size={16} /></a>
+          <a href="https://youtube.com/@mtman1987" target="_blank" rel="noopener noreferrer" className="hover:text-red-500 transition-colors"><Youtube size={16} /></a>
+          <a href="https://github.com/Mtman1987" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors"><Github size={16} /></a>
         </div>
       </div>
 

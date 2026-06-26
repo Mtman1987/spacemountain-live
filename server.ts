@@ -8,115 +8,212 @@ import { db, sqlite } from './src/db/connection.js';
 import { users, communityTools, userPreferences } from './src/db/schema.js';
 import { eq } from 'drizzle-orm';
 
-const PORT = 3000;
+const PORT = Number(process.env.PORT || 3000);
+
+type AppStatusType = 'live' | 'warn' | 'pink' | 'default';
+
+type AppRegistryEntry = {
+  id: string;
+  name: string;
+  description: string;
+  badge: string;
+  miniLabel: string;
+  route: string;
+  appUrl: string | null;
+  healthUrl: string | null;
+  statusText: string;
+  statusType: AppStatusType;
+};
+
+const APP_REGISTRY: AppRegistryEntry[] = [
+  {
+    id: 'streamweaver',
+    name: 'StreamWeaver',
+    description: 'AI bots, TTS, overlays, commands, battle systems, points, and OBS browser sources.',
+    badge: 'SW',
+    miniLabel: 'Automation + Overlays',
+    route: '/streamweaver',
+    appUrl: 'https://streamweaver-new.fly.dev',
+    healthUrl: 'https://streamweaver-new.fly.dev/api/health',
+    statusText: 'Checking',
+    statusType: 'default',
+  },
+  {
+    id: 'hearmeout',
+    name: 'HearMeOut',
+    description: 'Voice rooms, music queues, watch parties, now playing, chat widgets, and room overlays.',
+    badge: 'HO',
+    miniLabel: 'Music + Movies',
+    route: '/hearmeout',
+    appUrl: 'https://hearmeout-main.fly.dev',
+    healthUrl: 'https://hearmeout-main.fly.dev/api/health',
+    statusText: 'Checking',
+    statusType: 'default',
+  },
+  {
+    id: 'discord-hub',
+    name: 'Discord Stream Hub',
+    description: 'Live shoutouts, spotlight rotation, Discord bridge, community routing, and crew channels.',
+    badge: 'DSH',
+    miniLabel: 'Auth + Shoutout Bot',
+    route: '/discord-hub',
+    appUrl: 'https://discord-stream-hub-new.fly.dev',
+    healthUrl: 'https://discord-stream-hub-new.fly.dev/api/health',
+    statusText: 'Checking',
+    statusType: 'default',
+  },
+  {
+    id: 'chat-tag',
+    name: 'Chat Tag',
+    description: 'Cross-stream tag, Chat Bingo, active tag tracking, points, leaderboard, and chat announcements.',
+    badge: 'CT',
+    miniLabel: 'Game System',
+    route: '/chat-tag',
+    appUrl: 'https://chat-tag-new.fly.dev',
+    healthUrl: 'https://chat-tag-new.fly.dev',
+    statusText: 'Checking',
+    statusType: 'default',
+  },
+  {
+    id: 'mountainview',
+    name: 'MountainView Glasses',
+    description: 'QR scanning, voice commands, camera capture, app control, and StreamWeaver visual routing.',
+    badge: 'MV',
+    miniLabel: 'AI Glasses Hub',
+    route: '/mtnview',
+    appUrl: null,
+    healthUrl: null,
+    statusText: 'Local module',
+    statusType: 'default',
+  },
+  {
+    id: 'mail',
+    name: 'spmt.live Mail',
+    description: 'Person-to-person, app-to-person, forum, bot, and station notification inbox messaging.',
+    badge: 'MAIL',
+    miniLabel: 'Internal Identity',
+    route: '/inbox',
+    appUrl: 'https://spmt.live',
+    healthUrl: 'https://spmt.live/api/health',
+    statusText: 'Checking',
+    statusType: 'default',
+  },
+  {
+    id: 'forums',
+    name: 'Community Forums',
+    description: 'Threads, guides, crew announcements, applications, and general help channels.',
+    badge: 'FORUM',
+    miniLabel: 'Discussions',
+    route: '/forums',
+    appUrl: 'https://spmt.live',
+    healthUrl: 'https://spmt.live/api/health',
+    statusText: 'Checking',
+    statusType: 'default',
+  },
+  {
+    id: 'builder',
+    name: 'Workflow Studio',
+    description: 'Connect QR scans, voice prompts, bots, overlays, rooms, messages, Discord, Twitch, and AI actions.',
+    badge: 'BUILD',
+    miniLabel: 'Builder',
+    route: '/builder',
+    appUrl: null,
+    healthUrl: null,
+    statusText: 'Local module',
+    statusType: 'default',
+  },
+];
+
+async function probeUrl(url: string | null) {
+  if (!url) {
+    return { ok: true, status: 200, responseMs: null, checkedAt: new Date().toISOString() };
+  }
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 5000);
+  const started = Date.now();
+  try {
+    const response = await fetch(url, {
+      method: 'GET',
+      signal: controller.signal,
+      headers: { Accept: 'application/json,text/html;q=0.8,*/*;q=0.5' },
+    });
+    return {
+      ok: response.ok,
+      status: response.status,
+      responseMs: Date.now() - started,
+      checkedAt: new Date().toISOString(),
+    };
+  } catch {
+    return {
+      ok: false,
+      status: 0,
+      responseMs: Date.now() - started,
+      checkedAt: new Date().toISOString(),
+    };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function getHydratedTools() {
+  const storedTools = db.select().from(communityTools).all();
+  const storedById = new Map(storedTools.map((tool) => [tool.id, tool]));
+
+  return Promise.all(APP_REGISTRY.map(async (app) => {
+    const stored = storedById.get(app.id);
+    const health = await probeUrl(app.healthUrl);
+    const hasHealthCheck = Boolean(app.healthUrl);
+    const statusType: AppStatusType = hasHealthCheck ? (health.ok ? 'live' : 'warn') : app.statusType;
+    const statusText = hasHealthCheck && health.ok
+      ? health.responseMs === null
+        ? app.statusText
+        : `Online ${health.responseMs}ms`
+      : hasHealthCheck
+        ? 'Unavailable'
+        : app.statusText;
+
+    return {
+      ...app,
+      pointsFlow: stored?.pointsFlow ?? 0,
+      statusText,
+      statusType,
+      lastCheckedAt: health.checkedAt,
+      responseMs: health.responseMs,
+    };
+  }));
+}
 
 async function startServer() {
   const app = express();
   app.use(express.json());
 
-  // Seed default community tools if table is empty
+  // Keep the local tool rows aligned with the real app registry.
   try {
-    const existingToolsCount = sqlite.prepare('SELECT COUNT(*) as count FROM community_tools').get() as { count: number };
-    if (existingToolsCount.count === 0) {
-      console.log('Seeding initial community tools into SQLite database...');
-      const defaultTools = [
-        {
-          id: 'chat-tag',
-          name: 'Chat Tag',
-          description: 'Cross-stream tag, Chat Bingo, active "It" tracking, points, leaderboard, and chat announcements.',
-          badge: '🏷',
-          miniLabel: 'Game System',
-          statusText: 'IT: LunaVibes',
-          statusType: 'live',
-          route: '/chat-tag',
-          pointsFlow: 184999,
-        },
-        {
-          id: 'discord-hub',
-          name: 'Discord Stream Hub',
-          description: 'Live shoutouts, spotlight rotation, Discord bridge, community routing, and crew channels.',
-          badge: '◇',
-          miniLabel: 'Auth + Shoutout Bot',
-          statusText: 'Bridge Online',
-          statusType: 'default',
-          route: '/discord-hub',
-          pointsFlow: 45020,
-        },
-        {
-          id: 'streamweaver',
-          name: 'StreamWeaver',
-          description: 'AI bots, TTS, overlays, commands, Pokémon battle systems, points, and OBS browser sources.',
-          badge: '✦',
-          miniLabel: 'Automation + Overlays',
-          statusText: '8 overlays active',
-          statusType: 'live',
-          route: '/streamweaver',
-          pointsFlow: 92842,
-        },
-        {
-          id: 'hearmeout',
-          name: 'HearMeOut',
-          description: 'Voice rooms, music queues, watch parties, now playing, chat widgets, and room overlays.',
-          badge: '🎧',
-          miniLabel: 'Music + Movies',
-          statusText: '4 rooms open',
-          statusType: 'warn',
-          route: '/hearmeout',
-          pointsFlow: 12054,
-        },
-        {
-          id: 'mountainview',
-          name: 'MountainView Glasses',
-          description: 'QR scanning, builder commands, camera capture, app control, image/video generation alerts.',
-          badge: '⌐',
-          miniLabel: 'AI Glasses Hub',
-          statusText: 'New system online',
-          statusType: 'pink',
-          route: '/mountainview',
-          pointsFlow: 7520,
-        },
-        {
-          id: 'mail',
-          name: 'spmt.live Mail',
-          description: 'Person-to-person, app-to-person, forum, bot, and station notification internal inbox messaging.',
-          badge: '✉',
-          miniLabel: 'Internal Identity',
-          statusText: 'Prototype Active',
-          statusType: 'live',
-          route: '/mail',
-          pointsFlow: 890,
-        },
-        {
-          id: 'forums',
-          name: 'Community Forums',
-          description: 'Threads, guides, crew announcements, dispute desks, applications, and general help channels.',
-          badge: '☷',
-          miniLabel: 'Discussions',
-          statusText: '24 threads open',
-          statusType: 'default',
-          route: '/forums',
-          pointsFlow: 14500,
-        },
-        {
-          id: 'builder',
-          name: 'Workflow Studio',
-          description: 'Connect QR scans, voice prompts, bots, overlays, rooms, messages, Discord, Twitch, and AI actions.',
-          badge: '▦',
-          miniLabel: 'Builder',
-          statusText: 'Mock UI Active',
-          statusType: 'warn',
-          route: '/builder',
-          pointsFlow: 3200,
-        }
-      ];
+    for (const registryTool of APP_REGISTRY) {
+      const existing = db.select().from(communityTools).where(eq(communityTools.id, registryTool.id)).get();
 
-      for (const tool of defaultTools) {
-        db.insert(communityTools).values(tool).run();
+      const row = {
+        id: registryTool.id,
+        name: registryTool.name,
+        description: registryTool.description,
+        badge: registryTool.badge,
+        miniLabel: registryTool.miniLabel,
+        statusText: registryTool.statusText,
+        statusType: registryTool.statusType,
+        route: registryTool.route,
+        pointsFlow: existing?.pointsFlow ?? 0,
+      };
+
+      if (existing) {
+        db.update(communityTools).set(row).where(eq(communityTools.id, registryTool.id)).run();
+      } else {
+        db.insert(communityTools).values(row).run();
       }
-      console.log('Successfully seeded 8 community tools!');
     }
+    console.log('Community tool registry synchronized.');
   } catch (err) {
-    console.error('Error seeding community tools:', err);
+    console.error('Error synchronizing community tools:', err);
   }
 
   // Health check endpoint
@@ -180,7 +277,7 @@ async function startServer() {
   // API Route: Get all community tools
   app.get('/api/tools', async (req, res) => {
     try {
-      const tools = db.select().from(communityTools).all();
+      const tools = await getHydratedTools();
       res.json(tools);
     } catch (err) {
       res.status(500).json({ error: 'Failed to retrieve community tools' });
@@ -305,36 +402,37 @@ async function startServer() {
   });
 
   // API Route: Get current stats / totals for counters
-  app.get('/api/stats', (req, res) => {
+  app.get('/api/stats', async (req, res) => {
     try {
       const userCount = sqlite.prepare('SELECT COUNT(*) as count FROM users').get() as { count: number };
       const toolCount = sqlite.prepare('SELECT COUNT(*) as count FROM community_tools').get() as { count: number };
       const totalPoints = sqlite.prepare('SELECT SUM(points_flow) as sum FROM community_tools').get() as { sum: number };
+      const tools = await getHydratedTools();
+      const checkedApps = tools.filter((tool) => tool.healthUrl || tool.appUrl).length;
+      const onlineApps = tools.filter((tool) => tool.healthUrl && tool.statusType === 'live').length;
       
       res.json({
         totalUsers: userCount.count,
         totalTools: toolCount.count,
-        pointsAwarded: totalPoints.sum || 184999,
-        scansCount: 1284,
-        mediaJobsCount: 72,
+        pointsAwarded: totalPoints.sum || 0,
+        onlineApps,
+        checkedApps,
+        scansCount: 0,
+        mediaJobsCount: 0,
       });
     } catch (err) {
-      res.json({
-        totalUsers: 0,
-        totalTools: 8,
-        pointsAwarded: 184999,
-        scansCount: 1284,
-        mediaJobsCount: 72,
-      });
+      res.status(500).json({ error: 'Failed to retrieve stats' });
     }
   });
 
   // ─── App Proxy Routes ───
-  // Proxy /streamweaver, /hearmeout, /chattag, /discordstreamhub to their Fly apps
+  // Proxy dashboard app routes to their Fly apps.
   const appProxyMap: Record<string, string> = {
     '/streamweaver': 'https://streamweaver-new.fly.dev',
     '/hearmeout': 'https://hearmeout-main.fly.dev',
+    '/chat-tag': 'https://chat-tag-new.fly.dev',
     '/chattag': 'https://chat-tag-new.fly.dev',
+    '/discord-hub': 'https://discord-stream-hub-new.fly.dev',
     '/discordstreamhub': 'https://discord-stream-hub-new.fly.dev',
   };
 
@@ -360,19 +458,7 @@ async function startServer() {
 
   // ─── Shop: Get products ───
   app.get('/api/shop/products', (req, res) => {
-    try {
-      const products = db.select().from(communityTools).all(); // temp reuse, we'll add a products table
-      res.json([
-        { id: 'tee-cosmic', name: 'Cosmic Tee', description: 'SpaceMountain.live logo on premium black cotton', price: 29.99, image: '/assets/space-logo-main.png', category: 'apparel' },
-        { id: 'hoodie-nebula', name: 'Nebula Hoodie', description: 'Deep space pullover with embroidered rocket patch', price: 54.99, image: '/assets/space-logo-main.png', category: 'apparel' },
-        { id: 'sticker-pack', name: 'Sticker Pack (6)', description: 'Holographic space-themed vinyl stickers', price: 12.99, image: '/assets/space-badges-clean.png', category: 'accessories' },
-        { id: 'mug-station', name: 'Station Mug', description: 'Matte black ceramic mug with glow-in-dark logo', price: 18.99, image: '/assets/space-logo-main.png', category: 'accessories' },
-        { id: 'overlay-pack', name: 'Stream Overlay Pack', description: 'Full cosmic stream overlay set for OBS', price: 9.99, image: '/assets/app-streamweaver.png', category: 'digital' },
-        { id: 'badge-set', name: 'Sub Badge Collection', description: '12 animated space-themed Twitch sub badges', price: 14.99, image: '/assets/space-badges-clean.png', category: 'digital' },
-      ]);
-    } catch (err) {
-      res.status(500).json({ error: 'Failed to load products' });
-    }
+    res.json([]);
   });
 
   // ─── Shop: Create PayPal order ───

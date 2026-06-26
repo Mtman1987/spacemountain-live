@@ -197,34 +197,43 @@ export default function Shop({ accentColor, paypalClientId }: ShopProps) {
       )}
 
       {/* Product grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-        {filtered.map(product => (
-          <motion.div
-            key={product.id}
-            whileHover={{ scale: 1.02, y: -2 }}
-            className="rounded-2xl border border-white/5 bg-white/[0.02] p-4 flex flex-col gap-3 cursor-pointer group"
-          >
-            <div className="w-full h-32 rounded-xl bg-black/40 border border-white/5 flex items-center justify-center overflow-hidden">
-              <img src={product.image} alt={product.name} className="max-h-full max-w-full object-contain p-3 opacity-80 group-hover:opacity-100 transition-opacity" />
-            </div>
-            <div className="flex flex-col gap-1">
-              <span className="text-[9px] font-mono uppercase tracking-wider text-zinc-500">{product.category}</span>
-              <span className="text-sm font-bold text-white">{product.name}</span>
-              <span className="text-[11px] text-zinc-400 leading-relaxed">{product.description}</span>
-            </div>
-            <div className="flex items-center justify-between mt-auto pt-2 border-t border-white/5">
-              <span className="text-sm font-bold" style={{ color: accentColor }}>${product.price.toFixed(2)}</span>
-              <button
-                onClick={() => addToCart(product)}
-                className="px-3 py-1.5 rounded-lg text-[10px] font-bold border transition-all hover:bg-white/10"
-                style={{ borderColor: `${accentColor}40`, color: accentColor }}
-              >
-                Add to Cart
-              </button>
-            </div>
-          </motion.div>
-        ))}
-      </div>
+      {filtered.length === 0 ? (
+        <div className="rounded-2xl border border-white/5 bg-white/[0.02] p-6 text-center">
+          <span className="text-sm font-bold text-white block">No local catalog is configured.</span>
+          <span className="text-[11px] text-zinc-400 mt-1 block">
+            Use the live merch store above until a real product feed is connected.
+          </span>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+          {filtered.map(product => (
+            <motion.div
+              key={product.id}
+              whileHover={{ scale: 1.02, y: -2 }}
+              className="rounded-2xl border border-white/5 bg-white/[0.02] p-4 flex flex-col gap-3 cursor-pointer group"
+            >
+              <div className="w-full h-32 rounded-xl bg-black/40 border border-white/5 flex items-center justify-center overflow-hidden">
+                <img src={product.image} alt={product.name} className="max-h-full max-w-full object-contain p-3 opacity-80 group-hover:opacity-100 transition-opacity" />
+              </div>
+              <div className="flex flex-col gap-1">
+                <span className="text-[9px] font-mono uppercase tracking-wider text-zinc-500">{product.category}</span>
+                <span className="text-sm font-bold text-white">{product.name}</span>
+                <span className="text-[11px] text-zinc-400 leading-relaxed">{product.description}</span>
+              </div>
+              <div className="flex items-center justify-between mt-auto pt-2 border-t border-white/5">
+                <span className="text-sm font-bold" style={{ color: accentColor }}>${product.price.toFixed(2)}</span>
+                <button
+                  onClick={() => addToCart(product)}
+                  className="px-3 py-1.5 rounded-lg text-[10px] font-bold border transition-all hover:bg-white/10"
+                  style={{ borderColor: `${accentColor}40`, color: accentColor }}
+                >
+                  Add to Cart
+                </button>
+              </div>
+            </motion.div>
+          ))}
+        </div>
+      )}
     </motion.div>
   );
 }

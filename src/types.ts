@@ -8,6 +8,20 @@ export interface CommunityTool {
   statusType: string;
   route: string;
   pointsFlow: number;
+  appUrl?: string | null;
+  healthUrl?: string | null;
+  lastCheckedAt?: string | null;
+  responseMs?: number | null;
+}
+
+export interface DashboardStats {
+  totalUsers: number;
+  totalTools: number;
+  pointsAwarded: number;
+  onlineApps: number;
+  checkedApps: number;
+  scansCount: number;
+  mediaJobsCount: number;
 }
 
 export interface BrandingConfig {
