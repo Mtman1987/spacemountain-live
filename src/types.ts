@@ -66,6 +66,53 @@ export interface ChatTagState {
   monthlyWinners?: ChatTagPlayer[];
 }
 
+export interface CommunityShoutout {
+  id: string;
+  category: 'spotlight' | 'partners' | 'crew' | 'mountaineers' | string;
+  groupName?: string | null;
+  twitchLogin?: string | null;
+  displayName: string;
+  title?: string | null;
+  description?: string | null;
+  gameName?: string | null;
+  viewerCount?: number;
+  streamUrl?: string | null;
+  avatarUrl?: string | null;
+  imageUrl?: string | null;
+  bannerUrl?: string | null;
+  sourceMessageUrl?: string | null;
+  discordUserId?: string | null;
+  serverId?: string | null;
+  isLive?: boolean;
+  isSpotlight?: boolean;
+  startedAt?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+
+export interface CommunityShoutoutFeed {
+  shoutouts: CommunityShoutout[];
+  spotlight: CommunityShoutout[];
+  partners: CommunityShoutout[];
+  crew: CommunityShoutout[];
+  mountaineers: CommunityShoutout[];
+  analytics: {
+    liveCount: number;
+    totalViewers: number;
+    lastUpdatedAt?: string | null;
+    categoryCounts: Record<string, number>;
+  };
+}
+
+export interface QuackverseSummary {
+  state?: any;
+  viewer?: any;
+  players?: any[];
+  turn?: any;
+  updatedAt?: string | null;
+  error?: string;
+}
+
 export interface BrandingConfig {
   domain: string;
   title: string;

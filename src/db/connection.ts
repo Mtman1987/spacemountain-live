@@ -87,6 +87,30 @@ sqlite.exec(`
     posted_at TEXT NOT NULL,
     created_at TEXT NOT NULL
   );
+
+  CREATE TABLE IF NOT EXISTS community_shoutouts (
+    id TEXT PRIMARY KEY,
+    category TEXT NOT NULL DEFAULT 'mountaineers',
+    group_name TEXT,
+    twitch_login TEXT,
+    display_name TEXT NOT NULL,
+    title TEXT,
+    description TEXT,
+    game_name TEXT,
+    viewer_count INTEGER NOT NULL DEFAULT 0,
+    stream_url TEXT,
+    avatar_url TEXT,
+    image_url TEXT,
+    banner_url TEXT,
+    source_message_url TEXT,
+    discord_user_id TEXT,
+    server_id TEXT,
+    is_live INTEGER NOT NULL DEFAULT 1,
+    is_spotlight INTEGER NOT NULL DEFAULT 0,
+    started_at TEXT,
+    updated_at TEXT NOT NULL,
+    created_at TEXT NOT NULL
+  );
 `);
 
 console.log('SQLite database structures successfully verified and prepared!');

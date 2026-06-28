@@ -237,6 +237,91 @@ function normalizeForwardedForumPost(body: any) {
   };
 }
 
+function normalizeShoutoutCategory(body: any, groupName: string, isSpotlight: boolean) {
+  const raw = String(body?.category || body?.bucket || groupName || '').trim().toLowerCase();
+  if (isSpotlight || raw.includes('spotlight')) return 'spotlight';
+  if (raw.includes('partner')) return 'partners';
+  if (raw.includes('crew')) return 'crew';
+  return 'mountaineers';
+}
+
+function normalizeCommunityShoutout(body: any) {
+  const stream = body?.stream || body?.twitchStream || {};
+  const user = body?.user || body?.twitchUser || {};
+  const groupName = String(body?.groupName || body?.group || body?.role || body?.cohort || '').trim();
+  const isSpotlight = Boolean(
+    body?.isSpotlight ||
+    body?.spotlight ||
+    String(body?.footer || body?.label || '').toLowerCase().includes('spotlight') ||
+    groupName.toLowerCase().includes('spotlight')
+  );
+  const twitchLogin = body?.twitchLogin || body?.twitch_login || body?.login || stream?.user_login || user?.login || null;
+  const displayName = String(
+    body?.displayName ||
+    body?.display_name ||
+    body?.username ||
+    body?.name ||
+    stream?.user_name ||
+    user?.display_name ||
+    twitchLogin ||
+    'Live creator'
+  ).trim();
+  const now = new Date().toISOString();
+  const updatedAt = String(body?.updatedAt || body?.updated_at || body?.lastUpdated || body?.timestamp || now);
+  const streamUrl = body?.streamUrl || body?.stream_url || body?.url || (twitchLogin ? `https://twitch.tv/${twitchLogin}` : null);
+  const thumbnail = body?.thumbnailUrl || body?.thumbnail_url || stream?.thumbnail_url || null;
+
+  return {
+    id: String(body?.id || body?.shoutoutId || body?.sourceMessageId || body?.messageId || `${twitchLogin || 'shoutout'}_${Date.parse(updatedAt) || Date.now()}`),
+    category: normalizeShoutoutCategory(body, groupName, isSpotlight),
+    groupName: groupName || null,
+    twitchLogin: twitchLogin ? String(twitchLogin) : null,
+    displayName: displayName || 'Live creator',
+    title: body?.title || stream?.title || null,
+    description: body?.description || body?.body || body?.message || null,
+    gameName: body?.gameName || body?.game_name || stream?.game_name || null,
+    viewerCount: Number(body?.viewerCount ?? body?.viewer_count ?? stream?.viewer_count ?? 0) || 0,
+    streamUrl: streamUrl ? String(streamUrl) : null,
+    avatarUrl: body?.avatarUrl || body?.avatar_url || body?.profileImageUrl || body?.profile_image_url || user?.profile_image_url || null,
+    imageUrl: body?.imageUrl || body?.image_url || body?.thumbnailUrl || body?.thumbnail_url || thumbnail || null,
+    bannerUrl: body?.bannerUrl || body?.banner_url || body?.gifUrl || body?.gif_url || null,
+    sourceMessageUrl: body?.sourceMessageUrl || body?.source_message_url || body?.messageUrl || null,
+    discordUserId: body?.discordUserId || body?.discord_user_id || body?.userId || null,
+    serverId: body?.serverId || body?.server_id || body?.guildId || null,
+    isLive: body?.isLive === undefined ? true : Boolean(body.isLive),
+    isSpotlight,
+    startedAt: body?.startedAt || body?.started_at || stream?.started_at || null,
+    updatedAt,
+    createdAt: now,
+  };
+}
+
+function mapCommunityShoutoutRow(row: any) {
+  return {
+    id: row.id,
+    category: row.category,
+    groupName: row.groupName,
+    twitchLogin: row.twitchLogin,
+    displayName: row.displayName,
+    title: row.title,
+    description: row.description,
+    gameName: row.gameName,
+    viewerCount: row.viewerCount,
+    streamUrl: row.streamUrl,
+    avatarUrl: row.avatarUrl,
+    imageUrl: row.imageUrl,
+    bannerUrl: row.bannerUrl,
+    sourceMessageUrl: row.sourceMessageUrl,
+    discordUserId: row.discordUserId,
+    serverId: row.serverId,
+    isLive: Boolean(row.isLive),
+    isSpotlight: Boolean(row.isSpotlight),
+    startedAt: row.startedAt,
+    updatedAt: row.updatedAt,
+    createdAt: row.createdAt,
+  };
+}
+
 async function startServer() {
   const app = express();
   app.use(express.json());
@@ -506,6 +591,143 @@ async function startServer() {
       res.status(result.status).json(result.payload);
     } catch (err) {
       res.status(502).json({ error: 'Could not reach ChatTag state' });
+    }
+  });
+
+  app.get('/api/integrations/chat-tag/quackverse', async (req, res) => {
+    try {
+      const result = await fetchJsonFromApp('https://chat-tag-new.fly.dev/api/quackverse/state');
+      res.status(result.status).json(result.payload);
+    } catch (err) {
+      res.status(502).json({ error: 'Could not reach Quackverse state' });
+    }
+  });
+
+  app.get('/api/community/shoutouts', (req, res) => {
+    try {
+      const rows = sqlite.prepare(`
+        SELECT
+          id,
+          category,
+          group_name as groupName,
+          twitch_login as twitchLogin,
+          display_name as displayName,
+          title,
+          description,
+          game_name as gameName,
+          viewer_count as viewerCount,
+          stream_url as streamUrl,
+          avatar_url as avatarUrl,
+          image_url as imageUrl,
+          banner_url as bannerUrl,
+          source_message_url as sourceMessageUrl,
+          discord_user_id as discordUserId,
+          server_id as serverId,
+          is_live as isLive,
+          is_spotlight as isSpotlight,
+          started_at as startedAt,
+          updated_at as updatedAt,
+          created_at as createdAt
+        FROM community_shoutouts
+        ORDER BY datetime(updated_at) DESC, datetime(created_at) DESC
+        LIMIT 80
+      `).all().map(mapCommunityShoutoutRow);
+
+      const categoryCounts = rows.reduce((counts: Record<string, number>, row: any) => {
+        counts[row.category] = (counts[row.category] || 0) + 1;
+        return counts;
+      }, {});
+      const spotlight = rows.filter((row: any) => row.isSpotlight || row.category === 'spotlight');
+      const partners = rows.filter((row: any) => row.category === 'partners');
+      const crew = rows.filter((row: any) => row.category === 'crew');
+      const mountaineers = rows.filter((row: any) => !['spotlight', 'partners', 'crew'].includes(row.category));
+
+      res.json({
+        shoutouts: rows,
+        spotlight: spotlight.slice(0, 3),
+        partners: partners.slice(0, 8),
+        crew: crew.slice(0, 8),
+        mountaineers: mountaineers.slice(0, 16),
+        analytics: {
+          liveCount: rows.filter((row: any) => row.isLive).length,
+          totalViewers: rows.reduce((sum: number, row: any) => sum + (Number(row.viewerCount) || 0), 0),
+          lastUpdatedAt: rows[0]?.updatedAt || null,
+          categoryCounts,
+        },
+      });
+    } catch (err) {
+      res.status(500).json({ error: 'Could not load community shoutouts' });
+    }
+  });
+
+  app.post(['/api/community/shoutouts', '/api/integrations/dsh/shoutout'], (req, res) => {
+    const expectedToken = process.env.COMMUNITY_SHOUTOUT_TOKEN;
+    const bearerToken = String(req.get('authorization') || '').replace(/^Bearer\s+/i, '').trim();
+    if (expectedToken && bearerToken !== expectedToken) {
+      return res.status(401).json({ error: 'Invalid community shoutout token' });
+    }
+
+    const shoutout = normalizeCommunityShoutout(req.body);
+    if (!shoutout.displayName) {
+      return res.status(400).json({ error: 'displayName or twitchLogin is required' });
+    }
+
+    try {
+      sqlite.prepare(`
+        INSERT OR REPLACE INTO community_shoutouts (
+          id,
+          category,
+          group_name,
+          twitch_login,
+          display_name,
+          title,
+          description,
+          game_name,
+          viewer_count,
+          stream_url,
+          avatar_url,
+          image_url,
+          banner_url,
+          source_message_url,
+          discord_user_id,
+          server_id,
+          is_live,
+          is_spotlight,
+          started_at,
+          updated_at,
+          created_at
+        ) VALUES (
+          @id,
+          @category,
+          @groupName,
+          @twitchLogin,
+          @displayName,
+          @title,
+          @description,
+          @gameName,
+          @viewerCount,
+          @streamUrl,
+          @avatarUrl,
+          @imageUrl,
+          @bannerUrl,
+          @sourceMessageUrl,
+          @discordUserId,
+          @serverId,
+          @isLive,
+          @isSpotlight,
+          @startedAt,
+          @updatedAt,
+          @createdAt
+        )
+      `).run({
+        ...shoutout,
+        isLive: shoutout.isLive ? 1 : 0,
+        isSpotlight: shoutout.isSpotlight ? 1 : 0,
+      });
+
+      res.status(201).json({ success: true, shoutout });
+    } catch (err) {
+      res.status(500).json({ error: 'Could not store community shoutout' });
     }
   });
 

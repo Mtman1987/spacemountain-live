@@ -13,6 +13,9 @@ import {
   UserPreferences,
   HearMeOutRoom,
   ChatTagState,
+  CommunityShoutout,
+  CommunityShoutoutFeed,
+  QuackverseSummary,
 } from './types';
 
 // Importing high-fidelity sub components
@@ -57,6 +60,54 @@ function ProcessedRocketImage({ className, glowHex }: { className?: string; glow
     />
   );
 }
+
+function formatShoutoutTime(value?: string | null) {
+  if (!value) return 'Waiting';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return 'Recently';
+  return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+}
+
+function getShoutoutImage(shoutout?: CommunityShoutout | null) {
+  return shoutout?.bannerUrl || shoutout?.imageUrl || shoutout?.avatarUrl || '/assets/space-logo-main.png';
+}
+
+const ShoutoutCard: React.FC<{
+  shoutout: CommunityShoutout;
+  compact?: boolean;
+}> = ({
+  shoutout,
+  compact = false,
+}) => {
+  return (
+    <article className="rounded-lg border border-white/10 bg-zinc-950/55 overflow-hidden">
+      <div
+        className={`${compact ? 'h-24' : 'h-32'} bg-zinc-900 bg-cover bg-center`}
+        style={{ backgroundImage: `linear-gradient(180deg, rgba(0,0,0,0.05), rgba(0,0,0,0.72)), url("${getShoutoutImage(shoutout)}")` }}
+      />
+      <div className="p-3">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-sm font-extrabold text-white truncate">{shoutout.displayName}</p>
+            <p className="text-[11px] text-zinc-400 truncate">{shoutout.gameName || shoutout.groupName || 'Live shoutout'}</p>
+          </div>
+          <span className="shrink-0 rounded-md bg-emerald-400/10 px-2 py-1 text-[10px] font-bold uppercase text-emerald-300">
+            {shoutout.isLive ? 'Live' : 'Seen'}
+          </span>
+        </div>
+        <p className="mt-2 line-clamp-2 text-xs text-zinc-300">{shoutout.title || shoutout.description || 'Discord Stream Hub generated this shoutout.'}</p>
+        <div className="mt-3 flex items-center justify-between gap-2 text-[11px] text-zinc-500">
+          <span>{Number(shoutout.viewerCount || 0).toLocaleString()} viewers</span>
+          {shoutout.streamUrl && (
+            <a className="font-bold text-cyan-300 hover:text-cyan-200" href={shoutout.streamUrl} target="_blank" rel="noreferrer">
+              Watch
+            </a>
+          )}
+        </div>
+      </div>
+    </article>
+  );
+};
 
 export default function App() {
   // Navigation & Interactive Tabs
@@ -293,6 +344,10 @@ export default function App() {
   const [chatTagState, setChatTagState] = useState<ChatTagState | null>(null);
   const [chatTagLoading, setChatTagLoading] = useState(false);
   const [embeddedAppUrl, setEmbeddedAppUrl] = useState<string | null>(null);
+  const [shoutoutFeed, setShoutoutFeed] = useState<CommunityShoutoutFeed | null>(null);
+  const [shoutoutsLoading, setShoutoutsLoading] = useState(false);
+  const [quackverseState, setQuackverseState] = useState<QuackverseSummary | null>(null);
+  const [quackverseLoading, setQuackverseLoading] = useState(false);
 
   // MountainView QR HUD Seed state
   const [qrHUDSeed, setQrHUDSeed] = useState('https://spacemountain.live/invite/novastar');
@@ -325,6 +380,34 @@ export default function App() {
       setChatTagState(null);
     } finally {
       setChatTagLoading(false);
+    }
+  };
+
+  const refreshCommunityShoutouts = async () => {
+    setShoutoutsLoading(true);
+    try {
+      const res = await fetch('/api/community/shoutouts');
+      const data = await res.json();
+      setShoutoutFeed(data || null);
+    } catch (err) {
+      console.warn('Community shoutouts fetch failed', err);
+      setShoutoutFeed(null);
+    } finally {
+      setShoutoutsLoading(false);
+    }
+  };
+
+  const refreshQuackverseState = async () => {
+    setQuackverseLoading(true);
+    try {
+      const res = await fetch('/api/integrations/chat-tag/quackverse');
+      const data = await res.json();
+      setQuackverseState(data || null);
+    } catch (err) {
+      console.warn('Quackverse state fetch failed', err);
+      setQuackverseState(null);
+    } finally {
+      setQuackverseLoading(false);
     }
   };
 
@@ -404,6 +487,8 @@ export default function App() {
     refreshHearMeOutRooms();
     refreshChatTagState();
     refreshForwardedForumPosts();
+    refreshCommunityShoutouts();
+    refreshQuackverseState();
 
     // 4. Fetch inbox from spmt.live if logged in
     const spmtToken = localStorage.getItem('spmtToken');
@@ -760,6 +845,13 @@ export default function App() {
   const currentItPlayer = chatTagPlayers.find((player) => player.isIt || player.id === chatTagState?.currentIt);
   const sortedChatTagPlayers = [...chatTagPlayers].sort((a, b) => (b.score || b.points || b.tags || 0) - (a.score || a.points || a.tags || 0));
   const recentTags = Array.isArray(chatTagState?.history) ? chatTagState.history.slice(0, 4) : [];
+  const spotlightShoutout = shoutoutFeed?.spotlight?.[0] || shoutoutFeed?.shoutouts?.[0] || null;
+  const quackversePlayers = Array.isArray(quackverseState?.players)
+    ? quackverseState.players
+    : Array.isArray(quackverseState?.state?.players)
+      ? quackverseState.state.players
+      : [];
+  const quackverseUpdatedAt = quackverseState?.updatedAt || quackverseState?.state?.updatedAt || quackverseState?.state?.lastUpdatedAt || null;
 
   return (
     <div 
@@ -909,98 +1001,208 @@ export default function App() {
                 transition={{ duration: 0.3 }}
                 className="flex flex-col gap-6"
               >
-                {/* Central Floating Orb Logo Block (Hero) */}
-                <div className="flex flex-col items-center text-center py-4 relative overflow-visible">
-                  {/* SpaceMountain Cyber-Realistic Emblem Centerpiece (corresponds to mountain-emblem from testing.html) */}
-                  <div className="relative w-full max-w-[650px] h-[clamp(210px,28vw,310px)] mb-2 flex items-center justify-center select-none group">
-                    <div
-                      aria-label="SpaceMountain.live logo"
-                      className="w-[min(650px,70vw)] h-full bg-no-repeat bg-center bg-contain"
-                      style={{
-                        backgroundImage: 'url("/assets/space-logo-main.png")',
-                        filter: `drop-shadow(0 0 ${Math.round(16 + preferences.glowIntensity * 0.18)}px ${rgbaFromHex(currentTheme.glowHex, 0.62)})`,
-                      }}
-                    />
-
-                    {/* Small flying rocket - ARENA TRIGGER */}
-                    <motion.div
-                      animate={{ 
-                        y: [-4, 4, -4],
-                        x: [-3, 3, -3]
-                      }}
-                      transition={{
-                        duration: 3,
-                        repeat: Infinity,
-                        ease: "easeInOut"
-                      }}
-                      id="arenaRocketTrigger"
-                      className="absolute z-20 top-6 right-20 text-xl filter drop-shadow-[0_0_8px_rgba(251,191,36,0.5)] cursor-pointer"
-                      onClick={() => setActiveTab('arena')}
-                      title="Enter Rocket Arena!"
-                    >
-                      🚀
-                    </motion.div>
+                <div className="flex flex-wrap items-center justify-between gap-4 border-b border-white/10 pb-4">
+                  <div>
+                    <h1 className="text-2xl md:text-4xl font-display font-black tracking-tight text-white">
+                      SpaceMountain Live Stage
+                    </h1>
+                    <p className="mt-1 max-w-2xl text-sm text-zinc-400">
+                      Discord Stream Hub shoutouts land here first, then branch into ChatTag, Quackverse, rooms, forums, and the rest of the ecosystem.
+                    </p>
                   </div>
-
-                  {/* Gigantic Title & Typography pairing */}
-                  <h1 className="text-3xl md:text-5xl font-display font-extrabold tracking-tight uppercase text-transparent bg-clip-text bg-gradient-to-r from-white via-zinc-200 to-zinc-400 mb-2">
-                    SPACEMOUNTAIN<span className="font-black" style={{ color: currentTheme.glowHex }}>.LIVE</span>
-                  </h1>
-
-                  <p className="text-[10px] md:text-xs font-mono font-extrabold tracking-[0.25em] uppercase mb-3" style={{ color: currentTheme.glowHex }}>
-                    LAUNCH, LEARN, JOIN, AND CONNECT THE APP SUITE.
-                  </p>
-
-                  <p className="text-xs text-zinc-400 font-sans max-w-md mx-auto leading-relaxed mb-6">
-                    This is the SpaceMountain hub: open the apps, learn what each one does, join HearMeOut rooms, track ChatTag, and read DSH-forwarded posts in the website forum.
-                  </p>
-
-                  {/* Core CTAs */}
-                  <div className="flex items-center gap-3">
-                    <a 
-                      href="/auth/login"
-                      className="px-6 py-2.5 rounded-xl font-sans font-extrabold text-xs text-black transition-all transform hover:-translate-y-0.5 active:translate-y-0 cursor-pointer shadow-lg inline-block no-underline"
-                      style={{
-                        backgroundColor: currentTheme.glowHex,
-                        boxShadow: `0 4px 20px ${currentTheme.glowHex}55`,
-                      }}
-                    >
-                      Create Your Account
-                    </a>
-                    <button 
-                      onClick={() => setActiveTab('apps')}
-                      className="px-6 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 font-sans font-bold text-xs text-zinc-300 hover:text-white transition-all transform hover:-translate-y-0.5 active:translate-y-0"
-                    >
-                      Explore Apps ‣
-                    </button>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                  {[
-                    { label: 'HearMeOut Rooms', value: `${hearmeoutRooms.length} open`, action: 'rooms', tone: 'text-emerald-400' },
-                    { label: 'ChatTag Tracker', value: currentItPlayer?.displayName || currentItPlayer?.twitchUsername || currentItPlayer?.username || currentItPlayer?.name || 'No one tagged', action: 'apps', tone: 'text-amber-400' },
-                    { label: 'DSH Forum Posts', value: `${forwardedForumPosts.length} forwarded`, action: 'forums', tone: 'text-purple-400' },
-                  ].map((item) => (
+                  <div className="flex flex-wrap items-center gap-2">
                     <button
-                      key={item.label}
-                      onClick={() => setActiveTab(item.action)}
-                      className="p-4 rounded-2xl border border-white/5 bg-white/[0.02] text-left hover:bg-white/[0.04] transition-all"
+                      onClick={refreshCommunityShoutouts}
+                      disabled={shoutoutsLoading}
+                      className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs font-bold text-zinc-200 hover:bg-white/10 disabled:opacity-50"
                     >
-                      <span className={`text-[10px] font-mono font-bold uppercase ${item.tone}`}>{item.label}</span>
-                      <span className="block text-sm font-bold text-white mt-1">{item.value}</span>
+                      <RefreshCw size={14} className={shoutoutsLoading ? 'animate-spin' : ''} />
+                      Refresh Stage
                     </button>
-                  ))}
+                    <button
+                      onClick={() => setActiveTab('apps')}
+                      className="rounded-lg px-3 py-2 text-xs font-extrabold text-black"
+                      style={{ backgroundColor: currentTheme.glowHex }}
+                    >
+                      Apps
+                    </button>
+                  </div>
                 </div>
 
-                {/* The dynamic 8 Glossy app cards rows */}
-                <MainAppSuite 
-                  tools={tools} 
-                  onTriggerAction={handleTriggerAction} 
-                  accentColor={currentTheme.glowHex} 
-                  preferences={preferences}
-                  stats={stats}
-                />
+                <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_340px] gap-4">
+                  <section className="rounded-lg border border-white/10 bg-zinc-950/50 overflow-hidden">
+                    <div
+                      className="min-h-[360px] bg-cover bg-center p-5 md:p-7 flex flex-col justify-end"
+                      style={{
+                        backgroundImage: `linear-gradient(90deg, rgba(5,5,5,0.92), rgba(5,5,5,0.68), rgba(5,5,5,0.24)), url("${getShoutoutImage(spotlightShoutout)}")`,
+                      }}
+                    >
+                      <div className="max-w-2xl">
+                        <div className="flex flex-wrap items-center gap-2 text-[11px] font-bold uppercase tracking-wide">
+                          <span className="rounded-md bg-amber-300 px-2 py-1 text-black">Community Spotlight</span>
+                          <span className="rounded-md bg-white/10 px-2 py-1 text-zinc-200">
+                            {spotlightShoutout ? formatShoutoutTime(spotlightShoutout.updatedAt) : 'Awaiting DSH'}
+                          </span>
+                        </div>
+                        <h2 className="mt-4 text-3xl md:text-5xl font-black tracking-tight text-white">
+                          {spotlightShoutout?.displayName || 'Waiting for the next live creator'}
+                        </h2>
+                        <p className="mt-3 max-w-xl text-sm md:text-base leading-relaxed text-zinc-300">
+                          {spotlightShoutout?.title || spotlightShoutout?.description || 'When Discord Stream Hub generates live Twitch shoutouts, the spotlight replaces the old app launcher here.'}
+                        </p>
+                        <div className="mt-5 flex flex-wrap items-center gap-3">
+                          {spotlightShoutout?.streamUrl && (
+                            <a
+                              href={spotlightShoutout.streamUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-flex items-center gap-2 rounded-lg bg-cyan-300 px-4 py-2 text-xs font-extrabold text-zinc-950"
+                            >
+                              <Play size={14} />
+                              Watch Twitch
+                            </a>
+                          )}
+                          <button
+                            onClick={() => setActiveTab('forums')}
+                            className="rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-xs font-bold text-white hover:bg-white/10"
+                          >
+                            Website Forum
+                          </button>
+                          <span className="text-xs text-zinc-400">
+                            {spotlightShoutout ? `${Number(spotlightShoutout.viewerCount || 0).toLocaleString()} viewers` : 'POST /api/integrations/dsh/shoutout'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </section>
+
+                  <aside className="grid gap-3">
+                    <div className="rounded-lg border border-white/10 bg-zinc-950/70 p-4">
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <p className="text-[11px] font-bold uppercase text-cyan-300">Stage Analytics</p>
+                          <h3 className="text-lg font-black text-white">Live routing</h3>
+                        </div>
+                        <Activity size={19} className="text-cyan-300" />
+                      </div>
+                      <div className="mt-4 grid grid-cols-2 gap-2">
+                        {[
+                          ['Shoutouts', shoutoutFeed?.analytics?.liveCount ?? 0],
+                          ['Viewers', shoutoutFeed?.analytics?.totalViewers ?? 0],
+                          ['Forums', forwardedForumPosts.length],
+                          ['Rooms', hearmeoutRooms.length],
+                        ].map(([label, value]) => (
+                          <div key={label} className="rounded-md bg-white/[0.04] p-3">
+                            <p className="text-[10px] uppercase text-zinc-500">{label}</p>
+                            <p className="mt-1 text-xl font-black text-white">{Number(value).toLocaleString()}</p>
+                          </div>
+                        ))}
+                      </div>
+                      <p className="mt-3 text-[11px] text-zinc-500">
+                        Last DSH update: {formatShoutoutTime(shoutoutFeed?.analytics?.lastUpdatedAt)}
+                      </p>
+                    </div>
+
+                    <div className="rounded-lg border border-white/10 bg-zinc-950/70 p-4">
+                      <div className="flex items-center justify-between">
+                        <p className="text-[11px] font-bold uppercase text-amber-300">ChatTag</p>
+                        <button onClick={refreshChatTagState} className="text-zinc-400 hover:text-white" title="Refresh ChatTag">
+                          <RefreshCw size={14} className={chatTagLoading ? 'animate-spin' : ''} />
+                        </button>
+                      </div>
+                      <h3 className="mt-2 text-lg font-black text-white">
+                        {currentItPlayer?.displayName || currentItPlayer?.twitchUsername || currentItPlayer?.username || currentItPlayer?.name || chatTagState?.currentIt || 'No active tagger'}
+                      </h3>
+                      <p className="text-xs text-zinc-400">Who is it right now, plus top tracked players from ChatTag.</p>
+                      <div className="mt-3 space-y-2">
+                        {sortedChatTagPlayers.slice(0, 3).map((player, index) => (
+                          <div key={player.id || player.username || index} className="flex items-center justify-between gap-3 text-xs">
+                            <span className="truncate text-zinc-300">{player.displayName || player.twitchUsername || player.username || player.name || 'Player'}</span>
+                            <span className="font-bold text-amber-300">{player.score || player.points || player.tags || 0}</span>
+                          </div>
+                        ))}
+                        {sortedChatTagPlayers.length === 0 && <p className="text-xs text-zinc-500">No live ChatTag state returned yet.</p>}
+                      </div>
+                    </div>
+
+                    <div className="rounded-lg border border-white/10 bg-zinc-950/70 p-4">
+                      <div className="flex items-center justify-between">
+                        <p className="text-[11px] font-bold uppercase text-emerald-300">Quackverse</p>
+                        <button onClick={refreshQuackverseState} className="text-zinc-400 hover:text-white" title="Refresh Quackverse">
+                          <RefreshCw size={14} className={quackverseLoading ? 'animate-spin' : ''} />
+                        </button>
+                      </div>
+                      <h3 className="mt-2 text-lg font-black text-white">100-card ChatTag card game</h3>
+                      <p className="mt-1 text-xs leading-relaxed text-zinc-400">
+                        Characters, trunks, subclasses, family trees, and backstories from the ChatTag Quackverse.
+                      </p>
+                      <div className="mt-3 grid grid-cols-3 gap-2 text-center text-[11px]">
+                        <div className="rounded-md bg-white/[0.04] p-2"><span className="block font-black text-white">100</span><span className="text-zinc-500">Cards</span></div>
+                        <div className="rounded-md bg-white/[0.04] p-2"><span className="block font-black text-white">20</span><span className="text-zinc-500">Deck</span></div>
+                        <div className="rounded-md bg-white/[0.04] p-2"><span className="block font-black text-white">{quackversePlayers.length}</span><span className="text-zinc-500">Players</span></div>
+                      </div>
+                      <div className="mt-3 flex gap-2">
+                        <button
+                          onClick={() => setEmbeddedAppUrl('https://chat-tag-new.fly.dev/quackverse')}
+                          className="flex-1 rounded-lg bg-emerald-300 px-3 py-2 text-xs font-extrabold text-zinc-950"
+                        >
+                          Embed
+                        </button>
+                        <a
+                          href="https://chat-tag-new.fly.dev/quackverse-guide"
+                          target="_blank"
+                          rel="noreferrer"
+                          className="rounded-lg border border-white/10 px-3 py-2 text-xs font-bold text-zinc-200 hover:bg-white/10"
+                        >
+                          Guide
+                        </a>
+                      </div>
+                      <p className="mt-2 text-[11px] text-zinc-500">State: {formatShoutoutTime(quackverseUpdatedAt)}</p>
+                    </div>
+                  </aside>
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                  <section className="rounded-lg border border-white/10 bg-zinc-950/45 p-4">
+                    <div className="flex items-center justify-between gap-3 mb-3">
+                      <h2 className="text-lg font-black text-white">Partners</h2>
+                      <span className="text-xs text-zinc-500">{shoutoutFeed?.partners?.length || 0} live</span>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {(shoutoutFeed?.partners || []).slice(0, 4).map((shoutout) => <ShoutoutCard key={shoutout.id} shoutout={shoutout} compact />)}
+                      {(!shoutoutFeed?.partners || shoutoutFeed.partners.length === 0) && <p className="text-sm text-zinc-500">No partner shoutouts received yet.</p>}
+                    </div>
+                  </section>
+
+                  <section className="rounded-lg border border-white/10 bg-zinc-950/45 p-4">
+                    <div className="flex items-center justify-between gap-3 mb-3">
+                      <h2 className="text-lg font-black text-white">Crew</h2>
+                      <span className="text-xs text-zinc-500">{shoutoutFeed?.crew?.length || 0} live</span>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {(shoutoutFeed?.crew || []).slice(0, 4).map((shoutout) => <ShoutoutCard key={shoutout.id} shoutout={shoutout} compact />)}
+                      {(!shoutoutFeed?.crew || shoutoutFeed.crew.length === 0) && <p className="text-sm text-zinc-500">No crew shoutouts received yet.</p>}
+                    </div>
+                  </section>
+                </div>
+
+                <section className="rounded-lg border border-white/10 bg-zinc-950/45 p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
+                    <div>
+                      <h2 className="text-lg font-black text-white">Mountaineers</h2>
+                      <p className="text-xs text-zinc-500">General public shoutouts from DSH, including honored guests and raid-pile routing.</p>
+                    </div>
+                    <button onClick={() => setActiveTab('forums')} className="rounded-lg border border-white/10 px-3 py-2 text-xs font-bold text-zinc-200 hover:bg-white/10">
+                      Forum posts
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
+                    {(shoutoutFeed?.mountaineers || []).slice(0, 8).map((shoutout) => <ShoutoutCard key={shoutout.id} shoutout={shoutout} compact />)}
+                    {(!shoutoutFeed?.mountaineers || shoutoutFeed.mountaineers.length === 0) && (
+                      <p className="text-sm text-zinc-500">No public shoutouts are stored on the site yet. DSH can post them to /api/integrations/dsh/shoutout.</p>
+                    )}
+                  </div>
+                </section>
 
               </motion.div>
             )}
