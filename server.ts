@@ -263,6 +263,11 @@ function normalizeTwitchImageUrl(value: any, width = 640, height = 360) {
   return String(value).replace(/\{width\}/g, String(width)).replace(/\{height\}/g, String(height));
 }
 
+function getTwitchAvatarFallback(twitchLogin: any) {
+  if (!twitchLogin) return null;
+  return `https://unavatar.io/twitch/${encodeURIComponent(String(twitchLogin))}`;
+}
+
 function normalizeCommunityShoutout(body: any) {
   const stream = body?.stream || body?.twitchStream || {};
   const user = body?.user || body?.twitchUser || {};
@@ -300,7 +305,7 @@ function normalizeCommunityShoutout(body: any) {
     gameName: body?.gameName || body?.game_name || stream?.game_name || null,
     viewerCount: Number(body?.viewerCount ?? body?.viewer_count ?? stream?.viewer_count ?? 0) || 0,
     streamUrl: streamUrl ? String(streamUrl) : null,
-    avatarUrl: body?.avatarUrl || body?.avatar_url || body?.profileImageUrl || body?.profile_image_url || user?.profile_image_url || null,
+    avatarUrl: body?.avatarUrl || body?.avatar_url || body?.profileImageUrl || body?.profile_image_url || user?.profile_image_url || getTwitchAvatarFallback(twitchLogin),
     imageUrl: normalizeTwitchImageUrl(body?.imageUrl || body?.image_url || body?.thumbnailUrl || body?.thumbnail_url || thumbnail),
     bannerUrl: body?.bannerUrl || body?.banner_url || body?.gifUrl || body?.gif_url || null,
     sourceMessageUrl: body?.sourceMessageUrl || body?.source_message_url || body?.messageUrl || null,
@@ -326,7 +331,7 @@ function mapCommunityShoutoutRow(row: any) {
     gameName: row.gameName,
     viewerCount: row.viewerCount,
     streamUrl: row.streamUrl,
-    avatarUrl: row.avatarUrl,
+    avatarUrl: row.avatarUrl || getTwitchAvatarFallback(row.twitchLogin),
     imageUrl: normalizeTwitchImageUrl(row.imageUrl),
     bannerUrl: row.bannerUrl,
     sourceMessageUrl: row.sourceMessageUrl,
