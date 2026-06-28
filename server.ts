@@ -670,10 +670,11 @@ async function startServer() {
         counts[row.category] = (counts[row.category] || 0) + 1;
         return counts;
       }, {});
-      const spotlight = rows.filter((row: any) => row.isSpotlight || row.category === 'spotlight');
-      const partners = rows.filter((row: any) => row.category === 'partners');
-      const crew = rows.filter((row: any) => row.category === 'crew');
-      const mountaineers = rows.filter((row: any) => !['spotlight', 'partners', 'crew'].includes(row.category));
+      const liveRows = rows.filter((row: any) => row.isLive);
+      const spotlight = liveRows.filter((row: any) => row.isSpotlight || row.category === 'spotlight');
+      const partners = liveRows.filter((row: any) => row.category === 'partners');
+      const crew = liveRows.filter((row: any) => row.category === 'crew');
+      const mountaineers = liveRows.filter((row: any) => !['spotlight', 'partners', 'crew'].includes(row.category));
 
       res.json({
         shoutouts: rows,

@@ -79,6 +79,48 @@ function getShoutoutVideo(shoutout?: CommunityShoutout | null) {
   return video.replace(/\{width\}/g, '1280').replace(/\{height\}/g, '720');
 }
 
+function getTwitchEmbedUrl(twitchLogin?: string | null) {
+  const login = String(twitchLogin || '').trim().toLowerCase();
+  if (!login) return null;
+  const hostname = typeof window !== 'undefined' ? window.location.hostname : 'spacemountain.live';
+  const params = new URLSearchParams({
+    channel: login,
+    parent: hostname,
+    muted: 'true',
+    autoplay: 'true',
+  });
+  return `https://player.twitch.tv/?${params.toString()}`;
+}
+
+function getPlayerName(player: any) {
+  return player?.displayName || player?.twitchUsername || player?.username || player?.name || player?.id || 'Player';
+}
+
+function formatRelativeMinutes(value?: number | string | null) {
+  if (!value) return 'Waiting';
+  const timestamp = typeof value === 'number' ? value : new Date(value).getTime();
+  if (!Number.isFinite(timestamp)) return 'Recently';
+  const minutes = Math.max(0, Math.floor((Date.now() - timestamp) / 60000));
+  if (minutes < 60) return `${minutes} min ago`;
+  const hours = Math.floor(minutes / 60);
+  return `${hours}h ${minutes % 60}m ago`;
+}
+
+function formatChatTagEvent(event: any) {
+  const action = String(event?.action || '').toLowerCase();
+  if (event?.tagger || event?.target || event?.tagged) {
+    return `${event.tagger || event.performedBy || 'Someone'} tagged ${event.target || event.tagged || event.targetUser || 'someone'}`;
+  }
+  if (action.includes('set-it')) {
+    return `${event.performedBy || 'bot-auto-rotate'} tagged ${event.targetUser || 'someone'}`;
+  }
+  if (action.includes('auto-rotate')) {
+    const details = event.details ? ` (${event.details})` : '';
+    return `${event.performedBy || 'bot-auto-rotate'} rotated IT${details}`;
+  }
+  return event?.details || `${event?.performedBy || 'Chat Tag'} updated the game`;
+}
+
 function getLiveSince(value?: string | null) {
   if (!value) return 'Live';
   const started = new Date(value).getTime();
@@ -98,11 +140,19 @@ const ShoutoutCard: React.FC<{
   compact = false,
 }) => {
   const videoUrl = getShoutoutVideo(shoutout);
+  const twitchEmbedUrl = shoutout.isLive ? getTwitchEmbedUrl(shoutout.twitchLogin) : null;
 
   return (
     <article className="rounded-lg border border-white/10 bg-zinc-950/55 overflow-hidden">
       <div className={`${compact ? 'h-24' : 'h-32'} relative overflow-hidden bg-zinc-900`}>
-        {videoUrl ? (
+        {twitchEmbedUrl ? (
+          <iframe
+            className="h-full w-full"
+            src={twitchEmbedUrl}
+            title={`${shoutout.displayName} live stream`}
+            allow="autoplay; fullscreen"
+          />
+        ) : videoUrl ? (
           <video
             className="h-full w-full object-cover"
             src={videoUrl}
@@ -148,6 +198,122 @@ const ShoutoutCard: React.FC<{
             </a>
           )}
         </div>
+      </div>
+    </article>
+  );
+};
+
+const ShoutoutProfileCard: React.FC<{
+  shoutout: CommunityShoutout | null;
+  label: string;
+  onForumClick: () => void;
+  emptyLabel?: string;
+  feature?: boolean;
+}> = ({ shoutout, label, onForumClick, emptyLabel = 'Waiting for the next live creator', feature = false }) => {
+  const twitchEmbedUrl = shoutout?.isLive ? getTwitchEmbedUrl(shoutout.twitchLogin) : null;
+  const videoUrl = getShoutoutVideo(shoutout);
+  const imageUrl = getShoutoutImage(shoutout);
+
+  return (
+    <article className="overflow-hidden rounded-lg border border-white/10 bg-zinc-950/50">
+      <div className={`relative overflow-hidden bg-zinc-950 ${feature ? 'min-h-[330px]' : 'min-h-[270px]'}`}>
+        <div
+          className="absolute inset-0 bg-cover bg-center opacity-70"
+          style={{ backgroundImage: `url("${imageUrl}")` }}
+        />
+        <div className="absolute inset-0 bg-gradient-to-r from-black via-black/75 to-black/35" />
+        <div className="relative z-10 flex min-h-[inherit] flex-col justify-end p-5 md:p-7">
+          <div className="max-w-2xl">
+            <div className="flex flex-wrap items-center gap-2 text-[11px] font-bold uppercase tracking-wide">
+              <span className="rounded-md bg-amber-300 px-2 py-1 text-black">{label}</span>
+              <span className="rounded-md bg-white/10 px-2 py-1 text-zinc-200">
+                {shoutout ? formatShoutoutTime(shoutout.updatedAt) : 'Awaiting DSH'}
+              </span>
+            </div>
+            <div className="mt-4 flex min-w-0 items-end gap-4">
+              {shoutout && (
+                <img
+                  src={shoutout.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(shoutout.displayName)}&background=111827&color=ffffff`}
+                  alt=""
+                  className="h-16 w-16 shrink-0 rounded-full border border-white/15 bg-zinc-900 object-cover"
+                />
+              )}
+              <div className="min-w-0">
+                <h2 className={`${feature ? 'text-3xl md:text-5xl' : 'text-2xl md:text-3xl'} truncate font-black tracking-tight text-white`}>
+                  {shoutout?.displayName || emptyLabel}
+                </h2>
+                <p className="mt-2 line-clamp-2 max-w-xl text-sm leading-relaxed text-zinc-300">
+                  {shoutout?.title || shoutout?.description || 'Discord Stream Hub generated shoutouts land here when creators are live.'}
+                </p>
+              </div>
+            </div>
+            {shoutout && (
+              <div className="mt-4 grid max-w-xl grid-cols-1 gap-2 sm:grid-cols-3">
+                <div className="rounded-md bg-black/35 p-3">
+                  <p className="text-[10px] uppercase text-zinc-500">Playing</p>
+                  <p className="mt-1 truncate text-xs font-bold text-white">{shoutout.gameName || 'Unknown game'}</p>
+                </div>
+                <div className="rounded-md bg-black/35 p-3">
+                  <p className="text-[10px] uppercase text-zinc-500">Viewers</p>
+                  <p className="mt-1 text-xs font-bold text-white">{Number(shoutout.viewerCount || 0).toLocaleString()}</p>
+                </div>
+                <div className="rounded-md bg-black/35 p-3">
+                  <p className="text-[10px] uppercase text-zinc-500">Live since</p>
+                  <p className="mt-1 text-xs font-bold text-white">{getLiveSince(shoutout.startedAt)}</p>
+                </div>
+              </div>
+            )}
+            <div className="mt-5 flex flex-wrap items-center gap-3">
+              {shoutout?.streamUrl && (
+                <a
+                  href={shoutout.streamUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-2 rounded-lg bg-cyan-300 px-4 py-2 text-xs font-extrabold text-zinc-950"
+                >
+                  <Play size={14} />
+                  Watch Twitch
+                </a>
+              )}
+              <button
+                onClick={onForumClick}
+                className="rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-xs font-bold text-white hover:bg-white/10"
+              >
+                Website Forum
+              </button>
+              <span className="text-xs text-zinc-400">
+                {shoutout ? `${Number(shoutout.viewerCount || 0).toLocaleString()} viewers` : 'POST /api/integrations/dsh/shoutout'}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div className={`bg-black ${feature ? 'h-[360px]' : 'h-[240px]'}`}>
+        {twitchEmbedUrl ? (
+          <iframe
+            className="h-full w-full"
+            src={twitchEmbedUrl}
+            title={`${shoutout?.displayName || label} live stream`}
+            allow="autoplay; fullscreen"
+          />
+        ) : videoUrl ? (
+          <video
+            className="h-full w-full object-cover"
+            src={videoUrl}
+            poster={imageUrl}
+            autoPlay
+            muted
+            loop
+            playsInline
+            controls
+            preload="metadata"
+          />
+        ) : (
+          <div
+            className="h-full w-full bg-cover bg-center"
+            style={{ backgroundImage: `url("${imageUrl}")` }}
+          />
+        )}
       </div>
     </article>
   );
@@ -910,8 +1076,14 @@ export default function App() {
   const chatTagPlayers = Array.isArray(chatTagState?.players) ? chatTagState.players : [];
   const currentItPlayer = chatTagPlayers.find((player) => player.isIt || player.id === chatTagState?.currentIt);
   const sortedChatTagPlayers = [...chatTagPlayers].sort((a, b) => (b.score || b.points || b.tags || 0) - (a.score || a.points || a.tags || 0));
-  const recentTags = Array.isArray(chatTagState?.history) ? chatTagState.history.slice(0, 4) : [];
-  const spotlightShoutout = shoutoutFeed?.spotlight?.[0] || shoutoutFeed?.shoutouts?.[0] || null;
+  const recentTags = [
+    ...(Array.isArray(chatTagState?.history) ? chatTagState.history : []),
+    ...(Array.isArray(chatTagState?.adminHistory) ? chatTagState.adminHistory : []),
+  ]
+    .sort((a: any, b: any) => new Date(b.timestamp || b.createdAt || 0).getTime() - new Date(a.timestamp || a.createdAt || 0).getTime())
+    .slice(0, 5);
+  const liveShoutouts = (shoutoutFeed?.shoutouts || []).filter((shoutout) => shoutout.isLive);
+  const spotlightShoutout = shoutoutFeed?.spotlight?.[0] || liveShoutouts[0] || null;
   const quackversePlayers = Array.isArray(quackverseState?.players)
     ? quackverseState.players
     : Array.isArray(quackverseState?.state?.players)
@@ -919,6 +1091,7 @@ export default function App() {
       : [];
   const quackverseUpdatedAt = quackverseState?.updatedAt || quackverseState?.state?.updatedAt || quackverseState?.state?.lastUpdatedAt || null;
   const chatTagCurrentName = currentItPlayer?.displayName || currentItPlayer?.twitchUsername || currentItPlayer?.username || currentItPlayer?.name || chatTagState?.currentIt || 'Free for all';
+  const chatTagLastEventTime = recentTags[0]?.timestamp || recentTags[0]?.createdAt || chatTagState?.lastTagTime || null;
 
   return (
     <div 
@@ -1098,84 +1271,12 @@ export default function App() {
 
                 <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_340px] gap-4">
                   <section className="rounded-lg border border-white/10 bg-zinc-950/50 overflow-hidden">
-                    <div
-                      className="relative min-h-[420px] overflow-hidden bg-zinc-950"
-                    >
-                      {getShoutoutVideo(spotlightShoutout) ? (
-                        <video
-                          className="absolute inset-0 h-full w-full object-cover"
-                          src={getShoutoutVideo(spotlightShoutout) || undefined}
-                          poster={getShoutoutImage(spotlightShoutout)}
-                          autoPlay
-                          muted
-                          loop
-                          playsInline
-                          controls
-                          preload="metadata"
-                        />
-                      ) : (
-                        <div
-                          className="absolute inset-0 bg-cover bg-center"
-                          style={{ backgroundImage: `url("${getShoutoutImage(spotlightShoutout)}")` }}
-                        />
-                      )}
-                      <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-black via-black/70 to-black/20" />
-                      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-black/80 to-transparent" />
-                      <div className="relative z-10 flex min-h-[420px] flex-col justify-end p-5 pb-16 md:p-7 md:pb-16">
-                      <div className="max-w-2xl">
-                        <div className="flex flex-wrap items-center gap-2 text-[11px] font-bold uppercase tracking-wide">
-                          <span className="rounded-md bg-amber-300 px-2 py-1 text-black">Community Spotlight</span>
-                          <span className="rounded-md bg-white/10 px-2 py-1 text-zinc-200">
-                            {spotlightShoutout ? formatShoutoutTime(spotlightShoutout.updatedAt) : 'Awaiting DSH'}
-                          </span>
-                        </div>
-                        <h2 className="mt-4 text-3xl md:text-5xl font-black tracking-tight text-white">
-                          {spotlightShoutout?.displayName || 'Waiting for the next live creator'}
-                        </h2>
-                        <p className="mt-3 max-w-xl text-sm md:text-base leading-relaxed text-zinc-300">
-                          {spotlightShoutout?.title || spotlightShoutout?.description || 'When Discord Stream Hub generates live Twitch shoutouts, the spotlight replaces the old app launcher here.'}
-                        </p>
-                        {spotlightShoutout && (
-                          <div className="mt-4 grid max-w-xl grid-cols-1 gap-2 sm:grid-cols-3">
-                            <div className="rounded-md bg-black/35 p-3">
-                              <p className="text-[10px] uppercase text-zinc-500">Playing</p>
-                              <p className="mt-1 truncate text-xs font-bold text-white">{spotlightShoutout.gameName || 'Unknown game'}</p>
-                            </div>
-                            <div className="rounded-md bg-black/35 p-3">
-                              <p className="text-[10px] uppercase text-zinc-500">Viewers</p>
-                              <p className="mt-1 text-xs font-bold text-white">{Number(spotlightShoutout.viewerCount || 0).toLocaleString()}</p>
-                            </div>
-                            <div className="rounded-md bg-black/35 p-3">
-                              <p className="text-[10px] uppercase text-zinc-500">Live since</p>
-                              <p className="mt-1 text-xs font-bold text-white">{getLiveSince(spotlightShoutout.startedAt)}</p>
-                            </div>
-                          </div>
-                        )}
-                        <div className="mt-5 flex flex-wrap items-center gap-3">
-                          {spotlightShoutout?.streamUrl && (
-                            <a
-                              href={spotlightShoutout.streamUrl}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="inline-flex items-center gap-2 rounded-lg bg-cyan-300 px-4 py-2 text-xs font-extrabold text-zinc-950"
-                            >
-                              <Play size={14} />
-                              Watch Twitch
-                            </a>
-                          )}
-                          <button
-                            onClick={() => setActiveTab('forums')}
-                            className="rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-xs font-bold text-white hover:bg-white/10"
-                          >
-                            Website Forum
-                          </button>
-                          <span className="text-xs text-zinc-400">
-                            {spotlightShoutout ? `${Number(spotlightShoutout.viewerCount || 0).toLocaleString()} viewers` : 'POST /api/integrations/dsh/shoutout'}
-                          </span>
-                        </div>
-                      </div>
-                      </div>
-                    </div>
+                    <ShoutoutProfileCard
+                      shoutout={spotlightShoutout}
+                      label="Community Spotlight"
+                      onForumClick={() => setActiveTab('forums')}
+                      feature
+                    />
                   </section>
 
                   <aside className="grid gap-3">
@@ -1281,7 +1382,14 @@ export default function App() {
                       <span className="text-xs text-zinc-500">{shoutoutFeed?.partners?.length || 0} live</span>
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      {(shoutoutFeed?.partners || []).slice(0, 4).map((shoutout) => <ShoutoutCard key={shoutout.id} shoutout={shoutout} compact />)}
+                      {(shoutoutFeed?.partners || []).slice(0, 4).map((shoutout) => (
+                        <ShoutoutProfileCard
+                          key={shoutout.id}
+                          shoutout={shoutout}
+                          label="Partner"
+                          onForumClick={() => setActiveTab('forums')}
+                        />
+                      ))}
                       {(!shoutoutFeed?.partners || shoutoutFeed.partners.length === 0) && <p className="text-sm text-zinc-500">No partner shoutouts received yet.</p>}
                     </div>
                   </section>
@@ -1292,7 +1400,14 @@ export default function App() {
                       <span className="text-xs text-zinc-500">{shoutoutFeed?.crew?.length || 0} live</span>
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      {(shoutoutFeed?.crew || []).slice(0, 4).map((shoutout) => <ShoutoutCard key={shoutout.id} shoutout={shoutout} compact />)}
+                      {(shoutoutFeed?.crew || []).slice(0, 4).map((shoutout) => (
+                        <ShoutoutProfileCard
+                          key={shoutout.id}
+                          shoutout={shoutout}
+                          label="Crew"
+                          onForumClick={() => setActiveTab('forums')}
+                        />
+                      ))}
                       {(!shoutoutFeed?.crew || shoutoutFeed.crew.length === 0) && <p className="text-sm text-zinc-500">No crew shoutouts received yet.</p>}
                     </div>
                   </section>
@@ -1371,54 +1486,50 @@ export default function App() {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mt-4">
-                    <div className="rounded-2xl border border-white/5 bg-white/[0.02] p-4">
-                      <span className="text-[10px] font-mono font-bold text-zinc-500 uppercase">Current It</span>
-                      <span className="block text-sm font-bold text-white mt-2">
-                        {currentItPlayer?.displayName || currentItPlayer?.twitchUsername || currentItPlayer?.username || currentItPlayer?.name || chatTagState?.currentIt || 'No active tagger'}
-                      </span>
-                      <span className="block text-[10px] text-zinc-500 mt-1">{chatTagPlayers.length} tracked players</span>
-                    </div>
+                  <div className="mt-4 rounded-lg border border-cyan-400/30 bg-[#2f3037] p-4 shadow-lg">
+                    <div className="border-l-4 border-cyan-300 pl-4">
+                      <h4 className="text-lg font-black text-white">SPMT Chat Tag</h4>
+                      <div className="mt-3 space-y-1 text-sm text-zinc-100">
+                        <p><span className="font-black text-white">{chatTagCurrentName}</span> is IT</p>
+                        <p>Last tag {formatRelativeMinutes(chatTagLastEventTime)}</p>
+                      </div>
 
-                    <div className="rounded-2xl border border-white/5 bg-white/[0.02] p-4">
-                      <span className="text-[10px] font-mono font-bold text-zinc-500 uppercase">Top Players</span>
-                      <div className="flex flex-col gap-2 mt-2">
-                        {sortedChatTagPlayers.slice(0, 3).map((player, index) => (
-                          <div key={player.id || player.username || index} className="flex items-center justify-between text-xs">
-                            <span className="text-zinc-300">{index + 1}. {player.displayName || player.twitchUsername || player.username || player.name || player.id}</span>
-                            <span className="font-mono font-bold text-amber-300">{player.score || player.points || player.tags || 0}</span>
+                      <div className="mt-4">
+                        <p className="text-sm font-black text-white">Recent</p>
+                        <div className="mt-1 space-y-1 text-sm text-zinc-100">
+                          {recentTags.map((event: any, index: number) => (
+                            <p key={event.id || index}>{formatChatTagEvent(event)}</p>
+                          ))}
+                          {recentTags.length === 0 && <p className="text-zinc-400">No recent tag events returned.</p>}
+                        </div>
+                      </div>
+
+                      <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-[minmax(0,1fr)_180px]">
+                        <div>
+                          <p className="text-sm font-black text-white">Top 3</p>
+                          <div className="mt-1 space-y-1 text-sm text-zinc-100">
+                            {sortedChatTagPlayers.slice(0, 3).map((player, index) => (
+                              <p key={player.id || player.username || index}>
+                                #{index + 1} {getPlayerName(player)} - {Number(player.score || player.points || 0).toLocaleString()} pts ({Number(player.tags || 0).toLocaleString()} tags)
+                              </p>
+                            ))}
+                            {sortedChatTagPlayers.length === 0 && <p className="text-zinc-400">No leaderboard returned yet.</p>}
                           </div>
-                        ))}
-                        {sortedChatTagPlayers.length === 0 && <span className="text-xs text-zinc-500">No player list returned yet.</span>}
+                        </div>
+                        <div className="text-sm">
+                          <p className="font-black text-white">Overlay</p>
+                          <button
+                            type="button"
+                            onClick={() => setEmbeddedAppUrl('https://chat-tag-new.fly.dev/overlay')}
+                            className="mt-1 text-left font-bold text-cyan-300 hover:text-cyan-200"
+                          >
+                            Add to OBS
+                          </button>
+                        </div>
                       </div>
-                    </div>
 
-                    <div className="rounded-2xl border border-white/5 bg-white/[0.02] p-4">
-                      <span className="text-[10px] font-mono font-bold text-zinc-500 uppercase">Chat Commands</span>
-                      <div className="flex flex-wrap gap-1.5 mt-2">
-                        {['spmt join', 'spmt tag @user', 'spmt score', 'spmt rank', 'spmt discord name'].map((command) => (
-                          <span key={command} className="px-2 py-1 rounded-lg bg-black/30 border border-white/10 text-[10px] font-mono text-zinc-300">
-                            {command}
-                          </span>
-                        ))}
-                      </div>
+                      <p className="mt-4 text-xs font-bold text-zinc-200">type spmt controls to interact with chat tag</p>
                     </div>
-                  </div>
-
-                  <div className="mt-4 rounded-2xl border border-amber-500/15 bg-amber-500/[0.03] p-4">
-                    <span className="text-xs font-bold text-white">Integration path</span>
-                    <p className="text-xs text-zinc-400 mt-1 leading-relaxed">
-                      ChatTag sends game events to Discord Stream Hub for leaderboard points, while the hub keeps the live state visible here for players learning the commands.
-                    </p>
-                    {recentTags.length > 0 && (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-3">
-                        {recentTags.map((tag, index) => (
-                          <div key={tag.id || index} className="text-[10px] font-mono text-zinc-400 bg-black/20 rounded-xl px-3 py-2">
-                            {(tag.tagger || 'Someone')} tagged {(tag.target || tag.tagged || 'someone')}
-                          </div>
-                        ))}
-                      </div>
-                    )}
                   </div>
                 </div>
 
