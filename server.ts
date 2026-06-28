@@ -214,16 +214,26 @@ function normalizeForwardedForumPost(body: any) {
   const sourceMessageUrl = body?.sourceMessageUrl || body?.source_message_url || body?.messageUrl || body?.url || null;
   const authorId = body?.authorId || body?.author_id || body?.userId || null;
   const authorName = String(body?.authorName || body?.author_name || body?.userName || body?.username || body?.displayName || 'Discord');
-  const attachments = Array.isArray(body?.attachments)
-    ? body.attachments
-      .map((attachment: any) => attachment?.url || attachment?.proxy_url || attachment)
-      .filter(Boolean)
-      .map((url: any) => `Attachment: ${String(url)}`)
-    : [];
-  const rawContent = [
-    String(body?.content || body?.body || body?.message || '').trim(),
-    ...attachments,
-  ].filter(Boolean).join('\n').trim();
+  const normalizedMentionMap = (() => {
+    if (body?.mentionedUsers && typeof body.mentionedUsers === 'object' && !Array.isArray(body.mentionedUsers)) {
+      return body.mentionedUsers;
+    }
+    if (Array.isArray(body?.mentions)) {
+      return body.mentions.reduce((acc: Record<string, string>, mention: any) => {
+        const id = String(mention?.id || mention?.userId || '').trim();
+        const name = String(mention?.displayName || mention?.global_name || mention?.username || mention?.name || id).trim();
+        if (id) acc[id] = name;
+        return acc;
+      }, {});
+    }
+    return null;
+  })();
+  let rawContent = String(body?.content || body?.body || body?.message || '').trim();
+  if (normalizedMentionMap) {
+    for (const [id, name] of Object.entries(normalizedMentionMap)) {
+      rawContent = rawContent.replace(new RegExp(`<@!?${id}>`, 'g'), `@${name}`);
+    }
+  }
   const title = String(
     body?.title ||
     (body?.guildName && sourceChannelName ? `${body.guildName} / #${sourceChannelName}` : '') ||
@@ -231,6 +241,21 @@ function normalizeForwardedForumPost(body: any) {
   ).trim().slice(0, 180);
   const category = String(body?.category || 'Discord Forward').trim().slice(0, 80);
   const postedAt = String(body?.postedAt || body?.posted_at || body?.timestamp || new Date().toISOString());
+
+  // Rich payload fields
+  const embeds = Array.isArray(body?.embeds) ? JSON.stringify(body.embeds) : null;
+  const richAttachments = [
+    ...(Array.isArray(body?.attachments) ? body.attachments : []),
+    ...(Array.isArray(body?.emotes)
+      ? body.emotes.map((emote: any) => ({
+        url: emote?.url,
+        filename: emote?.name ? `${emote.name}.${emote.animated ? 'gif' : 'webp'}` : 'discord-emote',
+        contentType: emote?.animated ? 'image/gif' : 'image/webp',
+      }))
+      : []),
+  ].filter((attachment: any) => attachment?.url);
+  const attachments = richAttachments.length > 0 ? JSON.stringify(richAttachments) : null;
+  const mentionedUsers = normalizedMentionMap ? JSON.stringify(normalizedMentionMap) : null;
 
   return {
     id: String(body?.id || body?.forwardId || `ff_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`),
@@ -243,10 +268,13 @@ function normalizeForwardedForumPost(body: any) {
     authorId: authorId ? String(authorId) : null,
     authorName,
     title: title || 'Discord forwarded post',
-    content: rawContent,
+    content: rawContent || (attachments || embeds ? 'Shared Discord media' : ''),
     category,
     postedAt,
     createdAt: new Date().toISOString(),
+    embeds,
+    attachments,
+    mentionedUsers,
   };
 }
 
@@ -784,11 +812,19 @@ async function startServer() {
           content,
           category,
           posted_at as postedAt,
-          created_at as createdAt
+          created_at as createdAt,
+          embeds,
+          attachments,
+          mentioned_users as mentionedUsers
         FROM forwarded_forum_posts
         ORDER BY datetime(created_at) DESC
         LIMIT 100
-      `).all();
+      `).all().map((row: any) => ({
+        ...row,
+        embeds: row.embeds ? JSON.parse(row.embeds) : null,
+        attachments: row.attachments ? JSON.parse(row.attachments) : null,
+        mentionedUsers: row.mentionedUsers ? JSON.parse(row.mentionedUsers) : null,
+      }));
       res.json({ posts: rows });
     } catch (err) {
       res.status(500).json({ error: 'Could not load forwarded forum posts' });
@@ -823,7 +859,10 @@ async function startServer() {
           content,
           category,
           posted_at,
-          created_at
+          created_at,
+          embeds,
+          attachments,
+          mentioned_users
         ) VALUES (
           @id,
           @sourceApp,
@@ -838,7 +877,10 @@ async function startServer() {
           @content,
           @category,
           @postedAt,
-          @createdAt
+          @createdAt,
+          @embeds,
+          @attachments,
+          @mentionedUsers
         )
       `).run(post);
 

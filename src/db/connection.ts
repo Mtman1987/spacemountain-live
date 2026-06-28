@@ -122,6 +122,9 @@ const ensureColumn = (table: string, column: string, definition: string) => {
 };
 
 ensureColumn('community_shoutouts', 'video_url', 'TEXT');
+ensureColumn('forwarded_forum_posts', 'embeds', 'TEXT');
+ensureColumn('forwarded_forum_posts', 'attachments', 'TEXT');
+ensureColumn('forwarded_forum_posts', 'mentioned_users', 'TEXT');
 
 console.log('SQLite database structures successfully verified and prepared!');
 

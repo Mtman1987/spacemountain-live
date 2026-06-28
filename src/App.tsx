@@ -165,7 +165,7 @@ const ShoutoutCard: React.FC<{
             {shoutout.isLive ? 'Live' : 'Seen'}
           </span>
         </div>
-        <p className="mt-2 line-clamp-2 text-xs text-zinc-300">{shoutout.title || shoutout.description || 'Discord Stream Hub generated this shoutout.'}</p>
+        <p className="mt-2 text-xs text-zinc-300">{shoutout.title || shoutout.description || 'Discord Stream Hub generated this shoutout.'}</p>
         <div className="mt-3 flex items-center justify-between gap-2 text-[11px] text-zinc-500">
           <span>{Number(shoutout.viewerCount || 0).toLocaleString()} viewers · {getLiveSince(shoutout.startedAt)}</span>
           {shoutout.streamUrl && (
@@ -192,7 +192,7 @@ const ShoutoutProfileCard: React.FC<{
 
   return (
     <article className="overflow-hidden rounded-lg border border-white/10 bg-zinc-950/50">
-      <div className={`relative overflow-hidden bg-zinc-950 ${feature ? 'min-h-[330px]' : 'min-h-[270px]'}`}>
+      <div className={`relative overflow-hidden bg-zinc-950 ${feature ? 'min-h-[330px]' : ''}`}>
         <div
           className="absolute inset-0 bg-cover bg-center opacity-70"
           style={{ backgroundImage: `url("${imageUrl}")` }}
@@ -215,10 +215,10 @@ const ShoutoutProfileCard: React.FC<{
                 />
               )}
               <div className="min-w-0">
-                <h2 className={`${feature ? 'text-3xl md:text-5xl' : 'text-2xl md:text-3xl'} truncate font-black tracking-tight text-white`}>
+                <h2 className={`${feature ? 'text-3xl xl:text-4xl 2xl:text-5xl' : 'text-2xl md:text-3xl'} break-words font-black tracking-tight text-white`}>
                   {shoutout?.displayName || emptyLabel}
                 </h2>
-                <p className="mt-2 line-clamp-2 max-w-xl text-sm leading-relaxed text-zinc-300">
+                <p className="mt-2 max-w-xl break-words text-sm leading-relaxed text-zinc-300">
                   {shoutout?.title || shoutout?.description || 'Discord Stream Hub generated shoutouts land here when creators are live.'}
                 </p>
               </div>
@@ -227,7 +227,7 @@ const ShoutoutProfileCard: React.FC<{
               <div className="mt-4 grid max-w-xl grid-cols-1 gap-2 sm:grid-cols-3">
                 <div className="rounded-md bg-black/35 p-3">
                   <p className="text-[10px] uppercase text-zinc-500">Playing</p>
-                  <p className="mt-1 truncate text-xs font-bold text-white">{shoutout.gameName || 'Unknown game'}</p>
+                  <p className="mt-1 break-words text-xs font-bold text-white">{shoutout.gameName || 'Unknown game'}</p>
                 </div>
                 <div className="rounded-md bg-black/35 p-3">
                   <p className="text-[10px] uppercase text-zinc-500">Viewers</p>
@@ -517,6 +517,10 @@ export default function App() {
   const [isCreatingThread, setIsCreatingThread] = useState(false);
   const [forwardedForumPosts, setForwardedForumPosts] = useState<any[]>([]);
   const [forwardedForumLoading, setForwardedForumLoading] = useState(false);
+  const [expandedChannels, setExpandedChannels] = useState<Set<string>>(new Set());
+  const [lastSeenTimestamps, setLastSeenTimestamps] = useState<Record<string, string>>(() => {
+    try { return JSON.parse(localStorage.getItem('forumLastSeen') || '{}'); } catch { return {}; }
+  });
   const forwardedForumChannels = useMemo(() => {
     const groups = new Map<string, { id: string; name: string; posts: any[]; lastPostAt: string | null }>();
 
@@ -1051,7 +1055,7 @@ export default function App() {
       : { gap: '1.5rem', paddingTop: '6rem' };
   const chatTagPlayers = Array.isArray(chatTagState?.players) ? chatTagState.players : [];
   const currentItPlayer = chatTagPlayers.find((player) => player.isIt || player.id === chatTagState?.currentIt);
-  const sortedChatTagPlayers = [...chatTagPlayers].sort((a, b) => (b.score || b.points || b.tags || 0) - (a.score || a.points || a.tags || 0));
+  const sortedChatTagPlayers = [...chatTagPlayers].sort((a, b) => Number(b.score ?? b.points ?? b.tags ?? 0) - Number(a.score ?? a.points ?? a.tags ?? 0));
   const recentTags = [
     ...(Array.isArray(chatTagState?.history) ? chatTagState.history : []),
     ...(Array.isArray(chatTagState?.adminHistory) ? chatTagState.adminHistory : []),
@@ -1352,41 +1356,49 @@ export default function App() {
                 </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                  <section className="rounded-lg border border-white/10 bg-zinc-950/45 p-4">
-                    <div className="flex items-center justify-between gap-3 mb-3">
-                      <h2 className="text-lg font-black text-white">Partners</h2>
-                      <span className="text-xs text-zinc-500">{shoutoutFeed?.partners?.length || 0} live</span>
-                    </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      {(shoutoutFeed?.partners || []).slice(0, 4).map((shoutout) => (
-                        <ShoutoutProfileCard
-                          key={shoutout.id}
-                          shoutout={shoutout}
-                          label="Partner"
-                          onForumClick={() => setActiveTab('forums')}
-                        />
-                      ))}
-                      {(!shoutoutFeed?.partners || shoutoutFeed.partners.length === 0) && <p className="text-sm text-zinc-500">No partner shoutouts received yet.</p>}
-                    </div>
-                  </section>
+                  {(shoutoutFeed?.partners?.length || 0) > 0 && (
+                    <section className={`rounded-lg border border-white/10 bg-zinc-950/45 p-4 ${(!shoutoutFeed?.crew || shoutoutFeed.crew.length === 0) ? 'lg:col-span-2' : ''}`}>
+                      <div className="flex items-center justify-between gap-3 mb-3">
+                        <h2 className="text-lg font-black text-white">Partners</h2>
+                        <span className="text-xs text-zinc-500">{shoutoutFeed?.partners?.length || 0} live</span>
+                      </div>
+                      <div className="grid grid-cols-1 gap-3">
+                        {(shoutoutFeed?.partners || []).slice(0, 4).map((shoutout) => (
+                          <ShoutoutProfileCard
+                            key={shoutout.id}
+                            shoutout={shoutout}
+                            label="Partner"
+                            onForumClick={() => setActiveTab('forums')}
+                            feature
+                          />
+                        ))}
+                      </div>
+                    </section>
+                  )}
 
-                  <section className="rounded-lg border border-white/10 bg-zinc-950/45 p-4">
-                    <div className="flex items-center justify-between gap-3 mb-3">
-                      <h2 className="text-lg font-black text-white">Crew</h2>
-                      <span className="text-xs text-zinc-500">{shoutoutFeed?.crew?.length || 0} live</span>
-                    </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      {(shoutoutFeed?.crew || []).slice(0, 4).map((shoutout) => (
-                        <ShoutoutProfileCard
-                          key={shoutout.id}
-                          shoutout={shoutout}
-                          label="Crew"
-                          onForumClick={() => setActiveTab('forums')}
-                        />
-                      ))}
-                      {(!shoutoutFeed?.crew || shoutoutFeed.crew.length === 0) && <p className="text-sm text-zinc-500">No crew shoutouts received yet.</p>}
-                    </div>
-                  </section>
+                  {(shoutoutFeed?.crew?.length || 0) > 0 && (
+                    <section className={`rounded-lg border border-white/10 bg-zinc-950/45 p-4 ${(!shoutoutFeed?.partners || shoutoutFeed.partners.length === 0) ? 'lg:col-span-2' : ''}`}>
+                      <div className="flex items-center justify-between gap-3 mb-3">
+                        <h2 className="text-lg font-black text-white">Crew</h2>
+                        <span className="text-xs text-zinc-500">{shoutoutFeed?.crew?.length || 0} live</span>
+                      </div>
+                      <div className="grid grid-cols-1 gap-3">
+                        {(shoutoutFeed?.crew || []).slice(0, 4).map((shoutout) => (
+                          <ShoutoutProfileCard
+                            key={shoutout.id}
+                            shoutout={shoutout}
+                            label="Crew"
+                            onForumClick={() => setActiveTab('forums')}
+                            feature
+                          />
+                        ))}
+                      </div>
+                    </section>
+                  )}
+
+                  {(!shoutoutFeed?.partners || shoutoutFeed.partners.length === 0) && (!shoutoutFeed?.crew || shoutoutFeed.crew.length === 0) && (
+                    <p className="text-sm text-zinc-500 lg:col-span-2">No partner or crew shoutouts received yet.</p>
+                  )}
                 </div>
 
                 <section className="rounded-lg border border-white/10 bg-zinc-950/45 p-4">
@@ -1563,6 +1575,47 @@ export default function App() {
                     </div>
                   )}
                 </div>
+
+                <div className="dynamic-cosmic-card rounded-3xl p-5 backdrop-blur-xl transition-all duration-300">
+                  <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/5 pb-4">
+                    <div>
+                      <h3 className="text-lg font-sans font-bold text-white flex items-center gap-2">
+                        <Layout className="text-purple-400" size={18} />
+                        Discord Stream Hub
+                      </h3>
+                      <p className="text-xs text-zinc-400 mt-0.5">Admin calendar, leaderboard, and community tools from DSH.</p>
+                    </div>
+                    <a href="https://discord-stream-hub-new.fly.dev" target="_blank" rel="noreferrer" className="px-3 py-1.5 rounded-xl bg-white/5 border border-white/10 text-xs font-bold text-zinc-300 hover:text-white no-underline">
+                      Pop Out DSH
+                    </a>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-4">
+                    <div className="rounded-2xl border border-white/5 bg-white/[0.02] p-4">
+                      <span className="text-xs font-bold text-white">Admin Calendar</span>
+                      <p className="text-xs text-zinc-400 mt-1">Stream schedule and event calendar from DSH.</p>
+                      <div className="grid grid-cols-2 gap-2 mt-3">
+                        <button type="button" onClick={() => setEmbeddedAppUrl('https://discord-stream-hub-new.fly.dev/calendar')} className="px-3 py-1.5 rounded-xl bg-purple-500/10 border border-purple-500/20 text-xs font-bold text-purple-300">
+                          Embed
+                        </button>
+                        <a href="https://discord-stream-hub-new.fly.dev/calendar" target="_blank" rel="noreferrer" className="px-3 py-1.5 rounded-xl bg-black/30 border border-white/10 text-xs font-bold text-zinc-300 text-center no-underline">
+                          Pop Out
+                        </a>
+                      </div>
+                    </div>
+                    <div className="rounded-2xl border border-white/5 bg-white/[0.02] p-4">
+                      <span className="text-xs font-bold text-white">Leaderboard</span>
+                      <p className="text-xs text-zinc-400 mt-1">Points leaderboard and community rankings.</p>
+                      <div className="grid grid-cols-2 gap-2 mt-3">
+                        <button type="button" onClick={() => setEmbeddedAppUrl('https://discord-stream-hub-new.fly.dev/leaderboard')} className="px-3 py-1.5 rounded-xl bg-purple-500/10 border border-purple-500/20 text-xs font-bold text-purple-300">
+                          Embed
+                        </button>
+                        <a href="https://discord-stream-hub-new.fly.dev/leaderboard" target="_blank" rel="noreferrer" className="px-3 py-1.5 rounded-xl bg-black/30 border border-white/10 text-xs font-bold text-zinc-300 text-center no-underline">
+                          Pop Out
+                        </a>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </motion.div>
             )}
 
@@ -1726,40 +1779,127 @@ export default function App() {
                   <div className="rounded-2xl border border-white/5 bg-white/[0.02] p-4">
                     <div className="flex items-center justify-between mb-3">
                       <span className="text-xs font-bold text-white">Forwarded Discord Channels</span>
-                      <span className="text-[10px] text-zinc-500 font-mono">One forum channel per Discord channel</span>
+                      <span className="text-[10px] text-zinc-500 font-mono">Click to expand</span>
                     </div>
-                    <div className="flex flex-col gap-3">
-                      {forwardedForumChannels.map((channel) => (
-                        <div key={channel.id} className="rounded-2xl border border-white/5 overflow-hidden" style={{ background: 'var(--chat-surface-bg)' }}>
-                          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/5 bg-white/[0.03] px-4 py-3">
-                            <div>
-                              <span className="text-[10px] font-mono tracking-wider text-purple-400 font-semibold uppercase">Discord channel</span>
-                              <h3 className="text-sm font-black text-white">#{channel.name}</h3>
-                            </div>
-                            <span className="rounded-full border border-white/10 bg-black/20 px-3 py-1 text-[10px] font-bold text-zinc-300">
-                              {channel.posts.length} {channel.posts.length === 1 ? 'post' : 'posts'}
-                            </span>
-                          </div>
-                          <div className="flex flex-col gap-0">
-                            {channel.posts.map((post) => (
-                              <div key={post.id} className="border-b border-white/5 p-4 last:border-b-0">
-                                <div className="flex flex-wrap items-center justify-between gap-2">
-                                  <span className="text-xs font-bold text-white">{post.authorName || 'Discord'}</span>
-                                  <span className="text-[10px] text-zinc-500 font-mono">
-                                    {post.postedAt ? new Date(post.postedAt).toLocaleString() : ''}
-                                  </span>
-                                </div>
-                                <p className="text-xs text-zinc-400 leading-relaxed mt-2 whitespace-pre-wrap">{post.content}</p>
-                                {post.sourceMessageUrl && (
-                                  <a href={post.sourceMessageUrl} target="_blank" rel="noreferrer" className="mt-2 inline-block text-[10px] text-purple-300 hover:text-purple-200 no-underline">
-                                    Source message
-                                  </a>
-                                )}
+                    <div className="flex flex-col gap-2">
+                      {forwardedForumChannels.map((channel) => {
+                        const isExpanded = expandedChannels.has(channel.id);
+                        const lastSeen = lastSeenTimestamps[channel.id];
+                        const hasNew = channel.lastPostAt && (!lastSeen || new Date(channel.lastPostAt).getTime() > new Date(lastSeen).getTime());
+
+                        return (
+                          <div key={channel.id} className="relative overflow-hidden rounded-2xl border border-white/5" style={{ background: 'var(--chat-surface-bg)' }}>
+                            {hasNew && (
+                              <span className="absolute right-3 top-3 z-10 rounded bg-red-500 px-2 py-0.5 text-[9px] font-black uppercase tracking-wide text-white">
+                                New
+                              </span>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setExpandedChannels((prev) => {
+                                  const next = new Set(prev);
+                                  if (next.has(channel.id)) {
+                                    next.delete(channel.id);
+                                  } else {
+                                    next.add(channel.id);
+                                    // Mark as seen
+                                    const now = new Date().toISOString();
+                                    setLastSeenTimestamps((ts) => {
+                                      const updated = { ...ts, [channel.id]: now };
+                                      localStorage.setItem('forumLastSeen', JSON.stringify(updated));
+                                      return updated;
+                                    });
+                                  }
+                                  return next;
+                                });
+                              }}
+                              className="w-full flex flex-wrap items-center justify-between gap-2 border-b border-white/5 bg-white/[0.03] px-4 py-3 pr-16 text-left hover:bg-white/[0.06] transition-colors"
+                            >
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm font-black text-white">#{channel.name}</span>
                               </div>
-                            ))}
+                              <span className="rounded-full border border-white/10 bg-black/20 px-3 py-1 text-[10px] font-bold text-zinc-300">
+                                {channel.posts.length} {channel.posts.length === 1 ? 'post' : 'posts'}
+                              </span>
+                            </button>
+                            {isExpanded && (
+                              <div className="flex flex-col gap-0">
+                                {channel.posts.map((post) => {
+                                  // Render content with @user mentions, custom emotes, and animated emotes
+                                  let rendered = post.content || '';
+                                  const mentions: Record<string, string> = post.mentionedUsers || {};
+                                  rendered = rendered.replace(/<@(\d+)>/g, (_: string, id: string) => `@${mentions[id] || id}`);
+                                  rendered = rendered.replace(/<a:(\w+):(\d+)>/g, (_: string, name: string, id: string) => `![${name}](https://cdn.discordapp.com/emojis/${id}.gif)`);
+                                  rendered = rendered.replace(/<:(\w+):(\d+)>/g, (_: string, name: string, id: string) => `![${name}](https://cdn.discordapp.com/emojis/${id}.webp)`);
+
+                                  const embeds: any[] = Array.isArray(post.embeds) ? post.embeds : [];
+                                  const attachments: any[] = Array.isArray(post.attachments) ? post.attachments : [];
+
+                                  return (
+                                    <div key={post.id} className="border-b border-white/5 p-4 last:border-b-0">
+                                      <div className="flex flex-wrap items-center justify-between gap-2">
+                                        <span className="text-xs font-bold text-white">{post.authorName || 'Discord'}</span>
+                                        <span className="text-[10px] text-zinc-500 font-mono">
+                                          {post.postedAt ? new Date(post.postedAt).toLocaleString() : ''}
+                                        </span>
+                                      </div>
+                                      <p className="text-xs text-zinc-400 leading-relaxed mt-2 whitespace-pre-wrap">
+                                        {rendered.split(/(!\[[^\]]*\]\([^)]+\))/g).map((segment, i) => {
+                                          const emoteMatch = segment.match(/^!\[([^\]]*)\]\(([^)]+)\)$/);
+                                          if (emoteMatch) return <img key={i} src={emoteMatch[2]} alt={emoteMatch[1]} className="inline h-5 w-5 align-middle" />;
+                                          return <span key={i}>{segment}</span>;
+                                        })}
+                                      </p>
+                                      {attachments.length > 0 && (
+                                        <div className="mt-2 flex flex-wrap gap-2">
+                                          {attachments.map((att: any, i: number) => {
+                                            const url = typeof att === 'string' ? att : att?.url;
+                                            if (!url) return null;
+                                            const contentType = att?.contentType || att?.content_type;
+                                            const isImage = /\.(png|jpe?g|gif|webp)(\?.*)?$/i.test(url) || contentType?.startsWith('image');
+                                            return isImage
+                                              ? <img key={i} src={url} alt={att?.filename || ''} className="max-h-48 rounded-lg border border-white/10" />
+                                              : <a key={i} href={url} target="_blank" rel="noreferrer" className="text-[10px] text-purple-300 hover:text-purple-200">{att?.filename || 'Attachment'}</a>;
+                                          })}
+                                        </div>
+                                      )}
+                                      {embeds.length > 0 && (
+                                        <div className="mt-2 flex flex-col gap-2">
+                                          {embeds.map((embed: any, i: number) => (
+                                            <div key={i} className="rounded-lg border-l-4 bg-zinc-900/60 p-3" style={{ borderColor: embed.color ? `#${embed.color.toString(16).padStart(6, '0')}` : 'rgba(255,255,255,0.1)' }}>
+                                              {embed.title && <p className="text-xs font-bold text-white">{embed.title}</p>}
+                                              {embed.description && <p className="text-xs text-zinc-400 mt-1 whitespace-pre-wrap">{embed.description}</p>}
+                                              {Array.isArray(embed.fields) && embed.fields.length > 0 && (
+                                                <div className="mt-2 grid grid-cols-1 gap-2 md:grid-cols-2">
+                                                  {embed.fields.slice(0, 6).map((field: any, fieldIndex: number) => (
+                                                    <div key={fieldIndex} className="rounded-md bg-black/25 p-2">
+                                                      {field.name && <p className="text-[10px] font-bold uppercase text-zinc-300">{field.name}</p>}
+                                                      {field.value && <p className="mt-1 whitespace-pre-wrap text-[11px] text-zinc-400">{field.value}</p>}
+                                                    </div>
+                                                  ))}
+                                                </div>
+                                              )}
+                                              {embed.thumbnail?.url && <img src={embed.thumbnail.url} alt="" className="mt-2 max-h-24 rounded border border-white/10" />}
+                                              {embed.image?.url && <img src={embed.image.url} alt="" className="mt-2 max-h-48 rounded border border-white/10" />}
+                                              {embed.url && <a href={embed.url} target="_blank" rel="noreferrer" className="mt-2 inline-block text-[10px] text-purple-300 hover:text-purple-200">Open embed</a>}
+                                            </div>
+                                          ))}
+                                        </div>
+                                      )}
+                                      {post.sourceMessageUrl && (
+                                        <a href={post.sourceMessageUrl} target="_blank" rel="noreferrer" className="mt-2 inline-block text-[10px] text-purple-300 hover:text-purple-200 no-underline">
+                                          Source message
+                                        </a>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
                           </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   </div>
                 )}
