@@ -139,37 +139,13 @@ const ShoutoutCard: React.FC<{
   shoutout,
   compact = false,
 }) => {
-  const videoUrl = getShoutoutVideo(shoutout);
-  const twitchEmbedUrl = shoutout.isLive ? getTwitchEmbedUrl(shoutout.twitchLogin) : null;
-
   return (
     <article className="rounded-lg border border-white/10 bg-zinc-950/55 overflow-hidden">
       <div className={`${compact ? 'h-24' : 'h-32'} relative overflow-hidden bg-zinc-900`}>
-        {twitchEmbedUrl ? (
-          <iframe
-            className="h-full w-full"
-            src={twitchEmbedUrl}
-            title={`${shoutout.displayName} live stream`}
-            allow="autoplay; fullscreen"
-          />
-        ) : videoUrl ? (
-          <video
-            className="h-full w-full object-cover"
-            src={videoUrl}
-            poster={getShoutoutImage(shoutout)}
-            autoPlay
-            muted
-            loop
-            playsInline
-            controls
-            preload="metadata"
-          />
-        ) : (
-          <div
-            className="h-full w-full bg-cover bg-center"
-            style={{ backgroundImage: `url("${getShoutoutImage(shoutout)}")` }}
-          />
-        )}
+        <div
+          className="h-full w-full bg-cover bg-center"
+          style={{ backgroundImage: `url("${getShoutoutImage(shoutout)}")` }}
+        />
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/5 to-black/70" />
       </div>
       <div className="p-3">
