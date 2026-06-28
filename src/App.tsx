@@ -73,6 +73,12 @@ function getShoutoutImage(shoutout?: CommunityShoutout | null) {
   return image.replace(/\{width\}/g, '640').replace(/\{height\}/g, '360');
 }
 
+function getShoutoutVideo(shoutout?: CommunityShoutout | null) {
+  const video = shoutout?.videoUrl;
+  if (!video) return null;
+  return video.replace(/\{width\}/g, '1280').replace(/\{height\}/g, '720');
+}
+
 function getLiveSince(value?: string | null) {
   if (!value) return 'Live';
   const started = new Date(value).getTime();
@@ -91,12 +97,31 @@ const ShoutoutCard: React.FC<{
   shoutout,
   compact = false,
 }) => {
+  const videoUrl = getShoutoutVideo(shoutout);
+
   return (
     <article className="rounded-lg border border-white/10 bg-zinc-950/55 overflow-hidden">
-      <div
-        className={`${compact ? 'h-24' : 'h-32'} bg-zinc-900 bg-cover bg-center`}
-        style={{ backgroundImage: `linear-gradient(180deg, rgba(0,0,0,0.05), rgba(0,0,0,0.72)), url("${getShoutoutImage(shoutout)}")` }}
-      />
+      <div className={`${compact ? 'h-24' : 'h-32'} relative overflow-hidden bg-zinc-900`}>
+        {videoUrl ? (
+          <video
+            className="h-full w-full object-cover"
+            src={videoUrl}
+            poster={getShoutoutImage(shoutout)}
+            autoPlay
+            muted
+            loop
+            playsInline
+            controls
+            preload="metadata"
+          />
+        ) : (
+          <div
+            className="h-full w-full bg-cover bg-center"
+            style={{ backgroundImage: `url("${getShoutoutImage(shoutout)}")` }}
+          />
+        )}
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/5 to-black/70" />
+      </div>
       <div className="p-3">
         <div className="flex items-start justify-between gap-3">
           <div className="flex min-w-0 items-center gap-2">
@@ -350,6 +375,28 @@ export default function App() {
   const [isCreatingThread, setIsCreatingThread] = useState(false);
   const [forwardedForumPosts, setForwardedForumPosts] = useState<any[]>([]);
   const [forwardedForumLoading, setForwardedForumLoading] = useState(false);
+  const forwardedForumChannels = useMemo(() => {
+    const groups = new Map<string, { id: string; name: string; posts: any[]; lastPostAt: string | null }>();
+
+    for (const post of forwardedForumPosts) {
+      const id = String(post.sourceChannelId || post.sourceChannelName || 'discord-channel');
+      const name = post.sourceChannelName || post.sourceChannelId || 'Discord channel';
+      const existing = groups.get(id) || { id, name, posts: [], lastPostAt: null };
+      existing.posts.push(post);
+      const postedAt = post.postedAt || post.createdAt || null;
+      if (postedAt && (!existing.lastPostAt || new Date(postedAt).getTime() > new Date(existing.lastPostAt).getTime())) {
+        existing.lastPostAt = postedAt;
+      }
+      groups.set(id, existing);
+    }
+
+    return Array.from(groups.values())
+      .map((group) => ({
+        ...group,
+        posts: group.posts.sort((a, b) => new Date(a.postedAt || a.createdAt || 0).getTime() - new Date(b.postedAt || b.createdAt || 0).getTime()),
+      }))
+      .sort((a, b) => new Date(b.lastPostAt || 0).getTime() - new Date(a.lastPostAt || 0).getTime());
+  }, [forwardedForumPosts]);
 
   // Voice rooms state
   const [voiceRoomActive, setVoiceRoomActive] = useState(false);
@@ -1052,11 +1099,29 @@ export default function App() {
                 <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_340px] gap-4">
                   <section className="rounded-lg border border-white/10 bg-zinc-950/50 overflow-hidden">
                     <div
-                      className="min-h-[360px] bg-cover bg-center p-5 md:p-7 flex flex-col justify-end"
-                      style={{
-                        backgroundImage: `linear-gradient(90deg, rgba(5,5,5,0.92), rgba(5,5,5,0.68), rgba(5,5,5,0.24)), url("${getShoutoutImage(spotlightShoutout)}")`,
-                      }}
+                      className="relative min-h-[420px] overflow-hidden bg-zinc-950"
                     >
+                      {getShoutoutVideo(spotlightShoutout) ? (
+                        <video
+                          className="absolute inset-0 h-full w-full object-cover"
+                          src={getShoutoutVideo(spotlightShoutout) || undefined}
+                          poster={getShoutoutImage(spotlightShoutout)}
+                          autoPlay
+                          muted
+                          loop
+                          playsInline
+                          controls
+                          preload="metadata"
+                        />
+                      ) : (
+                        <div
+                          className="absolute inset-0 bg-cover bg-center"
+                          style={{ backgroundImage: `url("${getShoutoutImage(spotlightShoutout)}")` }}
+                        />
+                      )}
+                      <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-black via-black/70 to-black/20" />
+                      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-black/80 to-transparent" />
+                      <div className="relative z-10 flex min-h-[420px] flex-col justify-end p-5 pb-16 md:p-7 md:pb-16">
                       <div className="max-w-2xl">
                         <div className="flex flex-wrap items-center gap-2 text-[11px] font-bold uppercase tracking-wide">
                           <span className="rounded-md bg-amber-300 px-2 py-1 text-black">Community Spotlight</span>
@@ -1108,6 +1173,7 @@ export default function App() {
                             {spotlightShoutout ? `${Number(spotlightShoutout.viewerCount || 0).toLocaleString()} viewers` : 'POST /api/integrations/dsh/shoutout'}
                           </span>
                         </div>
+                      </div>
                       </div>
                     </div>
                   </section>
@@ -1563,39 +1629,47 @@ export default function App() {
                       <span className="block text-xs text-white mt-1 font-mono">POST /api/forum/forward</span>
                     </div>
                     <div className="rounded-xl border border-white/5 bg-black/20 p-3">
-                      <span className="text-[10px] font-mono font-bold text-purple-300 uppercase">Forwarded posts</span>
-                      <span className="block text-xs text-white mt-1">{forwardedForumPosts.length}</span>
+                      <span className="text-[10px] font-mono font-bold text-purple-300 uppercase">Forwarded channels</span>
+                      <span className="block text-xs text-white mt-1">{forwardedForumChannels.length}</span>
                     </div>
                   </div>
                 </div>
 
-                {forwardedForumPosts.length > 0 && (
+                {forwardedForumChannels.length > 0 && (
                   <div className="rounded-2xl border border-white/5 bg-white/[0.02] p-4">
                     <div className="flex items-center justify-between mb-3">
-                      <span className="text-xs font-bold text-white">Forwarded From DSH</span>
-                      <span className="text-[10px] text-zinc-500 font-mono">Newest first</span>
+                      <span className="text-xs font-bold text-white">Forwarded Discord Channels</span>
+                      <span className="text-[10px] text-zinc-500 font-mono">One forum channel per Discord channel</span>
                     </div>
-                    <div className="flex flex-col gap-2">
-                      {forwardedForumPosts.map((post) => (
-                        <div key={post.id} className="p-4 rounded-2xl border border-white/5" style={{ background: 'var(--chat-surface-bg)' }}>
-                          <div className="flex flex-wrap items-center justify-between gap-2">
-                            <div className="flex flex-col min-w-0">
-                              <span className="text-[10px] font-mono tracking-wider text-purple-400 font-semibold">{post.category || 'Discord Forward'}</span>
-                              <span className="text-xs font-bold text-white mt-0.5">{post.title}</span>
+                    <div className="flex flex-col gap-3">
+                      {forwardedForumChannels.map((channel) => (
+                        <div key={channel.id} className="rounded-2xl border border-white/5 overflow-hidden" style={{ background: 'var(--chat-surface-bg)' }}>
+                          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/5 bg-white/[0.03] px-4 py-3">
+                            <div>
+                              <span className="text-[10px] font-mono tracking-wider text-purple-400 font-semibold uppercase">Discord channel</span>
+                              <h3 className="text-sm font-black text-white">#{channel.name}</h3>
                             </div>
-                            <span className="text-[10px] text-zinc-500 font-mono">
-                              {post.sourceChannelName || post.sourceChannelId || 'Discord channel'}
+                            <span className="rounded-full border border-white/10 bg-black/20 px-3 py-1 text-[10px] font-bold text-zinc-300">
+                              {channel.posts.length} {channel.posts.length === 1 ? 'post' : 'posts'}
                             </span>
                           </div>
-                          <p className="text-xs text-zinc-400 leading-relaxed mt-2 whitespace-pre-wrap">{post.content}</p>
-                          <div className="flex flex-wrap items-center gap-2 mt-3 text-[10px] text-zinc-500 font-mono">
-                            <span>By {post.authorName || 'Discord'}</span>
-                            <span>{post.postedAt ? new Date(post.postedAt).toLocaleString() : ''}</span>
-                            {post.sourceMessageUrl && (
-                              <a href={post.sourceMessageUrl} target="_blank" rel="noreferrer" className="text-purple-300 hover:text-purple-200 no-underline">
-                                Source message
-                              </a>
-                            )}
+                          <div className="flex flex-col gap-0">
+                            {channel.posts.map((post) => (
+                              <div key={post.id} className="border-b border-white/5 p-4 last:border-b-0">
+                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                  <span className="text-xs font-bold text-white">{post.authorName || 'Discord'}</span>
+                                  <span className="text-[10px] text-zinc-500 font-mono">
+                                    {post.postedAt ? new Date(post.postedAt).toLocaleString() : ''}
+                                  </span>
+                                </div>
+                                <p className="text-xs text-zinc-400 leading-relaxed mt-2 whitespace-pre-wrap">{post.content}</p>
+                                {post.sourceMessageUrl && (
+                                  <a href={post.sourceMessageUrl} target="_blank" rel="noreferrer" className="mt-2 inline-block text-[10px] text-purple-300 hover:text-purple-200 no-underline">
+                                    Source message
+                                  </a>
+                                )}
+                              </div>
+                            ))}
                           </div>
                         </div>
                       ))}

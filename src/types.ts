@@ -79,6 +79,7 @@ export interface CommunityShoutout {
   streamUrl?: string | null;
   avatarUrl?: string | null;
   imageUrl?: string | null;
+  videoUrl?: string | null;
   bannerUrl?: string | null;
   sourceMessageUrl?: string | null;
   discordUserId?: string | null;

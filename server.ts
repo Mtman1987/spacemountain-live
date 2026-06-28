@@ -268,6 +268,13 @@ function getTwitchAvatarFallback(twitchLogin: any) {
   return `https://unavatar.io/twitch/${encodeURIComponent(String(twitchLogin))}`;
 }
 
+function normalizeVideoUrl(value: any) {
+  if (!value) return null;
+  const url = String(value).trim();
+  if (!url) return null;
+  return /\.(mp4|webm|mov)(\?.*)?$/i.test(url) ? url : null;
+}
+
 function normalizeCommunityShoutout(body: any) {
   const stream = body?.stream || body?.twitchStream || {};
   const user = body?.user || body?.twitchUser || {};
@@ -307,6 +314,7 @@ function normalizeCommunityShoutout(body: any) {
     streamUrl: streamUrl ? String(streamUrl) : null,
     avatarUrl: body?.avatarUrl || body?.avatar_url || body?.profileImageUrl || body?.profile_image_url || user?.profile_image_url || getTwitchAvatarFallback(twitchLogin),
     imageUrl: normalizeTwitchImageUrl(body?.imageUrl || body?.image_url || body?.thumbnailUrl || body?.thumbnail_url || thumbnail),
+    videoUrl: normalizeVideoUrl(body?.videoUrl || body?.video_url || body?.mp4Url || body?.mp4_url || body?.clipVideoUrl || body?.clip_video_url || body?.clipUrl || body?.clip_url),
     bannerUrl: body?.bannerUrl || body?.banner_url || body?.gifUrl || body?.gif_url || null,
     sourceMessageUrl: body?.sourceMessageUrl || body?.source_message_url || body?.messageUrl || null,
     discordUserId: body?.discordUserId || body?.discord_user_id || body?.userId || null,
@@ -333,6 +341,7 @@ function mapCommunityShoutoutRow(row: any) {
     streamUrl: row.streamUrl,
     avatarUrl: row.avatarUrl || getTwitchAvatarFallback(row.twitchLogin),
     imageUrl: normalizeTwitchImageUrl(row.imageUrl),
+    videoUrl: normalizeVideoUrl(row.videoUrl),
     bannerUrl: row.bannerUrl,
     sourceMessageUrl: row.sourceMessageUrl,
     discordUserId: row.discordUserId,
@@ -642,6 +651,7 @@ async function startServer() {
           stream_url as streamUrl,
           avatar_url as avatarUrl,
           image_url as imageUrl,
+          video_url as videoUrl,
           banner_url as bannerUrl,
           source_message_url as sourceMessageUrl,
           discord_user_id as discordUserId,
@@ -710,6 +720,7 @@ async function startServer() {
           stream_url,
           avatar_url,
           image_url,
+          video_url,
           banner_url,
           source_message_url,
           discord_user_id,
@@ -732,6 +743,7 @@ async function startServer() {
           @streamUrl,
           @avatarUrl,
           @imageUrl,
+          @videoUrl,
           @bannerUrl,
           @sourceMessageUrl,
           @discordUserId,

@@ -101,6 +101,7 @@ sqlite.exec(`
     stream_url TEXT,
     avatar_url TEXT,
     image_url TEXT,
+    video_url TEXT,
     banner_url TEXT,
     source_message_url TEXT,
     discord_user_id TEXT,
@@ -112,6 +113,15 @@ sqlite.exec(`
     created_at TEXT NOT NULL
   );
 `);
+
+const ensureColumn = (table: string, column: string, definition: string) => {
+  const columns = sqlite.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>;
+  if (!columns.some((row) => row.name === column)) {
+    sqlite.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+  }
+};
+
+ensureColumn('community_shoutouts', 'video_url', 'TEXT');
 
 console.log('SQLite database structures successfully verified and prepared!');
 
