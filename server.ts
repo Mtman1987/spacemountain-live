@@ -213,9 +213,22 @@ function normalizeForwardedForumPost(body: any) {
   const sourceMessageId = body?.sourceMessageId || body?.source_message_id || body?.messageId || null;
   const sourceMessageUrl = body?.sourceMessageUrl || body?.source_message_url || body?.messageUrl || body?.url || null;
   const authorId = body?.authorId || body?.author_id || body?.userId || null;
-  const authorName = String(body?.authorName || body?.author_name || body?.username || body?.displayName || 'Discord');
-  const rawContent = String(body?.content || body?.body || body?.message || '').trim();
-  const title = String(body?.title || `${sourceChannelName || 'Discord'} from ${authorName}`).trim().slice(0, 180);
+  const authorName = String(body?.authorName || body?.author_name || body?.userName || body?.username || body?.displayName || 'Discord');
+  const attachments = Array.isArray(body?.attachments)
+    ? body.attachments
+      .map((attachment: any) => attachment?.url || attachment?.proxy_url || attachment)
+      .filter(Boolean)
+      .map((url: any) => `Attachment: ${String(url)}`)
+    : [];
+  const rawContent = [
+    String(body?.content || body?.body || body?.message || '').trim(),
+    ...attachments,
+  ].filter(Boolean).join('\n').trim();
+  const title = String(
+    body?.title ||
+    (body?.guildName && sourceChannelName ? `${body.guildName} / #${sourceChannelName}` : '') ||
+    `${sourceChannelName || 'Discord'} from ${authorName}`
+  ).trim().slice(0, 180);
   const category = String(body?.category || 'Discord Forward').trim().slice(0, 80);
   const postedAt = String(body?.postedAt || body?.posted_at || body?.timestamp || new Date().toISOString());
 
