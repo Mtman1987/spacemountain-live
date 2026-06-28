@@ -258,6 +258,11 @@ function normalizeShoutoutCategory(body: any, groupName: string, isSpotlight: bo
   return 'mountaineers';
 }
 
+function normalizeTwitchImageUrl(value: any, width = 640, height = 360) {
+  if (!value) return null;
+  return String(value).replace(/\{width\}/g, String(width)).replace(/\{height\}/g, String(height));
+}
+
 function normalizeCommunityShoutout(body: any) {
   const stream = body?.stream || body?.twitchStream || {};
   const user = body?.user || body?.twitchUser || {};
@@ -296,7 +301,7 @@ function normalizeCommunityShoutout(body: any) {
     viewerCount: Number(body?.viewerCount ?? body?.viewer_count ?? stream?.viewer_count ?? 0) || 0,
     streamUrl: streamUrl ? String(streamUrl) : null,
     avatarUrl: body?.avatarUrl || body?.avatar_url || body?.profileImageUrl || body?.profile_image_url || user?.profile_image_url || null,
-    imageUrl: body?.imageUrl || body?.image_url || body?.thumbnailUrl || body?.thumbnail_url || thumbnail || null,
+    imageUrl: normalizeTwitchImageUrl(body?.imageUrl || body?.image_url || body?.thumbnailUrl || body?.thumbnail_url || thumbnail),
     bannerUrl: body?.bannerUrl || body?.banner_url || body?.gifUrl || body?.gif_url || null,
     sourceMessageUrl: body?.sourceMessageUrl || body?.source_message_url || body?.messageUrl || null,
     discordUserId: body?.discordUserId || body?.discord_user_id || body?.userId || null,
@@ -322,7 +327,7 @@ function mapCommunityShoutoutRow(row: any) {
     viewerCount: row.viewerCount,
     streamUrl: row.streamUrl,
     avatarUrl: row.avatarUrl,
-    imageUrl: row.imageUrl,
+    imageUrl: normalizeTwitchImageUrl(row.imageUrl),
     bannerUrl: row.bannerUrl,
     sourceMessageUrl: row.sourceMessageUrl,
     discordUserId: row.discordUserId,

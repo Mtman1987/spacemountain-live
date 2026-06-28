@@ -69,7 +69,19 @@ function formatShoutoutTime(value?: string | null) {
 }
 
 function getShoutoutImage(shoutout?: CommunityShoutout | null) {
-  return shoutout?.bannerUrl || shoutout?.imageUrl || shoutout?.avatarUrl || '/assets/space-logo-main.png';
+  const image = shoutout?.bannerUrl || shoutout?.imageUrl || shoutout?.avatarUrl || '/assets/space-logo-main.png';
+  return image.replace(/\{width\}/g, '640').replace(/\{height\}/g, '360');
+}
+
+function getLiveSince(value?: string | null) {
+  if (!value) return 'Live';
+  const started = new Date(value).getTime();
+  if (Number.isNaN(started)) return 'Live';
+  const minutes = Math.max(1, Math.floor((Date.now() - started) / 60000));
+  if (minutes < 60) return `Live ${minutes}m`;
+  const hours = Math.floor(minutes / 60);
+  const remainder = minutes % 60;
+  return `Live ${hours}h${remainder ? ` ${remainder}m` : ''}`;
 }
 
 const ShoutoutCard: React.FC<{
@@ -87,9 +99,16 @@ const ShoutoutCard: React.FC<{
       />
       <div className="p-3">
         <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <p className="text-sm font-extrabold text-white truncate">{shoutout.displayName}</p>
-            <p className="text-[11px] text-zinc-400 truncate">{shoutout.gameName || shoutout.groupName || 'Live shoutout'}</p>
+          <div className="flex min-w-0 items-center gap-2">
+            <img
+              src={shoutout.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(shoutout.displayName)}&background=111827&color=ffffff`}
+              alt=""
+              className="h-9 w-9 shrink-0 rounded-full border border-white/10 object-cover bg-zinc-900"
+            />
+            <div className="min-w-0">
+              <p className="text-sm font-extrabold text-white truncate">{shoutout.displayName}</p>
+              <p className="text-[11px] text-zinc-400 truncate">{shoutout.gameName || shoutout.groupName || 'Live shoutout'}</p>
+            </div>
           </div>
           <span className="shrink-0 rounded-md bg-emerald-400/10 px-2 py-1 text-[10px] font-bold uppercase text-emerald-300">
             {shoutout.isLive ? 'Live' : 'Seen'}
@@ -97,7 +116,7 @@ const ShoutoutCard: React.FC<{
         </div>
         <p className="mt-2 line-clamp-2 text-xs text-zinc-300">{shoutout.title || shoutout.description || 'Discord Stream Hub generated this shoutout.'}</p>
         <div className="mt-3 flex items-center justify-between gap-2 text-[11px] text-zinc-500">
-          <span>{Number(shoutout.viewerCount || 0).toLocaleString()} viewers</span>
+          <span>{Number(shoutout.viewerCount || 0).toLocaleString()} viewers · {getLiveSince(shoutout.startedAt)}</span>
           {shoutout.streamUrl && (
             <a className="font-bold text-cyan-300 hover:text-cyan-200" href={shoutout.streamUrl} target="_blank" rel="noreferrer">
               Watch
@@ -852,6 +871,7 @@ export default function App() {
       ? quackverseState.state.players
       : [];
   const quackverseUpdatedAt = quackverseState?.updatedAt || quackverseState?.state?.updatedAt || quackverseState?.state?.lastUpdatedAt || null;
+  const chatTagCurrentName = currentItPlayer?.displayName || currentItPlayer?.twitchUsername || currentItPlayer?.username || currentItPlayer?.name || chatTagState?.currentIt || 'Free for all';
 
   return (
     <div 
@@ -1050,6 +1070,22 @@ export default function App() {
                         <p className="mt-3 max-w-xl text-sm md:text-base leading-relaxed text-zinc-300">
                           {spotlightShoutout?.title || spotlightShoutout?.description || 'When Discord Stream Hub generates live Twitch shoutouts, the spotlight replaces the old app launcher here.'}
                         </p>
+                        {spotlightShoutout && (
+                          <div className="mt-4 grid max-w-xl grid-cols-1 gap-2 sm:grid-cols-3">
+                            <div className="rounded-md bg-black/35 p-3">
+                              <p className="text-[10px] uppercase text-zinc-500">Playing</p>
+                              <p className="mt-1 truncate text-xs font-bold text-white">{spotlightShoutout.gameName || 'Unknown game'}</p>
+                            </div>
+                            <div className="rounded-md bg-black/35 p-3">
+                              <p className="text-[10px] uppercase text-zinc-500">Viewers</p>
+                              <p className="mt-1 text-xs font-bold text-white">{Number(spotlightShoutout.viewerCount || 0).toLocaleString()}</p>
+                            </div>
+                            <div className="rounded-md bg-black/35 p-3">
+                              <p className="text-[10px] uppercase text-zinc-500">Live since</p>
+                              <p className="mt-1 text-xs font-bold text-white">{getLiveSince(spotlightShoutout.startedAt)}</p>
+                            </div>
+                          </div>
+                        )}
                         <div className="mt-5 flex flex-wrap items-center gap-3">
                           {spotlightShoutout?.streamUrl && (
                             <a
@@ -1111,9 +1147,19 @@ export default function App() {
                         </button>
                       </div>
                       <h3 className="mt-2 text-lg font-black text-white">
-                        {currentItPlayer?.displayName || currentItPlayer?.twitchUsername || currentItPlayer?.username || currentItPlayer?.name || chatTagState?.currentIt || 'No active tagger'}
+                        {chatTagCurrentName}
                       </h3>
-                      <p className="text-xs text-zinc-400">Who is it right now, plus top tracked players from ChatTag.</p>
+                      <p className="text-xs text-zinc-400">Persistent embed snapshot: who is it, active players, and latest tag activity.</p>
+                      <div className="mt-3 grid grid-cols-2 gap-2">
+                        <div className="rounded-md bg-white/[0.04] p-2">
+                          <p className="text-[10px] uppercase text-zinc-500">Now IT</p>
+                          <p className="mt-1 truncate text-xs font-black text-white">{chatTagCurrentName}</p>
+                        </div>
+                        <div className="rounded-md bg-white/[0.04] p-2">
+                          <p className="text-[10px] uppercase text-zinc-500">Players</p>
+                          <p className="mt-1 text-xs font-black text-white">{chatTagPlayers.length}</p>
+                        </div>
+                      </div>
                       <div className="mt-3 space-y-2">
                         {sortedChatTagPlayers.slice(0, 3).map((player, index) => (
                           <div key={player.id || player.username || index} className="flex items-center justify-between gap-3 text-xs">
@@ -1143,7 +1189,7 @@ export default function App() {
                       </div>
                       <div className="mt-3 flex gap-2">
                         <button
-                          onClick={() => setEmbeddedAppUrl('https://chat-tag-new.fly.dev/quackverse')}
+                          onClick={() => setEmbeddedAppUrl('/chat-tag/quackverse')}
                           className="flex-1 rounded-lg bg-emerald-300 px-3 py-2 text-xs font-extrabold text-zinc-950"
                         >
                           Embed
