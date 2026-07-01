@@ -92,6 +92,10 @@ function getTwitchEmbedUrl(twitchLogin?: string | null) {
   return `https://player.twitch.tv/?${params.toString()}`;
 }
 
+const dshDashboardUrl = 'https://discord-stream-hub-new.fly.dev/dashboard';
+const dshCalendarUrl = 'https://discord-stream-hub-new.fly.dev/calendar';
+const dshLeaderboardUrl = 'https://discord-stream-hub-new.fly.dev/leaderboard';
+
 function getPlayerName(player: any) {
   return player?.displayName || player?.twitchUsername || player?.username || player?.name || player?.id || 'Player';
 }
@@ -1249,6 +1253,42 @@ export default function App() {
                   </div>
                 </div>
 
+                <button
+                  id="arenaRocketTrigger"
+                  type="button"
+                  onClick={() => setActiveTab('arena')}
+                  onDoubleClick={() => setActiveTab('arena')}
+                  className="group relative min-h-[260px] overflow-hidden rounded-lg border border-white/10 bg-black/45 text-left shadow-[0_0_48px_rgba(0,0,0,0.45)]"
+                  style={{
+                    boxShadow: `0 0 42px ${rgbaFromHex(currentTheme.glowHex, 0.16)}`,
+                  }}
+                  title="Enter Rocket Arena"
+                >
+                  <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_35%,rgba(255,255,255,0.16),transparent_42%)]" />
+                  <div className="absolute inset-0 bg-gradient-to-b from-black/10 via-black/20 to-black/70" />
+                  <div className="relative flex min-h-[260px] flex-col items-center justify-center px-5 py-6 text-center">
+                    <img
+                      src="/assets/space-logo-main.png"
+                      alt="SpaceMountain"
+                      className="h-32 w-auto max-w-[82vw] object-contain drop-shadow-[0_0_28px_rgba(255,255,255,0.22)] md:h-44"
+                    />
+                    <motion.img
+                      src={sleekRocketIcon}
+                      alt="Rocket Arena launcher"
+                      className="absolute right-[14%] top-10 h-20 w-20 object-contain drop-shadow-[0_0_24px_rgba(250,204,21,0.55)] md:h-28 md:w-28"
+                      animate={{ y: [0, -10, 0], rotate: [10, 15, 10] }}
+                      transition={{ duration: 3.4, repeat: Infinity, ease: 'easeInOut' }}
+                    />
+                    <div className="mt-4 inline-flex items-center gap-2 rounded-full border border-white/10 bg-black/45 px-4 py-2 text-xs font-black uppercase tracking-[0.16em] text-white">
+                      <Rocket size={15} style={{ color: currentTheme.glowHex }} />
+                      Rocket Arena
+                    </div>
+                    <p className="mt-3 max-w-xl text-sm font-semibold text-zinc-300">
+                      Battle arena entry point for inventory, XP, and rocket combat testing.
+                    </p>
+                  </div>
+                </button>
+
                 <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_340px] gap-4">
                   <section className="rounded-lg border border-white/10 bg-zinc-950/50 overflow-hidden">
                     <ShoutoutProfileCard
@@ -1562,7 +1602,7 @@ export default function App() {
                       <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
                         <span className="text-xs font-bold text-white">Embedded app view</span>
                         <div className="flex items-center gap-2">
-                          <a href={embeddedAppUrl} target="_blank" rel="noreferrer" className="text-[10px] font-bold text-cyan-300 no-underline">Pop out</a>
+                          <a href={embeddedAppUrl} target="_blank" rel="noreferrer" className="text-[10px] font-bold text-cyan-300 no-underline">Pop out / sign in</a>
                           <button type="button" onClick={() => setEmbeddedAppUrl(null)} className="text-[10px] font-bold text-zinc-400 hover:text-white">Close</button>
                         </div>
                       </div>
@@ -1585,20 +1625,35 @@ export default function App() {
                       </h3>
                       <p className="text-xs text-zinc-400 mt-0.5">Admin calendar, leaderboard, and community tools from DSH.</p>
                     </div>
-                    <a href="https://discord-stream-hub-new.fly.dev" target="_blank" rel="noreferrer" className="px-3 py-1.5 rounded-xl bg-white/5 border border-white/10 text-xs font-bold text-zinc-300 hover:text-white no-underline">
-                      Pop Out DSH
+                    <a href={dshDashboardUrl} target="_blank" rel="noreferrer" className="px-3 py-1.5 rounded-xl bg-white/5 border border-white/10 text-xs font-bold text-zinc-300 hover:text-white no-underline">
+                      Open / Sign In
                     </a>
                   </div>
+                  <div className="mt-4 rounded-xl border border-amber-400/20 bg-amber-400/10 px-4 py-3 text-xs text-amber-100">
+                    OAuth sign-in flows run best in a top-level window. Open DSH once to authorize, then the embedded dashboard, calendar, and leaderboard can reuse the restored DSH session.
+                  </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-4">
+                    <div className="rounded-2xl border border-white/5 bg-white/[0.02] p-4 md:col-span-2">
+                      <span className="text-xs font-bold text-white">Dashboard</span>
+                      <p className="text-xs text-zinc-400 mt-1">Session-aware DSH home with shoutouts, calendar, forum messages, and leaderboard links.</p>
+                      <div className="grid grid-cols-2 gap-2 mt-3">
+                        <button type="button" onClick={() => setEmbeddedAppUrl(dshDashboardUrl)} className="px-3 py-1.5 rounded-xl bg-purple-500/10 border border-purple-500/20 text-xs font-bold text-purple-300">
+                          Embed
+                        </button>
+                        <a href={dshDashboardUrl} target="_blank" rel="noreferrer" className="px-3 py-1.5 rounded-xl bg-black/30 border border-white/10 text-xs font-bold text-zinc-300 text-center no-underline">
+                          Open / Sign In
+                        </a>
+                      </div>
+                    </div>
                     <div className="rounded-2xl border border-white/5 bg-white/[0.02] p-4">
                       <span className="text-xs font-bold text-white">Admin Calendar</span>
                       <p className="text-xs text-zinc-400 mt-1">Stream schedule and event calendar from DSH.</p>
                       <div className="grid grid-cols-2 gap-2 mt-3">
-                        <button type="button" onClick={() => setEmbeddedAppUrl('https://discord-stream-hub-new.fly.dev/calendar')} className="px-3 py-1.5 rounded-xl bg-purple-500/10 border border-purple-500/20 text-xs font-bold text-purple-300">
+                        <button type="button" onClick={() => setEmbeddedAppUrl(dshCalendarUrl)} className="px-3 py-1.5 rounded-xl bg-purple-500/10 border border-purple-500/20 text-xs font-bold text-purple-300">
                           Embed
                         </button>
-                        <a href="https://discord-stream-hub-new.fly.dev/calendar" target="_blank" rel="noreferrer" className="px-3 py-1.5 rounded-xl bg-black/30 border border-white/10 text-xs font-bold text-zinc-300 text-center no-underline">
-                          Pop Out
+                        <a href={dshCalendarUrl} target="_blank" rel="noreferrer" className="px-3 py-1.5 rounded-xl bg-black/30 border border-white/10 text-xs font-bold text-zinc-300 text-center no-underline">
+                          Open / Sign In
                         </a>
                       </div>
                     </div>
@@ -1606,11 +1661,11 @@ export default function App() {
                       <span className="text-xs font-bold text-white">Leaderboard</span>
                       <p className="text-xs text-zinc-400 mt-1">Points leaderboard and community rankings.</p>
                       <div className="grid grid-cols-2 gap-2 mt-3">
-                        <button type="button" onClick={() => setEmbeddedAppUrl('https://discord-stream-hub-new.fly.dev/leaderboard')} className="px-3 py-1.5 rounded-xl bg-purple-500/10 border border-purple-500/20 text-xs font-bold text-purple-300">
+                        <button type="button" onClick={() => setEmbeddedAppUrl(dshLeaderboardUrl)} className="px-3 py-1.5 rounded-xl bg-purple-500/10 border border-purple-500/20 text-xs font-bold text-purple-300">
                           Embed
                         </button>
-                        <a href="https://discord-stream-hub-new.fly.dev/leaderboard" target="_blank" rel="noreferrer" className="px-3 py-1.5 rounded-xl bg-black/30 border border-white/10 text-xs font-bold text-zinc-300 text-center no-underline">
-                          Pop Out
+                        <a href={dshLeaderboardUrl} target="_blank" rel="noreferrer" className="px-3 py-1.5 rounded-xl bg-black/30 border border-white/10 text-xs font-bold text-zinc-300 text-center no-underline">
+                          Open / Sign In
                         </a>
                       </div>
                     </div>
