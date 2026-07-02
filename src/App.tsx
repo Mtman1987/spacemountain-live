@@ -686,6 +686,29 @@ export default function App() {
     return profile;
   }, [identity, mergeSpmtAppsIntoTools, refreshSpmtApps]);
 
+  const updateSpmtAppInstall = async (appId: string, action: 'install' | 'disable') => {
+    const token = getStoredSpmtToken();
+    if (!token) {
+      alert('Please sign in with SPMT first.');
+      return;
+    }
+
+    const response = await fetch(`${spmtBaseUrl}/api/apps/${appId}/${action}`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+      credentials: 'include',
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      alert(data.error || `Failed to ${action} app`);
+      return;
+    }
+
+    const apps = Array.isArray(data?.apps) ? data.apps : await refreshSpmtApps(token);
+    setSpmtApps(apps);
+    setTools((current) => mergeSpmtAppsIntoTools(current, apps));
+  };
+
   // SPMT internal messages are tenant-scoped and stored by this SpaceMountain app.
   const [mails, setMails] = useState<any[]>([]);
   const [composeTo, setComposeTo] = useState('');
@@ -1988,6 +2011,79 @@ export default function App() {
                   preferences={preferences}
                   stats={stats}
                 />
+
+                <div className="dynamic-cosmic-card rounded-3xl p-5 backdrop-blur-xl transition-all duration-300">
+                  <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/5 pb-4">
+                    <div>
+                      <h3 className="text-lg font-sans font-bold text-white flex items-center gap-2">
+                        <Compass className="text-cyan-300" size={18} />
+                        Shipyard
+                      </h3>
+                      <p className="text-xs text-zinc-400 mt-0.5">Install, disable, inspect permissions, and launch apps through SPMT.</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => refreshSpmtApps().catch(() => {})}
+                      className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-bold text-zinc-300 hover:text-white"
+                    >
+                      Refresh Registry
+                    </button>
+                  </div>
+                  <div className="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-2">
+                    {spmtApps.map((app) => (
+                      <div key={app.id} className="rounded-2xl border border-white/10 bg-black/25 p-4">
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <div className="flex flex-wrap items-center gap-2">
+                              <h4 className="text-sm font-black text-white">{app.name}</h4>
+                              <span className={`rounded-full border px-2 py-0.5 text-[9px] font-bold uppercase ${app.installed ? 'border-emerald-400/30 bg-emerald-400/10 text-emerald-300' : 'border-amber-400/30 bg-amber-400/10 text-amber-300'}`}>
+                                {app.installed ? (app.enabled === false ? 'Disabled' : 'Installed') : 'Available'}
+                              </span>
+                            </div>
+                            <p className="mt-1 text-xs leading-relaxed text-zinc-400">{app.description}</p>
+                          </div>
+                        </div>
+                        <div className="mt-3">
+                          <p className="text-[10px] font-mono font-bold uppercase text-zinc-500">Permissions</p>
+                          <div className="mt-2 flex flex-wrap gap-1">
+                            {(app.permissions || []).map((permission: string) => (
+                              <span key={permission} className="rounded-full border border-cyan-400/20 bg-cyan-400/10 px-2 py-0.5 text-[10px] font-bold text-cyan-200">
+                                {permission}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                        <div className="mt-4 flex flex-wrap gap-2">
+                          {!app.installed || app.enabled === false ? (
+                            <button
+                              type="button"
+                              onClick={() => updateSpmtAppInstall(app.id, 'install')}
+                              className="rounded-xl bg-cyan-300 px-3 py-2 text-xs font-black text-zinc-950"
+                            >
+                              Enable App
+                            </button>
+                          ) : app.id !== 'spacemountain-live' && (
+                            <button
+                              type="button"
+                              onClick={() => updateSpmtAppInstall(app.id, 'disable')}
+                              className="rounded-xl border border-red-400/30 bg-red-400/10 px-3 py-2 text-xs font-bold text-red-200"
+                            >
+                              Disable
+                            </button>
+                          )}
+                          <a href={app.authUrl || app.url} target="_blank" rel="noreferrer" className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-bold text-zinc-300 no-underline hover:text-white">
+                            Launch
+                          </a>
+                        </div>
+                      </div>
+                    ))}
+                    {spmtApps.length === 0 && (
+                      <div className="rounded-2xl border border-white/10 bg-black/25 p-4 text-xs text-zinc-400">
+                        SPMT app registry is not loaded yet. Sign in or refresh the registry.
+                      </div>
+                    )}
+                  </div>
+                </div>
 
                 <div className="dynamic-cosmic-card rounded-3xl p-5 backdrop-blur-xl transition-all duration-300">
                   <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/5 pb-4">
