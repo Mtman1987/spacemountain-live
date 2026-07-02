@@ -1517,6 +1517,7 @@ export default function App() {
         pointsAwarded={stats.pointsAwarded}
         rocketFlying={rocketFlying}
         preferences={preferences}
+        notificationCount={commlinkNotifications.filter((item) => !item.read_at).length}
       />
 
       {/* Main Container Layout */}

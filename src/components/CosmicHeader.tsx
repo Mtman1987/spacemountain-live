@@ -13,11 +13,12 @@ interface CosmicHeaderProps {
   pointsAwarded: number;
   rocketFlying: boolean;
   preferences: UserPreferences;
+  notificationCount?: number;
 }
 
 const realAvatar = '/assets/astronaut-avatar.jpg';
 
-export default function CosmicHeader({ activeTab, setActiveTab, accentColor, identity, pointsAwarded, rocketFlying, preferences }: CosmicHeaderProps) {
+export default function CosmicHeader({ activeTab, setActiveTab, accentColor, identity, pointsAwarded, rocketFlying, preferences, notificationCount = 0 }: CosmicHeaderProps) {
   const [searchValue, setSearchValue] = useState('');
   const [isSearchExpanded, setIsSearchExpanded] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
@@ -113,12 +114,16 @@ export default function CosmicHeader({ activeTab, setActiveTab, accentColor, ide
         </div>
 
         <button 
-          onClick={() => alert('Notification stream will route through the SPMT Commlink.')}
+          onClick={() => setActiveTab('inbox')}
           className="relative p-2 rounded-xl bg-white/5 border border-white/5 text-zinc-400 hover:text-white hover:border-white/15 transition-all flex items-center justify-center"
-          title="Notifications"
+          title={notificationCount > 0 ? `${notificationCount} unread notifications` : 'Notifications'}
         >
           <Bell size={16} />
-          <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 bg-amber-400 rounded-full shadow-[0_0_5px_#fbbf24]" />
+          {notificationCount > 0 && (
+            <span className="absolute -top-1 -right-1 min-w-[16px] rounded-full bg-amber-400 px-1 text-[9px] font-black leading-4 text-black shadow-[0_0_8px_#fbbf24]">
+              {notificationCount > 9 ? '9+' : notificationCount}
+            </span>
+          )}
         </button>
 
         <button 
