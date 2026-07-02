@@ -33,7 +33,7 @@ const APP_REGISTRY: AppRegistryEntry[] = [
     badge: 'SW',
     miniLabel: 'Automation + Overlays',
     route: '/streamweaver',
-    appUrl: 'https://streamweaver-new.fly.dev',
+    appUrl: 'https://streamweaver-new.fly.dev/login?next=%2Fcommands',
     healthUrl: 'https://streamweaver-new.fly.dev/api/health',
     statusText: 'Checking',
     statusType: 'default',
@@ -57,7 +57,7 @@ const APP_REGISTRY: AppRegistryEntry[] = [
     badge: 'DSH',
     miniLabel: 'Auth + Shoutout Bot',
     route: '/discord-hub',
-    appUrl: 'https://discord-stream-hub-new.fly.dev',
+    appUrl: 'https://discord-stream-hub-new.fly.dev/dashboard',
     healthUrl: 'https://discord-stream-hub-new.fly.dev/api/health',
     statusText: 'Checking',
     statusType: 'default',
@@ -382,6 +382,44 @@ function mapCommunityShoutoutRow(row: any) {
   };
 }
 
+function normalizeMessageHandle(value: unknown, fallback = 'spmtmessaging') {
+  const cleaned = String(value || fallback)
+    .trim()
+    .replace(/^@/, '')
+    .replace(/@spmt\.(live|messaging)$/i, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]/g, '');
+
+  return cleaned || fallback;
+}
+
+function normalizeMessageTenant(value: unknown) {
+  return String(value || 'spmt')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]/g, '') || 'spmt';
+}
+
+function mapInternalMessageRow(row: any) {
+  return {
+    id: row.id,
+    tenantId: row.tenant_id,
+    fromHandle: row.from_handle,
+    fromUser: row.from_handle,
+    fromType: row.from_type,
+    toHandle: row.to_handle,
+    toUser: row.to_handle,
+    toType: row.to_type,
+    subject: row.subject,
+    body: row.body,
+    status: row.status,
+    metadata: row.metadata ? JSON.parse(row.metadata) : null,
+    readAt: row.read_at,
+    createdAt: row.created_at,
+    created_at: row.created_at,
+  };
+}
+
 async function startServer() {
   const app = express();
   app.use(express.json());
@@ -421,10 +459,9 @@ async function startServer() {
 
   // OAuth2 callback - handles redirect from spmt.live after user authorizes
   app.get('/auth/callback', (req, res) => {
-    const { code, state } = req.query;
-    // In production, exchange code for token server-side
-    // For now, redirect to frontend with the code
-    res.redirect(`/?auth_code=${code}${state ? `&state=${state}` : ''}`);
+    const { code, token, state } = req.query;
+    const sessionToken = token || code;
+    res.redirect(`/?auth_code=${encodeURIComponent(String(sessionToken || ''))}${state ? `&state=${encodeURIComponent(String(state))}` : ''}`);
   });
 
   // OAuth2 login redirect - sends user to spmt.live to authenticate
@@ -501,6 +538,89 @@ async function startServer() {
     } catch (err) {
       res.status(500).json({ error: 'Failed to update points flow' });
     }
+  });
+
+  app.get('/api/messages/inbox', (req, res) => {
+    const handle = normalizeMessageHandle(req.query.handle || req.headers['x-spmt-handle']);
+    const tenantId = normalizeMessageTenant(req.query.tenantId || req.headers['x-spmt-tenant']);
+    const limit = Math.min(Number(req.query.limit || 50) || 50, 100);
+
+    const rows = sqlite.prepare(`
+      SELECT * FROM internal_messages
+      WHERE tenant_id = ?
+        AND (to_handle = ? OR to_handle = 'spmtmessaging' OR to_type = 'app')
+      ORDER BY datetime(created_at) DESC
+      LIMIT ?
+    `).all(tenantId, handle, limit);
+
+    res.json(rows.map(mapInternalMessageRow));
+  });
+
+  app.get('/api/messages/outbox', (req, res) => {
+    const handle = normalizeMessageHandle(req.query.handle || req.headers['x-spmt-handle']);
+    const tenantId = normalizeMessageTenant(req.query.tenantId || req.headers['x-spmt-tenant']);
+    const limit = Math.min(Number(req.query.limit || 50) || 50, 100);
+
+    const rows = sqlite.prepare(`
+      SELECT * FROM internal_messages
+      WHERE tenant_id = ? AND from_handle = ?
+      ORDER BY datetime(created_at) DESC
+      LIMIT ?
+    `).all(tenantId, handle, limit);
+
+    res.json(rows.map(mapInternalMessageRow));
+  });
+
+  app.post('/api/messages', (req, res) => {
+    const toHandle = normalizeMessageHandle(req.body?.to || req.body?.toHandle);
+    const fromHandle = normalizeMessageHandle(req.body?.from || req.body?.fromHandle, 'spmtmessaging');
+    const tenantId = normalizeMessageTenant(req.body?.tenantId);
+    const subject = String(req.body?.subject || 'No subject').trim().slice(0, 160) || 'No subject';
+    const body = String(req.body?.body || '').trim();
+
+    if (!body) {
+      return res.status(400).json({ error: 'Message body is required' });
+    }
+
+    const message = {
+      id: `msg_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`,
+      tenant_id: tenantId,
+      from_handle: fromHandle,
+      from_type: String(req.body?.fromType || 'user').slice(0, 24),
+      to_handle: toHandle,
+      to_type: String(req.body?.toType || (toHandle === 'spmtmessaging' ? 'app' : 'user')).slice(0, 24),
+      subject,
+      body,
+      status: 'sent',
+      metadata: req.body?.metadata ? JSON.stringify(req.body.metadata) : null,
+      read_at: null,
+      created_at: new Date().toISOString(),
+    };
+
+    sqlite.prepare(`
+      INSERT INTO internal_messages (
+        id, tenant_id, from_handle, from_type, to_handle, to_type,
+        subject, body, status, metadata, read_at, created_at
+      )
+      VALUES (
+        @id, @tenant_id, @from_handle, @from_type, @to_handle, @to_type,
+        @subject, @body, @status, @metadata, @read_at, @created_at
+      )
+    `).run(message);
+
+    res.status(201).json({ message: mapInternalMessageRow(message) });
+  });
+
+  app.post('/api/messages/:id/read', (req, res) => {
+    const id = String(req.params.id || '');
+    const readAt = new Date().toISOString();
+    const result = sqlite.prepare('UPDATE internal_messages SET status = ?, read_at = ? WHERE id = ?').run('read', readAt, id);
+
+    if (!result.changes) {
+      return res.status(404).json({ error: 'Message not found' });
+    }
+
+    res.json({ success: true, id, readAt });
   });
 
   // API Route: Get or create user profile

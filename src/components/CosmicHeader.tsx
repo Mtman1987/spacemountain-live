@@ -220,7 +220,7 @@ export default function CosmicHeader({ activeTab, setActiveTab, accentColor, ide
         </div>
       ) : (
         <a
-          href="/auth/login"
+          href="https://spmt.live/api/oauth/authorize?client_id=spacemountain-live&redirect_uri=https%3A%2F%2Fspacemountain.live%2Fauth%2Fcallback"
           className="flex items-center gap-2 px-4 py-2 rounded-xl font-sans font-extrabold text-xs text-black transition-all transform hover:-translate-y-0.5 no-underline shadow-lg shrink-0"
           style={{ backgroundColor: accentColor, boxShadow: `0 4px 16px ${accentColor}44` }}
         >

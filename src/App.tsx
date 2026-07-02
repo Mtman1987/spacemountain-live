@@ -95,6 +95,88 @@ function getTwitchEmbedUrl(twitchLogin?: string | null) {
 const dshDashboardUrl = 'https://discord-stream-hub-new.fly.dev/dashboard';
 const dshCalendarUrl = 'https://discord-stream-hub-new.fly.dev/calendar';
 const dshLeaderboardUrl = 'https://discord-stream-hub-new.fly.dev/leaderboard';
+const streamweaverCommandsUrl = 'https://streamweaver-new.fly.dev/login?next=%2Fcommands';
+const streamweaverCommunityUrl = 'https://streamweaver-new.fly.dev/login?next=%2Fcommunity';
+const streamweaverIntegrationsUrl = 'https://streamweaver-new.fly.dev/login?next=%2Fintegrations';
+const streamweaverWorkflowsUrl = 'https://streamweaver-new.fly.dev/login?next=%2Factive-commands';
+const spmtBaseUrl = 'https://spmt.live';
+
+function getStoredSpmtToken() {
+  return localStorage.getItem('spmtToken') || localStorage.getItem('spmt_token') || '';
+}
+
+function storeSpmtSession(token: string, profile: UserProfile) {
+  localStorage.setItem('spmtToken', token);
+  localStorage.setItem('spmt_token', token);
+  localStorage.setItem('spmtIdentity', JSON.stringify(profile));
+}
+
+function clearSpmtSession() {
+  localStorage.removeItem('spmtToken');
+  localStorage.removeItem('spmt_token');
+  localStorage.removeItem('spmtIdentity');
+}
+
+function mapSpmtUserToProfile(user: any, previous?: UserProfile | null): UserProfile {
+  return {
+    id: user.id,
+    displayName: user.displayName || user.display_name || user.username,
+    username: user.username,
+    handle: user.handle || `${user.username}@spmt.live`,
+    recoveryEmail: user.email || null,
+    role: 'Captain',
+    status: 'Online',
+    points: previous?.points || 0,
+    avatarSpeaking: previous?.avatarSpeaking || false,
+    createdAt: user.createdAt || user.created_at || new Date().toISOString(),
+    discordUsername: user.discordUsername || user.discord_username || null,
+    discordId: user.discordId || user.discord_id || null,
+    twitchUsername: user.twitchUsername || user.twitch_username || null,
+    twitchId: user.twitchId || user.twitch_id || null,
+  };
+}
+
+function normalizeSpmtAppId(id: string) {
+  if (id === 'discord-stream-hub') return 'discord-hub';
+  return id;
+}
+
+type EmbeddedAppTarget = {
+  title: string;
+  url: string;
+  kind: 'app' | 'game' | 'overlay' | 'dashboard';
+};
+
+type EmbedSlot = EmbeddedAppTarget & {
+  id: number;
+  collapsed: boolean;
+};
+
+type AppNotification = {
+  id: number;
+  title: string;
+  body: string;
+  createdAt: string;
+};
+
+const defaultEmbedSlots: EmbedSlot[] = [
+  { id: 1, title: 'ChatTag Overlay', url: 'https://chat-tag-new.fly.dev/overlay', kind: 'overlay', collapsed: true },
+  { id: 2, title: 'Quackverse Game', url: '/chat-tag/quackverse', kind: 'game', collapsed: false },
+  { id: 3, title: 'DSH Dashboard', url: dshDashboardUrl, kind: 'dashboard', collapsed: true },
+];
+
+const embedPresets: EmbeddedAppTarget[] = [
+  { title: 'Quackverse Game', url: '/chat-tag/quackverse', kind: 'game' },
+  { title: 'ChatTag Overlay', url: 'https://chat-tag-new.fly.dev/overlay', kind: 'overlay' },
+  { title: 'ChatTag Home', url: 'https://chat-tag-new.fly.dev', kind: 'app' },
+  { title: 'StreamWeaver Commands', url: streamweaverCommandsUrl, kind: 'app' },
+  { title: 'StreamWeaver Flows', url: streamweaverCommunityUrl, kind: 'app' },
+  { title: 'StreamWeaver Integrations', url: streamweaverIntegrationsUrl, kind: 'app' },
+  { title: 'DSH Dashboard', url: dshDashboardUrl, kind: 'dashboard' },
+  { title: 'DSH Calendar', url: dshCalendarUrl, kind: 'dashboard' },
+  { title: 'DSH Leaderboard', url: dshLeaderboardUrl, kind: 'dashboard' },
+  { title: 'HearMeOut Rooms', url: 'https://hearmeout-main.fly.dev', kind: 'app' },
+];
 
 function getPlayerName(player: any) {
   return player?.displayName || player?.twitchUsername || player?.username || player?.name || player?.id || 'Player';
@@ -496,6 +578,7 @@ export default function App() {
 
   // Database-backed tools lists & aggregate stats
   const [tools, setTools] = useState<CommunityTool[]>([]);
+  const [spmtApps, setSpmtApps] = useState<any[]>([]);
   const [stats, setStats] = useState<DashboardStats>({
     totalUsers: 0,
     totalTools: 0,
@@ -506,12 +589,132 @@ export default function App() {
     mediaJobsCount: 0,
   });
 
-  // Secure Inbox messages state - fetched from spmt.live
+  const mergeSpmtAppsIntoTools = React.useCallback((localTools: CommunityTool[], apps: any[]) => {
+    if (!apps.length) return localTools;
+    const appMap = new Map(apps.map((app) => [normalizeSpmtAppId(String(app.id)), app]));
+    const merged = localTools.map((tool) => {
+      const app = appMap.get(tool.id);
+      if (!app) return tool;
+      return {
+        ...tool,
+        appUrl: app.url || tool.appUrl,
+        authUrl: app.authUrl || tool.authUrl || app.url || tool.appUrl,
+        installed: app.installed,
+        enabled: app.enabled,
+        permissions: app.permissions,
+        statusText: app.installed === false ? 'Available' : app.enabled === false ? 'Disabled' : tool.statusText,
+      };
+    });
+
+    for (const app of apps) {
+      const id = normalizeSpmtAppId(String(app.id));
+      if (merged.some((tool) => tool.id === id)) continue;
+      merged.push({
+        id,
+        name: app.name,
+        description: app.description || 'Registered through SPMT.',
+        badge: String(app.name || id).slice(0, 4).toUpperCase(),
+        miniLabel: app.installed ? 'Installed App' : 'Available App',
+        statusText: app.installed ? 'Installed' : 'Available',
+        statusType: app.status === 'connected' || app.status === 'bridge-ready' ? 'live' : 'default',
+        route: '/apps',
+        pointsFlow: 0,
+        appUrl: app.url,
+        authUrl: app.authUrl || app.url,
+        healthUrl: null,
+        installed: app.installed,
+        enabled: app.enabled,
+        permissions: app.permissions,
+      });
+    }
+
+    return merged;
+  }, []);
+
+  const refreshSpmtApps = React.useCallback(async (token = getStoredSpmtToken()) => {
+    const response = await fetch(`${spmtBaseUrl}/api/apps`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      credentials: 'include',
+    });
+    const data = response.ok ? await response.json() : { apps: [] };
+    const apps = Array.isArray(data?.apps) ? data.apps : [];
+    setSpmtApps(apps);
+    setTools((current) => mergeSpmtAppsIntoTools(current, apps));
+    return apps;
+  }, [mergeSpmtAppsIntoTools]);
+
+  const refreshSpmtIdentity = React.useCallback(async (token = getStoredSpmtToken()) => {
+    if (!token) return null;
+
+    const refreshResponse = await fetch(`${spmtBaseUrl}/api/auth/refresh`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+      credentials: 'include',
+    });
+    const response = refreshResponse.ok
+      ? refreshResponse
+      : await fetch(`${spmtBaseUrl}/api/me`, {
+          headers: { Authorization: `Bearer ${token}` },
+          credentials: 'include',
+        });
+
+    if (!response.ok) {
+      clearSpmtSession();
+      setIdentity(null);
+      return null;
+    }
+
+    const data = await response.json();
+    const profile = mapSpmtUserToProfile(data.user, identity);
+    const nextToken = data.token || token;
+    storeSpmtSession(nextToken, profile);
+    setIdentity(profile);
+    const apps = Array.isArray(data?.apps) ? data.apps : await refreshSpmtApps(nextToken);
+    setSpmtApps(apps);
+    setTools((current) => mergeSpmtAppsIntoTools(current, apps));
+    return profile;
+  }, [identity, mergeSpmtAppsIntoTools, refreshSpmtApps]);
+
+  // SPMT internal messages are tenant-scoped and stored by this SpaceMountain app.
   const [mails, setMails] = useState<any[]>([]);
   const [composeTo, setComposeTo] = useState('');
   const [composeSubject, setComposeSubject] = useState('');
   const [composeBody, setComposeBody] = useState('');
   const [isComposing, setIsComposing] = useState(false);
+
+  const getSpmtHandle = () => {
+    if (identity?.username) return identity.username;
+
+    try {
+      const cached = JSON.parse(localStorage.getItem('spmtIdentity') || 'null');
+      if (cached?.username) return cached.username;
+    } catch {
+      // Fall through to the shared app inbox.
+    }
+
+    return 'spmtmessaging';
+  };
+
+  const refreshSpmtInbox = async () => {
+    const handle = getSpmtHandle();
+    const params = new URLSearchParams({ handle, tenantId: 'spmt' });
+    const response = await fetch(`/api/messages/inbox?${params.toString()}`, {
+      headers: { 'x-spmt-handle': handle, 'x-spmt-tenant': 'spmt' },
+    });
+    const messages = response.ok ? await response.json() : [];
+
+    setMails(messages.map((m: any) => ({
+      id: m.id,
+      folder: 'inbox',
+      from: `@${m.fromHandle || m.fromUser || 'spmtmessaging'}`,
+      to: `@${m.toHandle || m.toUser || handle}`,
+      subject: m.subject || 'No subject',
+      preview: `${m.body || ''}`.slice(0, 70),
+      body: m.body,
+      time: new Date(m.createdAt || m.created_at || Date.now()).toLocaleString(),
+      tag: m.fromType === 'bot' ? 'AI Bot' : m.toType === 'app' ? 'App' : 'SPMT',
+    })));
+  };
 
   // Forums Threads state - fetched from spmt.live
   const [forumThreads, setForumThreads] = useState<any[]>([]);
@@ -559,7 +762,86 @@ export default function App() {
   // ChatTag tracker state
   const [chatTagState, setChatTagState] = useState<ChatTagState | null>(null);
   const [chatTagLoading, setChatTagLoading] = useState(false);
-  const [embeddedAppUrl, setEmbeddedAppUrl] = useState<string | null>(null);
+  const [embedSlots, setEmbedSlots] = useState<EmbedSlot[]>(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem('spmtEmbedSlots') || 'null');
+      if (Array.isArray(saved) && saved.length === 3) {
+        return saved.map((slot, index) => ({
+          ...defaultEmbedSlots[index],
+          ...slot,
+          id: index + 1,
+        }));
+      }
+    } catch {}
+    return defaultEmbedSlots;
+  });
+  const [activeEmbedSlot, setActiveEmbedSlot] = useState(2);
+  const [notifications, setNotifications] = useState<AppNotification[]>([]);
+  const notify = (title: string, body: string) => {
+    setNotifications((items) => [{ id: Date.now(), title, body, createdAt: new Date().toISOString() }, ...items].slice(0, 8));
+  };
+  const openEmbeddedApp = (
+    title: string,
+    url: string,
+    kind: EmbeddedAppTarget['kind'] = 'app',
+    slotId = activeEmbedSlot
+  ) => {
+    setEmbedSlots((slots) => slots.map((slot) => (
+      slot.id === slotId ? { ...slot, title, url, kind, collapsed: false } : slot
+    )));
+    setActiveEmbedSlot(slotId);
+    notify('Embed slot updated', `Slot ${slotId}: ${title}`);
+  };
+  const updateEmbedSlot = (slotId: number, patch: Partial<EmbedSlot>) => {
+    setEmbedSlots((slots) => slots.map((slot) => slot.id === slotId ? { ...slot, ...patch } : slot));
+  };
+  const sendEmbeddedAuth = React.useCallback((frame: HTMLIFrameElement | null) => {
+    if (!frame?.contentWindow) return;
+    const token = getStoredSpmtToken();
+    const storedIdentity = window.localStorage.getItem('spmtIdentity');
+    let profile: UserProfile | null = identity;
+
+    if (!profile && storedIdentity) {
+      try {
+        profile = JSON.parse(storedIdentity) as UserProfile;
+      } catch {
+        profile = null;
+      }
+    }
+
+    if (!token && !profile) return;
+
+    const targetOrigin = (() => {
+      try {
+        return new URL(frame.getAttribute('src') || window.location.href, window.location.origin).origin;
+      } catch {
+        return '*';
+      }
+    })();
+
+    frame.contentWindow.postMessage({
+      type: 'SPACEMOUNTAIN_AUTH',
+      source: 'spacemountain.live',
+      token,
+      profile,
+    }, targetOrigin);
+  }, [identity]);
+
+  useEffect(() => {
+    localStorage.setItem('spmtEmbedSlots', JSON.stringify(embedSlots));
+  }, [embedSlots]);
+
+  useEffect(() => {
+    function handleEmbeddedAuthRequest(event: MessageEvent) {
+      if (event.data?.type !== 'SPACEMOUNTAIN_AUTH_REQUEST') return;
+      const frame = Array.from(document.querySelectorAll<HTMLIFrameElement>('[data-embed-slot-frame]'))
+        .find((item) => item.contentWindow === event.source);
+      sendEmbeddedAuth(frame || null);
+    }
+
+    window.addEventListener('message', handleEmbeddedAuthRequest);
+    return () => window.removeEventListener('message', handleEmbeddedAuthRequest);
+  }, [sendEmbeddedAuth]);
   const [shoutoutFeed, setShoutoutFeed] = useState<CommunityShoutoutFeed | null>(null);
   const [shoutoutsLoading, setShoutoutsLoading] = useState(false);
   const [quackverseState, setQuackverseState] = useState<QuackverseSummary | null>(null);
@@ -647,33 +929,10 @@ export default function App() {
     const params = new URLSearchParams(window.location.search);
     const authCode = params.get('auth_code');
     if (authCode) {
-      // Exchange code for user info
-      fetch('https://spmt.live/api/oauth/userinfo', {
-        headers: { 'Authorization': `Bearer ${authCode}` },
-        credentials: 'include',
-      })
-        .then(r => r.ok ? r.json() : null)
-        .then(user => {
-          if (user) {
-            const profile: UserProfile = {
-              id: user.id,
-              displayName: user.display_name || user.username,
-              username: user.username,
-              recoveryEmail: user.email,
-              role: 'Captain',
-              status: 'Online',
-              points: 0,
-              avatarSpeaking: false,
-              createdAt: user.created_at,
-            };
-            setIdentity(profile);
-            localStorage.setItem('spmtIdentity', JSON.stringify(profile));
-            localStorage.setItem('spmtToken', authCode);
-            // Clean URL
-            window.history.replaceState({}, '', '/');
-          }
-        })
-        .catch(() => {});
+      localStorage.setItem('spmtToken', authCode);
+      localStorage.setItem('spmt_token', authCode);
+      refreshSpmtIdentity(authCode)
+        .finally(() => window.history.replaceState({}, '', '/'));
     }
 
     // 1. Fetch domain branding
@@ -688,9 +947,11 @@ export default function App() {
     fetch('/api/tools')
       .then(res => res.json())
       .then((data: CommunityTool[]) => {
-        setTools(data);
+        setTools(mergeSpmtAppsIntoTools(data, spmtApps));
       })
       .catch(err => console.error('Tools fetch failed:', err));
+
+    refreshSpmtApps().catch(() => {});
 
     // 3. Fetch database aggregates
     fetch('/api/stats')
@@ -706,31 +967,12 @@ export default function App() {
     refreshCommunityShoutouts();
     refreshQuackverseState();
 
-    // 4. Fetch inbox from spmt.live if logged in
-    const spmtToken = localStorage.getItem('spmtToken');
+    // 4. Fetch the local tenant-scoped SPMT inbox.
+    refreshSpmtInbox().catch(() => {});
+
+    const spmtToken = getStoredSpmtToken();
     if (spmtToken) {
-      // Points are fetched on every tab change (see below)
-
-      fetch('https://spmt.live/api/messages/inbox', {
-        headers: { 'Authorization': `Bearer ${spmtToken}` },
-        credentials: 'include',
-      })
-        .then(r => r.ok ? r.json() : [])
-        .then(messages => {
-          setMails(messages.map((m: any) => ({
-            id: m.id,
-            folder: 'inbox',
-            from: `${m.from_user}@spmt.live`,
-            to: identity?.username ? `${identity.username}@spmt.live` : '',
-            subject: m.subject || 'No subject',
-            preview: m.body?.substring(0, 50) + '...',
-            body: m.body,
-            time: new Date(m.created_at).toLocaleString(),
-            tag: 'Message',
-          })));
-        })
-        .catch(() => {});
-
+      refreshSpmtIdentity(spmtToken).catch(() => {});
       // 5. Fetch forum threads from spmt.live
       fetch('https://spmt.live/api/forum/threads')
         .then(r => r.ok ? r.json() : [])
@@ -930,19 +1172,24 @@ export default function App() {
     }
   };
 
-  // Send a Mail secure message via spmt.live
+  // Send a tenant-scoped SPMT internal message.
   const handleSendMail = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!composeTo || !composeBody) return;
 
-    const spmtToken = localStorage.getItem('spmtToken');
-    if (!spmtToken) { alert('Please sign in first'); return; }
-
     try {
-      const res = await fetch('https://spmt.live/api/messages', {
+      const from = getSpmtHandle();
+      const res = await fetch('/api/messages', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${spmtToken}` },
-        body: JSON.stringify({ to: composeTo.replace(/@spmt\.live$/, ''), subject: composeSubject, body: composeBody }),
+        headers: { 'Content-Type': 'application/json', 'x-spmt-handle': from, 'x-spmt-tenant': 'spmt' },
+        body: JSON.stringify({
+          tenantId: 'spmt',
+          from,
+          to: composeTo.replace(/^@/, '').replace(/@spmt\.(live|messaging)$/i, ''),
+          subject: composeSubject,
+          body: composeBody,
+          metadata: { source: 'spacemountain.inbox' },
+        }),
       });
       const data = await res.json();
       if (res.ok) {
@@ -950,12 +1197,12 @@ export default function App() {
         setComposeTo('');
         setComposeSubject('');
         setComposeBody('');
-        alert('Message sent!');
+        await refreshSpmtInbox();
       } else {
         alert(data.error || 'Failed to send');
       }
     } catch {
-      alert('Failed to connect to spmt.live');
+      alert('Failed to send internal message');
     }
   };
 
@@ -964,7 +1211,7 @@ export default function App() {
     e.preventDefault();
     if (!newThreadTitle || !newThreadBody) return;
 
-    const spmtToken = localStorage.getItem('spmtToken');
+    const spmtToken = getStoredSpmtToken();
     if (!spmtToken) { alert('Please sign in first'); return; }
 
     try {
@@ -1376,7 +1623,7 @@ export default function App() {
                       </div>
                       <div className="mt-3 flex gap-2">
                         <button
-                          onClick={() => setEmbeddedAppUrl('/chat-tag/quackverse')}
+                          onClick={() => openEmbeddedApp('ChatTag Quackverse', '/chat-tag/quackverse', 'game')}
                           className="flex-1 rounded-lg bg-emerald-300 px-3 py-2 text-xs font-extrabold text-zinc-950"
                         >
                           Embed
@@ -1548,7 +1795,7 @@ export default function App() {
                           <p className="font-black text-white">Overlay</p>
                           <button
                             type="button"
-                            onClick={() => setEmbeddedAppUrl('https://chat-tag-new.fly.dev/overlay')}
+                            onClick={() => openEmbeddedApp('ChatTag OBS Overlay', 'https://chat-tag-new.fly.dev/overlay', 'overlay')}
                             className="mt-1 text-left font-bold text-cyan-300 hover:text-cyan-200"
                           >
                             Add to OBS
@@ -1570,23 +1817,23 @@ export default function App() {
                       </h3>
                       <p className="text-xs text-zinc-400 mt-0.5">Learn bot commands, browse installable community flows, and open builders inside the hub first.</p>
                     </div>
-                    <a href="https://streamweaver-new.fly.dev" target="_blank" rel="noreferrer" className="px-3 py-1.5 rounded-xl bg-white/5 border border-white/10 text-xs font-bold text-zinc-300 hover:text-white no-underline">
+                    <a href={streamweaverCommandsUrl} target="_blank" rel="noreferrer" className="px-3 py-1.5 rounded-xl bg-white/5 border border-white/10 text-xs font-bold text-zinc-300 hover:text-white no-underline">
                       Pop Out StreamWeaver
                     </a>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mt-4">
                     {[
-                      ['Community Flows', 'Install shared flow packs', 'https://streamweaver-new.fly.dev/community'],
-                      ['Commands', 'Learn and make commands', 'https://streamweaver-new.fly.dev/commands'],
-                      ['Bot Integrations', 'Connect broadcaster, bot, and community bot', 'https://streamweaver-new.fly.dev/integrations'],
-                      ['Workflows', 'Build and edit action flows', 'https://streamweaver-new.fly.dev/active-commands'],
+                      ['Community Flows', 'Install shared flow packs', streamweaverCommunityUrl],
+                      ['Commands', 'Learn and make commands', streamweaverCommandsUrl],
+                      ['Bot Integrations', 'Connect broadcaster, bot, and community bot', streamweaverIntegrationsUrl],
+                      ['Workflows', 'Build and edit action flows', streamweaverWorkflowsUrl],
                     ].map(([title, body, url]) => (
                       <div key={title} className="rounded-2xl border border-white/5 bg-white/[0.02] p-4">
                         <span className="text-xs font-bold text-white">{title}</span>
                         <p className="text-xs text-zinc-400 mt-1 leading-relaxed">{body}</p>
                         <div className="grid grid-cols-2 gap-2 mt-3">
-                          <button type="button" onClick={() => setEmbeddedAppUrl(url)} className="px-3 py-1.5 rounded-xl bg-cyan-500/10 border border-cyan-500/20 text-xs font-bold text-cyan-300">
+                          <button type="button" onClick={() => openEmbeddedApp(`StreamWeaver ${title}`, url, 'app')} className="px-3 py-1.5 rounded-xl bg-cyan-500/10 border border-cyan-500/20 text-xs font-bold text-cyan-300">
                             Embed
                           </button>
                           <a href={url} target="_blank" rel="noreferrer" className="px-3 py-1.5 rounded-xl bg-black/30 border border-white/10 text-xs font-bold text-zinc-300 text-center no-underline">
@@ -1597,23 +1844,26 @@ export default function App() {
                     ))}
                   </div>
 
-                  {embeddedAppUrl && (
-                    <div className="rounded-2xl border border-cyan-500/20 bg-black/50 overflow-hidden mt-4">
-                      <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
-                        <span className="text-xs font-bold text-white">Embedded app view</span>
-                        <div className="flex items-center gap-2">
-                          <a href={embeddedAppUrl} target="_blank" rel="noreferrer" className="text-[10px] font-bold text-cyan-300 no-underline">Pop out / sign in</a>
-                          <button type="button" onClick={() => setEmbeddedAppUrl(null)} className="text-[10px] font-bold text-zinc-400 hover:text-white">Close</button>
-                        </div>
+                  <div className="mt-4 rounded-2xl border border-cyan-500/20 bg-black/35 p-4">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div>
+                        <span className="text-xs font-bold text-white">Persistent footer slots</span>
+                        <p className="text-xs text-zinc-400 mt-1">Embeds stay mounted while you move between SpaceMountain pages.</p>
                       </div>
-                      <iframe
-                        src={embeddedAppUrl}
-                        title="Embedded SpaceMountain app"
-                        className="w-full h-[620px] bg-black"
-                        allow="autoplay; microphone; camera; fullscreen; clipboard-write"
-                      />
+                      <div className="flex gap-2">
+                        {embedSlots.map((slot) => (
+                          <button
+                            key={slot.id}
+                            type="button"
+                            onClick={() => setActiveEmbedSlot(slot.id)}
+                            className={`px-3 py-1.5 rounded-xl border text-xs font-bold ${activeEmbedSlot === slot.id ? 'bg-cyan-500/20 border-cyan-400/50 text-cyan-200' : 'bg-black/30 border-white/10 text-zinc-300'}`}
+                          >
+                            Slot {slot.id}
+                          </button>
+                        ))}
+                      </div>
                     </div>
-                  )}
+                  </div>
                 </div>
 
                 <div className="dynamic-cosmic-card rounded-3xl p-5 backdrop-blur-xl transition-all duration-300">
@@ -1637,7 +1887,7 @@ export default function App() {
                       <span className="text-xs font-bold text-white">Dashboard</span>
                       <p className="text-xs text-zinc-400 mt-1">Session-aware DSH home with shoutouts, calendar, forum messages, and leaderboard links.</p>
                       <div className="grid grid-cols-2 gap-2 mt-3">
-                        <button type="button" onClick={() => setEmbeddedAppUrl(dshDashboardUrl)} className="px-3 py-1.5 rounded-xl bg-purple-500/10 border border-purple-500/20 text-xs font-bold text-purple-300">
+                        <button type="button" onClick={() => openEmbeddedApp('Discord Stream Hub Dashboard', dshDashboardUrl, 'dashboard')} className="px-3 py-1.5 rounded-xl bg-purple-500/10 border border-purple-500/20 text-xs font-bold text-purple-300">
                           Embed
                         </button>
                         <a href={dshDashboardUrl} target="_blank" rel="noreferrer" className="px-3 py-1.5 rounded-xl bg-black/30 border border-white/10 text-xs font-bold text-zinc-300 text-center no-underline">
@@ -1649,7 +1899,7 @@ export default function App() {
                       <span className="text-xs font-bold text-white">Admin Calendar</span>
                       <p className="text-xs text-zinc-400 mt-1">Stream schedule and event calendar from DSH.</p>
                       <div className="grid grid-cols-2 gap-2 mt-3">
-                        <button type="button" onClick={() => setEmbeddedAppUrl(dshCalendarUrl)} className="px-3 py-1.5 rounded-xl bg-purple-500/10 border border-purple-500/20 text-xs font-bold text-purple-300">
+                        <button type="button" onClick={() => openEmbeddedApp('Discord Stream Hub Calendar', dshCalendarUrl, 'dashboard')} className="px-3 py-1.5 rounded-xl bg-purple-500/10 border border-purple-500/20 text-xs font-bold text-purple-300">
                           Embed
                         </button>
                         <a href={dshCalendarUrl} target="_blank" rel="noreferrer" className="px-3 py-1.5 rounded-xl bg-black/30 border border-white/10 text-xs font-bold text-zinc-300 text-center no-underline">
@@ -1661,7 +1911,7 @@ export default function App() {
                       <span className="text-xs font-bold text-white">Leaderboard</span>
                       <p className="text-xs text-zinc-400 mt-1">Points leaderboard and community rankings.</p>
                       <div className="grid grid-cols-2 gap-2 mt-3">
-                        <button type="button" onClick={() => setEmbeddedAppUrl(dshLeaderboardUrl)} className="px-3 py-1.5 rounded-xl bg-purple-500/10 border border-purple-500/20 text-xs font-bold text-purple-300">
+                        <button type="button" onClick={() => openEmbeddedApp('Discord Stream Hub Leaderboard', dshLeaderboardUrl, 'dashboard')} className="px-3 py-1.5 rounded-xl bg-purple-500/10 border border-purple-500/20 text-xs font-bold text-purple-300">
                           Embed
                         </button>
                         <a href={dshLeaderboardUrl} target="_blank" rel="noreferrer" className="px-3 py-1.5 rounded-xl bg-black/30 border border-white/10 text-xs font-bold text-zinc-300 text-center no-underline">
@@ -1687,15 +1937,15 @@ export default function App() {
                   <div>
                     <h2 className="text-xl font-sans font-bold text-white flex items-center gap-2">
                       <Mail className="text-rose-500" size={20} />
-                      spmt.live Secure Inbox
+                      spmt / @spmtmessaging
                     </h2>
-                    <p className="text-xs text-zinc-400 font-sans mt-0.5">Encrypted communications stream</p>
+                    <p className="text-xs text-zinc-400 font-sans mt-0.5">Tenant-scoped internal messages between users, apps, and AI bots</p>
                   </div>
                   <button
                     onClick={() => setIsComposing(!isComposing)}
                     className="px-4 py-1.5 rounded-xl bg-gradient-to-r from-red-500 to-orange-500 font-mono text-xs font-bold flex items-center gap-1.5 transition-all"
                   >
-                    <Plus size={14} /> {isComposing ? 'VIEW INBOX' : 'COMPOSE TRANSMISSION'}
+                    <Plus size={14} /> {isComposing ? 'VIEW INBOX' : 'COMPOSE MESSAGE'}
                   </button>
                 </div>
 
@@ -1709,12 +1959,12 @@ export default function App() {
                           required
                           value={composeTo}
                           onChange={(e) => setComposeTo(e.target.value)}
-                          placeholder="e.g. athena@spmt.live"
+                          placeholder="e.g. @spmtmessaging, streamweaver, athena"
                           className="w-full bg-white/5 border border-white/10 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-orange-500/50"
                         />
                       </div>
                       <div>
-                        <label className="text-[10px] font-mono font-bold text-zinc-400 block mb-1">SUBJECT MATTER</label>
+                        <label className="text-[10px] font-mono font-bold text-zinc-400 block mb-1">SUBJECT</label>
                         <input
                           type="text"
                           value={composeSubject}
@@ -1725,13 +1975,13 @@ export default function App() {
                       </div>
                     </div>
                     <div>
-                      <label className="text-[10px] font-mono font-bold text-zinc-400 block mb-1">TRANSMISSION BODY</label>
+                        <label className="text-[10px] font-mono font-bold text-zinc-400 block mb-1">MESSAGE BODY</label>
                       <textarea
                         required
                         rows={5}
                         value={composeBody}
                         onChange={(e) => setComposeBody(e.target.value)}
-                        placeholder="Type message here..."
+                        placeholder="Type an internal message..."
                         className="w-full bg-white/5 border border-white/10 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-orange-500/50"
                       />
                     </div>
@@ -1739,11 +1989,16 @@ export default function App() {
                       type="submit"
                       className="px-5 py-2.5 rounded-xl bg-orange-500 text-xs font-bold font-mono self-start flex items-center gap-1.5"
                     >
-                      <Send size={14} /> SEND SECURE TRANSMISSION
+                      <Send size={14} /> SEND MESSAGE
                     </button>
                   </form>
                 ) : (
                   <div className="flex flex-col gap-2">
+                    {mails.length === 0 && (
+                      <div className="p-4 rounded-2xl border border-white/5 text-xs text-zinc-400" style={{ background: 'var(--chat-surface-bg)' }}>
+                        No tenant messages yet. Send one to @spmtmessaging, another user handle, or an app handle.
+                      </div>
+                    )}
                     {mails.map((m) => (
                       <div
                         key={m.id}
@@ -2383,45 +2638,84 @@ export default function App() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-2">
-                  {tools.filter((tool) => ['streamweaver', 'hearmeout', 'discord-hub', 'chat-tag', 'mountainview', 'forums'].includes(tool.id)).map((tool) => (
-                    <div key={tool.id} className="p-4 rounded-2xl bg-white/[0.02] border border-white/5 flex flex-col justify-between">
-                      <div className="flex items-center gap-3 mb-4">
-                        {preferences.showAvatars && (
-                          <div className="w-10 h-10 rounded-full bg-zinc-900 border border-white/10 flex items-center justify-center text-lg">
-                            {tool.badge.slice(0, 2)}
+                <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 mt-2">
+                  <div className="xl:col-span-2 rounded-2xl border border-white/5 bg-white/[0.02] p-4">
+                    <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/5 pb-3">
+                      <div>
+                        <h3 className="text-sm font-bold text-white">Embed control dashboard</h3>
+                        <p className="text-xs text-zinc-500 mt-1">Choose what lives in each persistent footer slot.</p>
+                      </div>
+                      <div className="flex gap-2">
+                        {embedSlots.map((slot) => (
+                          <button
+                            key={slot.id}
+                            type="button"
+                            onClick={() => setActiveEmbedSlot(slot.id)}
+                            className={`rounded-xl border px-3 py-1.5 text-xs font-bold ${activeEmbedSlot === slot.id ? 'border-blue-400/50 bg-blue-500/15 text-blue-200' : 'border-white/10 bg-black/30 text-zinc-300'}`}
+                          >
+                            Slot {slot.id}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="mt-4 grid grid-cols-1 lg:grid-cols-3 gap-3">
+                      {embedSlots.map((slot) => (
+                        <div key={slot.id} className="rounded-xl border border-white/10 bg-black/30 p-3">
+                          <div className="mb-3 flex items-center justify-between">
+                            <span className="text-xs font-black text-white">Slot {slot.id}</span>
+                            <button
+                              type="button"
+                              onClick={() => updateEmbedSlot(slot.id, { collapsed: !slot.collapsed })}
+                              className="text-[10px] font-bold text-blue-300"
+                            >
+                              {slot.collapsed ? 'Show' : 'Hide'}
+                            </button>
                           </div>
-                        )}
-                        <div className="flex flex-col">
-                          <span className="text-xs font-bold text-white">{tool.name}</span>
-                          <span className="text-[10px] text-zinc-500 font-mono mt-0.5">{tool.appUrl || tool.route}</span>
+                          <label className="text-[9px] font-mono text-zinc-500">Title</label>
+                          <input
+                            value={slot.title}
+                            onChange={(event) => updateEmbedSlot(slot.id, { title: event.target.value })}
+                            className="mt-1 w-full rounded-lg border border-white/10 bg-black/40 px-2 py-1.5 text-xs text-white outline-none focus:border-blue-400/60"
+                          />
+                          <label className="mt-3 block text-[9px] font-mono text-zinc-500">URL</label>
+                          <input
+                            value={slot.url}
+                            onChange={(event) => updateEmbedSlot(slot.id, { url: event.target.value })}
+                            className="mt-1 w-full rounded-lg border border-white/10 bg-black/40 px-2 py-1.5 text-xs text-white outline-none focus:border-blue-400/60"
+                          />
                         </div>
-                      </div>
-                      <div className="flex items-center justify-between text-[10px] font-mono pt-3 border-t border-white/5">
+                      ))}
+                    </div>
+
+                    <div className="mt-4 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-2">
+                      {embedPresets.map((preset) => (
                         <button
+                          key={`${preset.title}:${preset.url}`}
                           type="button"
-                          onClick={() => {
-                            if (tool.id === 'hearmeout') setActiveTab('rooms');
-                            else if (tool.id === 'discord-hub' || tool.id === 'forums') setActiveTab('forums');
-                            else if (tool.id === 'chat-tag') setActiveTab('apps');
-                            else if (tool.id === 'mountainview') setActiveTab('mtnview');
-                            else window.open(tool.appUrl || tool.route, '_blank');
-                          }}
-                          className="text-zinc-300 hover:text-white"
+                          onClick={() => openEmbeddedApp(preset.title, preset.url, preset.kind)}
+                          className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-left hover:border-blue-400/40 hover:bg-blue-500/10"
                         >
-                          Open
+                          <span className="block text-[11px] font-bold text-white">{preset.title}</span>
+                          <span className="block text-[9px] uppercase tracking-wider text-zinc-500">{preset.kind}</span>
                         </button>
-                        <span className={`font-bold ${tool.statusType === 'live' ? 'text-emerald-400' : 'text-zinc-500'}`}>
-                          ● {tool.statusText}
-                        </span>
-                      </div>
+                      ))}
                     </div>
-                  ))}
-                  {tools.length === 0 && (
-                    <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/5 text-xs text-zinc-400">
-                      Loading app registry...
+                  </div>
+
+                  <div className="rounded-2xl border border-white/5 bg-white/[0.02] p-4">
+                    <h3 className="text-sm font-bold text-white">Notifications</h3>
+                    <div className="mt-3 flex flex-col gap-2">
+                      {notifications.length === 0 ? (
+                        <p className="text-xs text-zinc-500">No embed events yet.</p>
+                      ) : notifications.map((item) => (
+                        <div key={item.id} className="rounded-xl border border-white/10 bg-black/30 p-3">
+                          <span className="block text-xs font-bold text-white">{item.title}</span>
+                          <span className="mt-1 block text-xs text-zinc-400">{item.body}</span>
+                        </div>
+                      ))}
                     </div>
-                  )}
+                  </div>
                 </div>
               </motion.div>
             )}
@@ -2432,23 +2726,73 @@ export default function App() {
 
       </main>
 
-      {/* Embedded footer message */}
+      {/* Persistent app embed slots */}
       <footer 
-        className="w-full text-center py-5 border-t text-[10px] font-mono relative z-20 bg-black/10 transition-all duration-1000"
+        className="w-full border-t text-[10px] font-mono relative z-20 bg-black/35 transition-all duration-1000 px-6 py-4"
         style={{ 
           borderColor: `${currentTheme.glowHex}1a`,
           color: `${currentTheme.glowHex}88`
         }}
       >
-        <span className="inline-flex items-center justify-center gap-2">
-          <img
-            src="/assets/astronaut-avatar.jpg"
-            alt="SpaceMountain account"
-            className="w-5 h-5 rounded-full object-cover border border-white/10"
-            referrerPolicy="no-referrer"
-          />
-          <span>One login for the SpaceMountain app hub • Spmt.live</span>
-        </span>
+        <div className="mx-auto flex max-w-7xl flex-col gap-3">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <span className="inline-flex items-center justify-center gap-2">
+              <img
+                src="/assets/astronaut-avatar.jpg"
+                alt="SpaceMountain account"
+                className="w-5 h-5 rounded-full object-cover border border-white/10"
+                referrerPolicy="no-referrer"
+              />
+              <span>One login for the SpaceMountain app hub • persistent app slots</span>
+            </span>
+            <div className="flex flex-wrap gap-2">
+              {notifications.slice(0, 3).map((item) => (
+                <span key={item.id} className="rounded-full border border-white/10 bg-white/[0.04] px-2 py-1 text-[9px] text-zinc-300">
+                  {item.title}: {item.body}
+                </span>
+              ))}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
+            {embedSlots.map((slot) => (
+              <div key={slot.id} className={`overflow-hidden rounded-2xl border bg-black/45 ${activeEmbedSlot === slot.id ? 'border-cyan-400/45' : 'border-white/10'}`}>
+                <div className="flex items-center justify-between gap-2 border-b border-white/10 px-3 py-2">
+                  <button
+                    type="button"
+                    onClick={() => setActiveEmbedSlot(slot.id)}
+                    className="min-w-0 text-left"
+                    title={`Use slot ${slot.id} for new embeds`}
+                  >
+                    <span className="block truncate text-[10px] font-black text-white">Slot {slot.id}: {slot.title}</span>
+                    <span className="block truncate text-[8px] uppercase tracking-wider text-zinc-500">{slot.kind}</span>
+                  </button>
+                  <div className="flex shrink-0 items-center gap-2">
+                    <a href={slot.url} target="_blank" rel="noreferrer" className="text-[9px] font-bold text-cyan-300 no-underline">Pop out</a>
+                    <button
+                      type="button"
+                      onClick={() => updateEmbedSlot(slot.id, { collapsed: !slot.collapsed })}
+                      className="text-[9px] font-bold text-zinc-400 hover:text-white"
+                    >
+                      {slot.collapsed ? 'Show' : 'Hide'}
+                    </button>
+                  </div>
+                </div>
+                {!slot.collapsed && (
+                  <iframe
+                    key={`${slot.id}:${slot.url}`}
+                    src={slot.url}
+                    title={slot.title}
+                    data-embed-slot-frame={slot.id}
+                    onLoad={(event) => sendEmbeddedAuth(event.currentTarget)}
+                    className="h-[360px] w-full bg-black"
+                    allow="autoplay; microphone; camera; fullscreen; clipboard-write"
+                  />
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
       </footer>
 
       {/* Easter Egg Flying Rocket Particles Trail */}

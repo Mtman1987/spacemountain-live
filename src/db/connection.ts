@@ -112,6 +112,21 @@ sqlite.exec(`
     updated_at TEXT NOT NULL,
     created_at TEXT NOT NULL
   );
+
+  CREATE TABLE IF NOT EXISTS internal_messages (
+    id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL DEFAULT 'spmt',
+    from_handle TEXT NOT NULL,
+    from_type TEXT NOT NULL DEFAULT 'user',
+    to_handle TEXT NOT NULL,
+    to_type TEXT NOT NULL DEFAULT 'user',
+    subject TEXT NOT NULL,
+    body TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'sent',
+    metadata TEXT,
+    read_at TEXT,
+    created_at TEXT NOT NULL
+  );
 `);
 
 const ensureColumn = (table: string, column: string, definition: string) => {
@@ -125,6 +140,11 @@ ensureColumn('community_shoutouts', 'video_url', 'TEXT');
 ensureColumn('forwarded_forum_posts', 'embeds', 'TEXT');
 ensureColumn('forwarded_forum_posts', 'attachments', 'TEXT');
 ensureColumn('forwarded_forum_posts', 'mentioned_users', 'TEXT');
+ensureColumn('internal_messages', 'tenant_id', "TEXT NOT NULL DEFAULT 'spmt'");
+ensureColumn('internal_messages', 'from_type', "TEXT NOT NULL DEFAULT 'user'");
+ensureColumn('internal_messages', 'to_type', "TEXT NOT NULL DEFAULT 'user'");
+ensureColumn('internal_messages', 'metadata', 'TEXT');
+ensureColumn('internal_messages', 'read_at', 'TEXT');
 
 console.log('SQLite database structures successfully verified and prepared!');
 

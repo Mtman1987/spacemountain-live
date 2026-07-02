@@ -9,9 +9,13 @@ export interface CommunityTool {
   route: string;
   pointsFlow: number;
   appUrl?: string | null;
+  authUrl?: string | null;
   healthUrl?: string | null;
   lastCheckedAt?: string | null;
   responseMs?: number | null;
+  installed?: boolean;
+  enabled?: boolean;
+  permissions?: string[];
 }
 
 export interface DashboardStats {
@@ -132,12 +136,17 @@ export interface UserProfile {
   id: string;
   displayName: string;
   username: string;
+  handle?: string;
   recoveryEmail: string | null;
   role: string;
   status: string;
   points: number;
   avatarSpeaking: boolean;
   createdAt: string;
+  discordUsername?: string | null;
+  discordId?: string | null;
+  twitchUsername?: string | null;
+  twitchId?: string | null;
 }
 
 export interface UserPreferences {

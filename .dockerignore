@@ -1,0 +1,11 @@
+node_modules
+dist
+.git
+.env
+.env.local
+*.log
+.codex-*.png
+0e76474ef88572ce8511f74a712f5929_low.webp
+ccdbea6e625737727efdd0754cc283c7_low.webp
+TODO-FIXES.md
+tsc_errors.txt

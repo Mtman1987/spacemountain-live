@@ -131,7 +131,7 @@ export default function Arena({ accentColor, points, username, displayName, onSp
   const arenaRef = useRef<HTMLDivElement>(null);
   const posRef = useRef({ x: 400, y: 300, angle: 0 });
   const mouseRef = useRef({ x: 400, y: 300 });
-  const token = localStorage.getItem('spmtToken');
+  const token = localStorage.getItem('spmtToken') || localStorage.getItem('spmt_token');
   const pilotName = displayName || username || 'Guest Captain';
 
   const visibleKills = Math.max(localStats.kills, ...players.map((p) => p.kills || 0), 0);

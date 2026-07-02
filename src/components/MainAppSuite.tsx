@@ -117,8 +117,8 @@ export default function MainAppSuite({ tools, onTriggerAction, accentColor, pref
         {tools.map((tool) => {
           const icon = appIcons[tool.id] || '✦';
           const label = tool.miniLabel || 'Sub Module';
-          const appLink = tool.appUrl || tool.route;
-          const isExternal = Boolean(tool.appUrl);
+          const appLink = tool.authUrl || tool.appUrl || tool.route;
+          const isExternal = Boolean(tool.authUrl || tool.appUrl);
           const isLive = tool.statusType === 'live';
           const isAvailable = isLive || !tool.healthUrl;
 
@@ -200,7 +200,7 @@ export default function MainAppSuite({ tools, onTriggerAction, accentColor, pref
                     className={`w-1.5 h-1.5 rounded-full inline-block ${isLive ? 'animate-ping' : ''}`}
                     style={{ backgroundColor: accentColor }}
                   />
-                  {tool.statusText}
+                  {tool.installed === false ? 'AVAILABLE' : tool.enabled === false ? 'DISABLED' : tool.statusText}
                 </span>
               </div>
               {/* Cooldown indicator */}
@@ -214,9 +214,9 @@ export default function MainAppSuite({ tools, onTriggerAction, accentColor, pref
                 type="button"
                 onClick={(event) => handleInstall(event, appLink, isExternal)}
                 className="mt-2 w-full inline-flex items-center justify-center gap-1 rounded-lg border border-white/10 bg-black/25 px-2 py-1 text-[8px] font-mono font-bold text-zinc-300 hover:text-white hover:bg-white/10"
-                title={isExternal ? `Open ${tool.name} so your browser can install it as an app` : 'Install SpaceMountain hub as an app'}
+                title={isExternal ? `Launch ${tool.name} through SPMT` : 'Install SpaceMountain hub as an app'}
               >
-                <Download size={10} /> Download
+                <Download size={10} /> {tool.installed === false ? 'Enable' : 'Launch'}
               </button>
             </motion.div>
           );
