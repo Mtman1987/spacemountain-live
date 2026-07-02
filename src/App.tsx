@@ -153,10 +153,21 @@ type EmbedSlot = EmbeddedAppTarget & {
 };
 
 type AppNotification = {
-  id: number;
+  id: number | string;
   title: string;
   body: string;
   createdAt: string;
+};
+
+type CommlinkNotification = {
+  id: string;
+  type: string;
+  title: string;
+  body: string;
+  source_app?: string | null;
+  link_url?: string | null;
+  read_at?: string | null;
+  created_at: string;
 };
 
 const defaultEmbedSlots: EmbedSlot[] = [
@@ -681,6 +692,7 @@ export default function App() {
   const [composeSubject, setComposeSubject] = useState('');
   const [composeBody, setComposeBody] = useState('');
   const [isComposing, setIsComposing] = useState(false);
+  const [commlinkNotifications, setCommlinkNotifications] = useState<CommlinkNotification[]>([]);
 
   const getSpmtHandle = () => {
     if (identity?.username) return identity.username;
@@ -696,6 +708,38 @@ export default function App() {
   };
 
   const refreshSpmtInbox = async () => {
+    const token = getStoredSpmtToken();
+    if (token) {
+      const [conversationResponse, notificationResponse] = await Promise.all([
+        fetch(`${spmtBaseUrl}/api/conversations`, {
+          headers: { Authorization: `Bearer ${token}` },
+          credentials: 'include',
+        }),
+        fetch(`${spmtBaseUrl}/api/notifications`, {
+          headers: { Authorization: `Bearer ${token}` },
+          credentials: 'include',
+        }),
+      ]);
+      const conversationData = conversationResponse.ok ? await conversationResponse.json() : { conversations: [] };
+      const notificationData = notificationResponse.ok ? await notificationResponse.json() : { notifications: [] };
+      const conversations = Array.isArray(conversationData?.conversations) ? conversationData.conversations : [];
+      const nextNotifications = Array.isArray(notificationData?.notifications) ? notificationData.notifications : [];
+
+      setCommlinkNotifications(nextNotifications);
+      setMails(conversations.map((conversation: any) => ({
+        id: conversation.id,
+        folder: 'commlink',
+        from: conversation.type === 'group' ? 'Group conversation' : 'Direct conversation',
+        to: identity?.handle || identity?.username || '@spmt.live',
+        subject: conversation.title || 'Commlink thread',
+        preview: `${conversation.last_message || ''}`.slice(0, 70),
+        body: conversation.last_message || 'No messages yet.',
+        time: new Date(conversation.updated_at || conversation.created_at || Date.now()).toLocaleString(),
+        tag: Number(conversation.unread_count || 0) > 0 ? `${conversation.unread_count} unread` : conversation.type || 'SPMT',
+      })));
+      return;
+    }
+
     const handle = getSpmtHandle();
     const params = new URLSearchParams({ handle, tenantId: 'spmt' });
     const response = await fetch(`/api/messages/inbox?${params.toString()}`, {
@@ -1178,6 +1222,33 @@ export default function App() {
     if (!composeTo || !composeBody) return;
 
     try {
+      const token = getStoredSpmtToken();
+      if (token) {
+        const res = await fetch(`${spmtBaseUrl}/api/messages`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          credentials: 'include',
+          body: JSON.stringify({
+            to: composeTo.replace(/^@/, '').replace(/@spmt\.live$/i, ''),
+            subject: composeSubject,
+            body: composeBody,
+            sourceApp: 'spacemountain-live',
+            metadata: { source: 'spacemountain.inbox' },
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          alert(data.error || 'Failed to send');
+          return;
+        }
+        setIsComposing(false);
+        setComposeTo('');
+        setComposeSubject('');
+        setComposeBody('');
+        await refreshSpmtInbox();
+        return;
+      }
+
       const from = getSpmtHandle();
       const res = await fetch('/api/messages', {
         method: 'POST',
@@ -1994,9 +2065,31 @@ export default function App() {
                   </form>
                 ) : (
                   <div className="flex flex-col gap-2">
+                    {commlinkNotifications.length > 0 && (
+                      <div className="mb-3 rounded-2xl border border-cyan-400/15 bg-cyan-400/[0.04] p-4">
+                        <div className="mb-3 flex items-center justify-between gap-3">
+                          <h3 className="text-sm font-bold text-white">Notifications</h3>
+                          <span className="rounded-full border border-white/10 bg-black/30 px-2 py-1 text-[10px] font-bold text-cyan-200">
+                            {commlinkNotifications.filter((item) => !item.read_at).length} unread
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+                          {commlinkNotifications.slice(0, 4).map((item) => (
+                            <div key={item.id} className="rounded-xl border border-white/10 bg-black/25 p-3">
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="truncate text-xs font-bold text-white">{item.title}</span>
+                                <span className="shrink-0 text-[9px] uppercase tracking-wider text-zinc-500">{item.type}</span>
+                              </div>
+                              <p className="mt-1 line-clamp-2 text-xs text-zinc-400">{item.body}</p>
+                              <p className="mt-2 text-[10px] text-zinc-500">{new Date(item.created_at).toLocaleString()}</p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                     {mails.length === 0 && (
                       <div className="p-4 rounded-2xl border border-white/5 text-xs text-zinc-400" style={{ background: 'var(--chat-surface-bg)' }}>
-                        No tenant messages yet. Send one to @spmtmessaging, another user handle, or an app handle.
+                        No Commlink messages yet. Send one to another @spmt.live handle or an app handle.
                       </div>
                     )}
                     {mails.map((m) => (
