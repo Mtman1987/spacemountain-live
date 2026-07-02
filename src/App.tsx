@@ -691,10 +691,14 @@ export default function App() {
   const [composeTo, setComposeTo] = useState('');
   const [composeSubject, setComposeSubject] = useState('');
   const [composeBody, setComposeBody] = useState('');
+  const [composeGroupTitle, setComposeGroupTitle] = useState('');
   const [isComposing, setIsComposing] = useState(false);
   const [commlinkNotifications, setCommlinkNotifications] = useState<CommlinkNotification[]>([]);
   const [commlinkSearch, setCommlinkSearch] = useState('');
   const [commlinkFilter, setCommlinkFilter] = useState<'all' | 'unread' | 'direct' | 'app'>('all');
+  const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
+  const [activeConversationMessages, setActiveConversationMessages] = useState<any[]>([]);
+  const [threadReplyBody, setThreadReplyBody] = useState('');
 
   const getSpmtHandle = () => {
     if (identity?.username) return identity.username;
@@ -735,6 +739,7 @@ export default function App() {
       setMails(messages.map((message: any) => ({
         id: message.id,
         folder: 'commlink',
+        conversationId: message.conversation_id,
         from: `@${message.from_user || 'spmt'}`,
         to: `@${message.to_user || identity?.username || 'spmt'}`,
         subject: message.subject || 'Commlink message',
@@ -758,6 +763,7 @@ export default function App() {
     setMails(messages.map((m: any) => ({
       id: m.id,
       folder: 'inbox',
+      conversationId: m.conversationId || null,
       from: `@${m.fromHandle || m.fromUser || 'spmtmessaging'}`,
       to: `@${m.toHandle || m.toUser || handle}`,
       subject: m.subject || 'No subject',
@@ -1232,25 +1238,67 @@ export default function App() {
     try {
       const token = getStoredSpmtToken();
       if (token) {
-        const res = await fetch(`${spmtBaseUrl}/api/messages`, {
+        const recipients = composeTo
+          .split(',')
+          .map((item) => item.trim().replace(/^@/, '').replace(/@spmt\.live$/i, ''))
+          .filter(Boolean);
+
+        if (recipients.length > 1) {
+          const conversationRes = await fetch(`${spmtBaseUrl}/api/conversations`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+            credentials: 'include',
+            body: JSON.stringify({
+              title: composeGroupTitle || composeSubject || 'Group conversation',
+              recipients,
+            }),
+          });
+          const conversationData = await conversationRes.json();
+          if (!conversationRes.ok) {
+            alert(conversationData.error || 'Failed to create group conversation');
+            return;
+          }
+
+          const messageRes = await fetch(`${spmtBaseUrl}/api/conversations/${conversationData.id}/messages`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+            credentials: 'include',
+            body: JSON.stringify({
+              subject: composeSubject,
+              body: composeBody,
+              sourceApp: 'spacemountain-live',
+              metadata: { source: 'spacemountain.group' },
+            }),
+          });
+          const messageData = await messageRes.json();
+          if (!messageRes.ok) {
+            alert(messageData.error || 'Failed to send group message');
+            return;
+          }
+          setActiveConversationId(conversationData.id);
+        } else {
+          const res = await fetch(`${spmtBaseUrl}/api/messages`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
           credentials: 'include',
           body: JSON.stringify({
-            to: composeTo.replace(/^@/, '').replace(/@spmt\.live$/i, ''),
+            to: recipients[0],
             subject: composeSubject,
             body: composeBody,
             sourceApp: 'spacemountain-live',
             metadata: { source: 'spacemountain.inbox' },
           }),
-        });
-        const data = await res.json();
-        if (!res.ok) {
-          alert(data.error || 'Failed to send');
-          return;
+          });
+          const data = await res.json();
+          if (!res.ok) {
+            alert(data.error || 'Failed to send');
+            return;
+          }
+          setActiveConversationId(data.conversationId || null);
         }
         setIsComposing(false);
         setComposeTo('');
+        setComposeGroupTitle('');
         setComposeSubject('');
         setComposeBody('');
         await refreshSpmtInbox();
@@ -1283,6 +1331,56 @@ export default function App() {
     } catch {
       alert('Failed to send internal message');
     }
+  };
+
+  const openCommlinkThread = async (conversationId?: string | null) => {
+    const token = getStoredSpmtToken();
+    if (!token || !conversationId) return;
+
+    const response = await fetch(`${spmtBaseUrl}/api/conversations/${conversationId}/messages`, {
+      headers: { Authorization: `Bearer ${token}` },
+      credentials: 'include',
+    });
+    const data = response.ok ? await response.json() : { messages: [] };
+    const messages = Array.isArray(data?.messages) ? data.messages : [];
+    setActiveConversationId(conversationId);
+    setActiveConversationMessages(messages.map((message: any) => ({
+      ...message,
+      attachments: message.attachments ? JSON.parse(message.attachments) : [],
+      mentions: message.mentioned_users ? JSON.parse(message.mentioned_users) : [],
+    })));
+
+    await fetch(`${spmtBaseUrl}/api/conversations/${conversationId}/read`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+      credentials: 'include',
+    }).catch(() => {});
+    refreshSpmtInbox().catch(() => {});
+  };
+
+  const handleSendThreadReply = async (event: React.FormEvent) => {
+    event.preventDefault();
+    const token = getStoredSpmtToken();
+    if (!token || !activeConversationId || !threadReplyBody.trim()) return;
+
+    const response = await fetch(`${spmtBaseUrl}/api/conversations/${activeConversationId}/messages`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      credentials: 'include',
+      body: JSON.stringify({
+        body: threadReplyBody,
+        sourceApp: 'spacemountain-live',
+        metadata: { source: 'spacemountain.thread-reply' },
+      }),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      alert(data.error || 'Failed to send reply');
+      return;
+    }
+
+    setThreadReplyBody('');
+    await openCommlinkThread(activeConversationId);
   };
 
   // Create a new Forums Thread via spmt.live
@@ -2033,13 +2131,13 @@ export default function App() {
                   <form onSubmit={handleSendMail} className="flex flex-col gap-4">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
-                        <label className="text-[10px] font-mono font-bold text-zinc-400 block mb-1">RECIPIENT HANDLE</label>
+                        <label className="text-[10px] font-mono font-bold text-zinc-400 block mb-1">RECIPIENT HANDLE(S)</label>
                         <input
                           type="text"
                           required
                           value={composeTo}
                           onChange={(e) => setComposeTo(e.target.value)}
-                          placeholder="e.g. @spmtmessaging, streamweaver, athena"
+                          placeholder="e.g. @mtman or @mtman,@athena,@streamweaver"
                           className="w-full bg-white/5 border border-white/10 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-orange-500/50"
                         />
                       </div>
@@ -2054,6 +2152,18 @@ export default function App() {
                         />
                       </div>
                     </div>
+                    {composeTo.includes(',') && (
+                      <div>
+                        <label className="text-[10px] font-mono font-bold text-zinc-400 block mb-1">GROUP TITLE</label>
+                        <input
+                          type="text"
+                          value={composeGroupTitle}
+                          onChange={(e) => setComposeGroupTitle(e.target.value)}
+                          placeholder="e.g. Launch crew"
+                          className="w-full bg-white/5 border border-white/10 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-orange-500/50"
+                        />
+                      </div>
+                    )}
                     <div>
                         <label className="text-[10px] font-mono font-bold text-zinc-400 block mb-1">MESSAGE BODY</label>
                       <textarea
@@ -2132,10 +2242,73 @@ export default function App() {
                         No Commlink messages yet. Send one to another @spmt.live handle or an app handle.
                       </div>
                     )}
+                    {activeConversationId && (
+                      <div className="mb-3 rounded-2xl border border-orange-400/20 bg-orange-400/[0.04] p-4">
+                        <div className="mb-3 flex items-center justify-between gap-3">
+                          <h3 className="text-sm font-bold text-white">Thread</h3>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setActiveConversationId(null);
+                              setActiveConversationMessages([]);
+                              setThreadReplyBody('');
+                            }}
+                            className="rounded-lg border border-white/10 bg-black/30 px-2 py-1 text-[10px] font-bold text-zinc-300"
+                          >
+                            Close
+                          </button>
+                        </div>
+                        <div className="flex max-h-[360px] flex-col gap-2 overflow-y-auto pr-1">
+                          {activeConversationMessages.length === 0 ? (
+                            <p className="text-xs text-zinc-400">No messages in this thread yet.</p>
+                          ) : activeConversationMessages.map((message) => (
+                            <div key={message.id} className="rounded-xl border border-white/10 bg-black/25 p-3">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <span className="text-xs font-bold text-white">@{message.from_user}</span>
+                                <span className="text-[10px] text-zinc-500">{new Date(message.created_at).toLocaleString()}</span>
+                                <span className="rounded bg-white/5 px-1.5 py-0.5 text-[9px] uppercase text-zinc-500">{message.message_type || 'message'}</span>
+                              </div>
+                              {message.subject && <p className="mt-1 text-xs font-bold text-orange-300">{message.subject}</p>}
+                              <p className="mt-1 whitespace-pre-wrap text-xs leading-relaxed text-zinc-300">{message.body}</p>
+                              {Array.isArray(message.mentions) && message.mentions.length > 0 && (
+                                <div className="mt-2 flex flex-wrap gap-1">
+                                  {message.mentions.map((mention: any) => (
+                                    <span key={mention.id || mention.username} className="rounded-full border border-cyan-400/20 bg-cyan-400/10 px-2 py-0.5 text-[10px] font-bold text-cyan-200">
+                                      @{mention.username}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
+                              {Array.isArray(message.attachments) && message.attachments.length > 0 && (
+                                <div className="mt-2 flex flex-wrap gap-2">
+                                  {message.attachments.map((attachment: any) => (
+                                    <a key={attachment.url} href={attachment.url} target="_blank" rel="noreferrer" className="rounded-lg border border-white/10 bg-white/[0.04] px-2 py-1 text-[10px] font-bold text-zinc-300 no-underline hover:text-white">
+                                      {attachment.name || attachment.type || 'Attachment'}
+                                    </a>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                        <form onSubmit={handleSendThreadReply} className="mt-3 flex flex-col gap-2 md:flex-row">
+                          <input
+                            value={threadReplyBody}
+                            onChange={(event) => setThreadReplyBody(event.target.value)}
+                            placeholder="Reply to this Commlink thread..."
+                            className="min-w-0 flex-1 rounded-xl border border-white/10 bg-black/25 px-3 py-2 text-xs text-white outline-none focus:border-orange-400/50"
+                          />
+                          <button type="submit" className="rounded-xl bg-orange-500 px-4 py-2 text-xs font-bold text-zinc-950">
+                            Reply
+                          </button>
+                        </form>
+                      </div>
+                    )}
                     {mails.map((m) => (
                       <div
                         key={m.id}
-                        className="p-4 rounded-2xl border border-white/5 flex items-start justify-between gap-4"
+                        onClick={() => openCommlinkThread(m.conversationId)}
+                        className="p-4 rounded-2xl border border-white/5 flex items-start justify-between gap-4 cursor-pointer hover:border-orange-400/25"
                         style={{ background: 'var(--chat-surface-bg)' }}
                       >
                         <div className="flex flex-col">
@@ -2166,7 +2339,10 @@ export default function App() {
                           )}
                         </div>
                         <button
-                          onClick={() => setMails(prev => prev.filter(x => x.id !== m.id))}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            setMails(prev => prev.filter(x => x.id !== m.id));
+                          }}
                           className="p-1.5 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20 transition-all"
                         >
                           <Trash2 size={12} />
