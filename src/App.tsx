@@ -689,6 +689,7 @@ export default function App() {
   // SPMT internal messages are tenant-scoped and stored by this SpaceMountain app.
   const [mails, setMails] = useState<any[]>([]);
   const [composeTo, setComposeTo] = useState('');
+  const [composeRecipients, setComposeRecipients] = useState<string[]>([]);
   const [composeSubject, setComposeSubject] = useState('');
   const [composeBody, setComposeBody] = useState('');
   const [composeGroupTitle, setComposeGroupTitle] = useState('');
@@ -711,6 +712,27 @@ export default function App() {
     }
 
     return 'spmtmessaging';
+  };
+
+  const normalizeRecipientHandle = (value: string) => value
+    .trim()
+    .replace(/^@/, '')
+    .replace(/@spmt\.live$/i, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]/g, '');
+
+  const addComposeRecipient = (value = composeTo) => {
+    const handles = value
+      .split(/[,\s]+/)
+      .map(normalizeRecipientHandle)
+      .filter(Boolean);
+    if (!handles.length) return;
+    setComposeRecipients((current) => Array.from(new Set([...current, ...handles])));
+    setComposeTo('');
+  };
+
+  const removeComposeRecipient = (handle: string) => {
+    setComposeRecipients((current) => current.filter((item) => item !== handle));
   };
 
   const refreshSpmtInbox = async () => {
@@ -780,6 +802,9 @@ export default function App() {
   const [newThreadCategory, setNewThreadCategory] = useState('Technical Support');
   const [newThreadBody, setNewThreadBody] = useState('');
   const [isCreatingThread, setIsCreatingThread] = useState(false);
+  const [activeForumThread, setActiveForumThread] = useState<any | null>(null);
+  const [activeForumPosts, setActiveForumPosts] = useState<any[]>([]);
+  const [forumReplyBody, setForumReplyBody] = useState('');
   const [forwardedForumPosts, setForwardedForumPosts] = useState<any[]>([]);
   const [forwardedForumLoading, setForwardedForumLoading] = useState(false);
   const [expandedChannels, setExpandedChannels] = useState<Set<string>>(new Set());
@@ -1233,16 +1258,15 @@ export default function App() {
   // Send a tenant-scoped SPMT internal message.
   const handleSendMail = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!composeTo || !composeBody) return;
+    const recipients = Array.from(new Set([
+      ...composeRecipients,
+      ...composeTo.split(/[,\s]+/).map(normalizeRecipientHandle).filter(Boolean),
+    ]));
+    if (!recipients.length || !composeBody) return;
 
     try {
       const token = getStoredSpmtToken();
       if (token) {
-        const recipients = composeTo
-          .split(',')
-          .map((item) => item.trim().replace(/^@/, '').replace(/@spmt\.live$/i, ''))
-          .filter(Boolean);
-
         if (recipients.length > 1) {
           const conversationRes = await fetch(`${spmtBaseUrl}/api/conversations`, {
             method: 'POST',
@@ -1298,6 +1322,7 @@ export default function App() {
         }
         setIsComposing(false);
         setComposeTo('');
+        setComposeRecipients([]);
         setComposeGroupTitle('');
         setComposeSubject('');
         setComposeBody('');
@@ -1312,7 +1337,7 @@ export default function App() {
         body: JSON.stringify({
           tenantId: 'spmt',
           from,
-          to: composeTo.replace(/^@/, '').replace(/@spmt\.(live|messaging)$/i, ''),
+          to: recipients[0],
           subject: composeSubject,
           body: composeBody,
           metadata: { source: 'spacemountain.inbox' },
@@ -1322,6 +1347,7 @@ export default function App() {
       if (res.ok) {
         setIsComposing(false);
         setComposeTo('');
+        setComposeRecipients([]);
         setComposeSubject('');
         setComposeBody('');
         await refreshSpmtInbox();
@@ -1410,6 +1436,53 @@ export default function App() {
     } catch {
       alert('Failed to connect to spmt.live');
     }
+  };
+
+  const openForumThread = async (threadId: string) => {
+    const response = await fetch(`${spmtBaseUrl}/api/forum/threads/${threadId}`);
+    const data = response.ok ? await response.json() : null;
+    if (!data?.thread) {
+      alert('Could not load forum thread');
+      return;
+    }
+    setActiveForumThread(data.thread);
+    setActiveForumPosts(Array.isArray(data.posts) ? data.posts : []);
+    setIsCreatingThread(false);
+  };
+
+  const handleForumReply = async (event: React.FormEvent) => {
+    event.preventDefault();
+    const token = getStoredSpmtToken();
+    if (!token || !activeForumThread?.id || !forumReplyBody.trim()) return;
+
+    const response = await fetch(`${spmtBaseUrl}/api/forum/threads/${activeForumThread.id}/reply`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      credentials: 'include',
+      body: JSON.stringify({ body: forumReplyBody }),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      alert(data.error || 'Failed to post reply');
+      return;
+    }
+
+    setForumReplyBody('');
+    await openForumThread(activeForumThread.id);
+    fetch('https://spmt.live/api/forum/threads')
+      .then(r => r.ok ? r.json() : [])
+      .then(threads => {
+        setForumThreads(threads.map((t: any) => ({
+          id: t.id,
+          title: t.title,
+          category: t.category,
+          posts: t.post_count || 1,
+          author: t.author,
+          repliedBy: '',
+          isOpen: true,
+        })));
+      })
+      .catch(() => {});
   };
 
   // Define visual styling maps according to active theme preset
@@ -2132,14 +2205,42 @@ export default function App() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
                         <label className="text-[10px] font-mono font-bold text-zinc-400 block mb-1">RECIPIENT HANDLE(S)</label>
-                        <input
-                          type="text"
-                          required
-                          value={composeTo}
-                          onChange={(e) => setComposeTo(e.target.value)}
-                          placeholder="e.g. @mtman or @mtman,@athena,@streamweaver"
-                          className="w-full bg-white/5 border border-white/10 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-orange-500/50"
-                        />
+                        <div className="min-h-[46px] rounded-xl border border-white/10 bg-white/5 px-2 py-2 focus-within:border-orange-500/50">
+                          <div className="flex flex-wrap items-center gap-2">
+                            {composeRecipients.map((recipient) => (
+                              <span key={recipient} className="inline-flex items-center gap-1 rounded-full border border-orange-400/25 bg-orange-400/10 px-2.5 py-1 text-[11px] font-bold text-orange-100">
+                                @{recipient}
+                                <button
+                                  type="button"
+                                  onClick={() => removeComposeRecipient(recipient)}
+                                  className="rounded-full px-1 text-orange-200 hover:bg-orange-300/20 hover:text-white"
+                                  title={`Remove ${recipient}`}
+                                >
+                                  x
+                                </button>
+                              </span>
+                            ))}
+                            <input
+                              type="text"
+                              value={composeTo}
+                              onChange={(e) => setComposeTo(e.target.value)}
+                              onKeyDown={(event) => {
+                                if (event.key === 'Enter' || event.key === ',' || event.key === 'Tab') {
+                                  if (composeTo.trim()) {
+                                    event.preventDefault();
+                                    addComposeRecipient();
+                                  }
+                                } else if (event.key === 'Backspace' && !composeTo && composeRecipients.length > 0) {
+                                  removeComposeRecipient(composeRecipients[composeRecipients.length - 1]);
+                                }
+                              }}
+                              onBlur={() => composeTo.trim() && addComposeRecipient()}
+                              placeholder={composeRecipients.length ? 'Add another handle...' : 'Type a handle and press Enter'}
+                              className="min-w-[180px] flex-1 bg-transparent p-1 text-xs text-white placeholder-zinc-500 outline-none"
+                            />
+                          </div>
+                        </div>
+                        <p className="mt-1 text-[10px] text-zinc-500">Press Enter to add each @spmt.live recipient. Add more than one recipient to start a group chat.</p>
                       </div>
                       <div>
                         <label className="text-[10px] font-mono font-bold text-zinc-400 block mb-1">SUBJECT</label>
@@ -2152,7 +2253,7 @@ export default function App() {
                         />
                       </div>
                     </div>
-                    {composeTo.includes(',') && (
+                    {composeRecipients.length > 1 && (
                       <div>
                         <label className="text-[10px] font-mono font-bold text-zinc-400 block mb-1">GROUP TITLE</label>
                         <input
@@ -2588,10 +2689,56 @@ export default function App() {
                   </form>
                 ) : (
                   <div className="flex flex-col gap-2">
+                    {activeForumThread && (
+                      <div className="mb-3 rounded-2xl border border-purple-400/20 bg-purple-400/[0.04] p-4">
+                        <div className="mb-3 flex items-start justify-between gap-3">
+                          <div>
+                            <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-purple-300">{activeForumThread.category}</span>
+                            <h3 className="mt-1 text-base font-bold text-white">{activeForumThread.title}</h3>
+                            <p className="mt-1 text-[10px] text-zinc-500">Started by @{activeForumThread.author}</p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setActiveForumThread(null);
+                              setActiveForumPosts([]);
+                              setForumReplyBody('');
+                            }}
+                            className="rounded-lg border border-white/10 bg-black/30 px-2 py-1 text-[10px] font-bold text-zinc-300"
+                          >
+                            Close
+                          </button>
+                        </div>
+                        <div className="flex max-h-[420px] flex-col gap-2 overflow-y-auto pr-1">
+                          {activeForumPosts.map((post) => (
+                            <div key={post.id} className="rounded-xl border border-white/10 bg-black/25 p-3">
+                              <div className="mb-1 flex flex-wrap items-center gap-2">
+                                <span className="text-xs font-bold text-white">@{post.author}</span>
+                                <span className="text-[10px] text-zinc-500">{new Date(post.created_at).toLocaleString()}</span>
+                              </div>
+                              <p className="whitespace-pre-wrap text-xs leading-relaxed text-zinc-300">{post.body}</p>
+                            </div>
+                          ))}
+                        </div>
+                        <form onSubmit={handleForumReply} className="mt-3 flex flex-col gap-2">
+                          <textarea
+                            rows={3}
+                            value={forumReplyBody}
+                            onChange={(event) => setForumReplyBody(event.target.value)}
+                            placeholder="Reply to this forum thread..."
+                            className="w-full rounded-xl border border-white/10 bg-black/25 px-3 py-2 text-xs text-white outline-none focus:border-purple-400/50"
+                          />
+                          <button type="submit" className="self-start rounded-xl bg-purple-600 px-4 py-2 text-xs font-bold text-white">
+                            Post Reply
+                          </button>
+                        </form>
+                      </div>
+                    )}
                     {forumThreads.map((t) => (
                       <div
                         key={t.id}
-                        className="p-4 rounded-2xl border border-white/5 flex items-center justify-between gap-4"
+                        onClick={() => openForumThread(t.id)}
+                        className="p-4 rounded-2xl border border-white/5 flex items-center justify-between gap-4 cursor-pointer hover:border-purple-400/25"
                         style={{ background: 'var(--chat-surface-bg)' }}
                       >
                         <div className="flex flex-col">
