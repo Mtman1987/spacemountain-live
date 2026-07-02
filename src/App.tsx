@@ -693,6 +693,8 @@ export default function App() {
   const [composeBody, setComposeBody] = useState('');
   const [isComposing, setIsComposing] = useState(false);
   const [commlinkNotifications, setCommlinkNotifications] = useState<CommlinkNotification[]>([]);
+  const [commlinkSearch, setCommlinkSearch] = useState('');
+  const [commlinkFilter, setCommlinkFilter] = useState<'all' | 'unread' | 'direct' | 'app'>('all');
 
   const getSpmtHandle = () => {
     if (identity?.username) return identity.username;
@@ -711,7 +713,11 @@ export default function App() {
     const token = getStoredSpmtToken();
     if (token) {
       const [conversationResponse, notificationResponse] = await Promise.all([
-        fetch(`${spmtBaseUrl}/api/conversations`, {
+        fetch(`${spmtBaseUrl}/api/messages?${new URLSearchParams({
+          ...(commlinkSearch.trim() ? { q: commlinkSearch.trim() } : {}),
+          ...(commlinkFilter === 'unread' ? { unread: 'true' } : {}),
+          ...(commlinkFilter === 'direct' || commlinkFilter === 'app' ? { type: commlinkFilter } : {}),
+        }).toString()}`, {
           headers: { Authorization: `Bearer ${token}` },
           credentials: 'include',
         }),
@@ -720,22 +726,24 @@ export default function App() {
           credentials: 'include',
         }),
       ]);
-      const conversationData = conversationResponse.ok ? await conversationResponse.json() : { conversations: [] };
+      const messageData = conversationResponse.ok ? await conversationResponse.json() : { messages: [] };
       const notificationData = notificationResponse.ok ? await notificationResponse.json() : { notifications: [] };
-      const conversations = Array.isArray(conversationData?.conversations) ? conversationData.conversations : [];
+      const messages = Array.isArray(messageData?.messages) ? messageData.messages : [];
       const nextNotifications = Array.isArray(notificationData?.notifications) ? notificationData.notifications : [];
 
       setCommlinkNotifications(nextNotifications);
-      setMails(conversations.map((conversation: any) => ({
-        id: conversation.id,
+      setMails(messages.map((message: any) => ({
+        id: message.id,
         folder: 'commlink',
-        from: conversation.type === 'group' ? 'Group conversation' : 'Direct conversation',
-        to: identity?.handle || identity?.username || '@spmt.live',
-        subject: conversation.title || 'Commlink thread',
-        preview: `${conversation.last_message || ''}`.slice(0, 70),
-        body: conversation.last_message || 'No messages yet.',
-        time: new Date(conversation.updated_at || conversation.created_at || Date.now()).toLocaleString(),
-        tag: Number(conversation.unread_count || 0) > 0 ? `${conversation.unread_count} unread` : conversation.type || 'SPMT',
+        from: `@${message.from_user || 'spmt'}`,
+        to: `@${message.to_user || identity?.username || 'spmt'}`,
+        subject: message.subject || 'Commlink message',
+        preview: `${message.body || ''}`.slice(0, 70),
+        body: message.body || 'No message body.',
+        time: new Date(message.created_at || Date.now()).toLocaleString(),
+        tag: message.read_at ? (message.message_type || 'SPMT') : 'unread',
+        attachments: message.attachments ? JSON.parse(message.attachments) : [],
+        mentions: message.mentioned_users ? JSON.parse(message.mentioned_users) : [],
       })));
       return;
     }
@@ -2066,6 +2074,37 @@ export default function App() {
                   </form>
                 ) : (
                   <div className="flex flex-col gap-2">
+                    <div className="mb-3 grid grid-cols-1 gap-2 md:grid-cols-[1fr_auto]">
+                      <input
+                        type="search"
+                        value={commlinkSearch}
+                        onChange={(event) => setCommlinkSearch(event.target.value)}
+                        onKeyDown={(event) => {
+                          if (event.key === 'Enter') refreshSpmtInbox().catch(() => {});
+                        }}
+                        placeholder="Search Commlink messages..."
+                        className="w-full rounded-xl border border-white/10 bg-black/25 px-3 py-2 text-xs text-white outline-none focus:border-cyan-400/50"
+                      />
+                      <div className="flex flex-wrap gap-2">
+                        {(['all', 'unread', 'direct', 'app'] as const).map((filter) => (
+                          <button
+                            key={filter}
+                            type="button"
+                            onClick={() => setCommlinkFilter(filter)}
+                            className={`rounded-xl border px-3 py-2 text-[10px] font-bold uppercase ${commlinkFilter === filter ? 'border-cyan-400/50 bg-cyan-400/10 text-cyan-200' : 'border-white/10 bg-black/25 text-zinc-400'}`}
+                          >
+                            {filter}
+                          </button>
+                        ))}
+                        <button
+                          type="button"
+                          onClick={() => refreshSpmtInbox().catch(() => {})}
+                          className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-[10px] font-bold uppercase text-zinc-300"
+                        >
+                          Search
+                        </button>
+                      </div>
+                    </div>
                     {commlinkNotifications.length > 0 && (
                       <div className="mb-3 rounded-2xl border border-cyan-400/15 bg-cyan-400/[0.04] p-4">
                         <div className="mb-3 flex items-center justify-between gap-3">
@@ -2107,6 +2146,24 @@ export default function App() {
                           </div>
                           <span className="text-xs font-bold text-orange-400 mt-1">{m.subject}</span>
                           <p className="text-xs text-zinc-400 mt-1.5 leading-relaxed">{m.body}</p>
+                          {Array.isArray(m.mentions) && m.mentions.length > 0 && (
+                            <div className="mt-2 flex flex-wrap gap-1">
+                              {m.mentions.map((mention: any) => (
+                                <span key={mention.id || mention.username} className="rounded-full border border-cyan-400/20 bg-cyan-400/10 px-2 py-0.5 text-[10px] font-bold text-cyan-200">
+                                  @{mention.username}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                          {Array.isArray(m.attachments) && m.attachments.length > 0 && (
+                            <div className="mt-2 flex flex-wrap gap-2">
+                              {m.attachments.map((attachment: any) => (
+                                <a key={attachment.url} href={attachment.url} target="_blank" rel="noreferrer" className="rounded-lg border border-white/10 bg-white/[0.04] px-2 py-1 text-[10px] font-bold text-zinc-300 no-underline hover:text-white">
+                                  {attachment.name || attachment.type || 'Attachment'}
+                                </a>
+                              ))}
+                            </div>
+                          )}
                         </div>
                         <button
                           onClick={() => setMails(prev => prev.filter(x => x.id !== m.id))}
