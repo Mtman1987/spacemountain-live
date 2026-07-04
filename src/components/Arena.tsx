@@ -136,7 +136,7 @@ export default function Arena({ accentColor, points, username, displayName, onSp
 
   const visibleKills = Math.max(localStats.kills, ...players.map((p) => p.kills || 0), 0);
   const visibleDeaths = Math.max(localStats.deaths, ...players.map((p) => p.deaths || 0), 0);
-  const level = visibleKills;
+  const level = Math.max(Number(points) || 0, visibleKills);
 
   const weaponStatus = useMemo(() => {
     if (selectedWeapon === 'bullet') return `${inventory.bullets} bullets`;

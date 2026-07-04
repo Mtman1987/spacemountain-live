@@ -117,8 +117,8 @@ export default function MainAppSuite({ tools, onTriggerAction, accentColor, pref
         {tools.map((tool) => {
           const icon = appIcons[tool.id] || '✦';
           const label = tool.miniLabel || 'Sub Module';
-          const appLink = tool.authUrl || tool.appUrl || tool.route;
-          const isExternal = Boolean(tool.authUrl || tool.appUrl);
+          const appLink = tool.appUrl || tool.authUrl || tool.route;
+          const isExternal = Boolean(tool.appUrl || tool.authUrl);
           const isLive = tool.statusType === 'live';
           const isAvailable = isLive || !tool.healthUrl;
 

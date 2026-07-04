@@ -609,8 +609,8 @@ export default function App() {
       if (!app) return tool;
       return {
         ...tool,
-        appUrl: app.url || tool.appUrl,
-        authUrl: app.authUrl || tool.authUrl || app.url || tool.appUrl,
+        appUrl: app.url || tool.appUrl || app.authUrl,
+        authUrl: tool.authUrl || app.authUrl || app.url || tool.appUrl,
         installed: app.installed,
         enabled: app.enabled,
         permissions: app.permissions,
@@ -634,7 +634,7 @@ export default function App() {
         statusType: app.status === 'connected' || app.status === 'bridge-ready' ? 'live' : 'default',
         route: '/apps',
         pointsFlow: 0,
-        appUrl: app.url,
+        appUrl: app.url || app.authUrl,
         authUrl: app.authUrl || app.url,
         healthUrl: null,
         installed: app.installed,
@@ -2756,7 +2756,7 @@ export default function App() {
                               Disable
                             </button>
                           )}
-                          <a href={app.authUrl || app.url} target="_blank" rel="noreferrer" className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-bold text-zinc-300 no-underline hover:text-white">
+                          <a href={app.url || app.authUrl} target="_blank" rel="noreferrer" className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-bold text-zinc-300 no-underline hover:text-white">
                             Launch
                           </a>
                         </div>
