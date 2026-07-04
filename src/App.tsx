@@ -898,6 +898,16 @@ export default function App() {
   const [athenaOs, setAthenaOs] = useState<any | null>(null);
   const [platformInfo, setPlatformInfo] = useState<any | null>(null);
   const [bridgeRemoteResults, setBridgeRemoteResults] = useState<any | null>(null);
+  const [platformDocs, setPlatformDocs] = useState<any | null>(null);
+  const [platformPlugins, setPlatformPlugins] = useState<any[]>([]);
+  const [bridgeSections, setBridgeSections] = useState<Record<string, boolean>>({
+    operations: true,
+    search: true,
+    workspace: true,
+    platform: true,
+    stage: true,
+  });
+  const [voiceStatus, setVoiceStatus] = useState<'ready' | 'listening' | 'unsupported' | 'error'>('ready');
   const notify = (title: string, body: string) => {
     setNotifications((items) => [{ id: Date.now(), title, body, createdAt: new Date().toISOString() }, ...items].slice(0, 8));
   };
@@ -915,6 +925,9 @@ export default function App() {
   };
   const updateEmbedSlot = (slotId: number, patch: Partial<EmbedSlot>) => {
     setEmbedSlots((slots) => slots.map((slot) => slot.id === slotId ? { ...slot, ...patch } : slot));
+  };
+  const toggleBridgeSection = (section: string) => {
+    setBridgeSections((current) => ({ ...current, [section]: !current[section] }));
   };
   const runBridgeCommand = (command: string) => {
     const clean = command.trim().toLowerCase();
@@ -941,6 +954,7 @@ export default function App() {
   const startVoiceCommander = () => {
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (!SpeechRecognition) {
+      setVoiceStatus('unsupported');
       setVoiceTranscript('Voice input is not available in this browser. Type the command in Athena instead.');
       return;
     }
@@ -950,13 +964,23 @@ export default function App() {
     recognition.interimResults = false;
     recognition.maxAlternatives = 1;
     setVoiceListening(true);
+    setVoiceStatus('listening');
     recognition.onresult = (event: any) => {
       const transcript = event.results?.[0]?.[0]?.transcript || '';
       setVoiceTranscript(transcript);
+      setVoiceStatus('ready');
       runBridgeCommand(transcript);
     };
-    recognition.onerror = () => setVoiceTranscript('Voice command failed. Try again or use Athena text input.');
-    recognition.onend = () => setVoiceListening(false);
+    recognition.onerror = (event: any) => {
+      setVoiceStatus('error');
+      setVoiceTranscript(event?.error === 'not-allowed'
+        ? 'Microphone permission was blocked. Allow microphone access or use Athena text input.'
+        : 'Voice command failed. Try again or use Athena text input.');
+    };
+    recognition.onend = () => {
+      setVoiceListening(false);
+      setVoiceStatus((current) => current === 'listening' ? 'ready' : current);
+    };
     recognition.start();
   };
   useEffect(() => {
@@ -1149,6 +1173,14 @@ export default function App() {
       .then(res => res.ok ? res.json() : null)
       .then(data => setPlatformInfo(data))
       .catch(() => setPlatformInfo(null));
+    fetch(`${spmtBaseUrl}/api/platform/docs`)
+      .then(res => res.ok ? res.json() : null)
+      .then(data => setPlatformDocs(data))
+      .catch(() => setPlatformDocs(null));
+    fetch(`${spmtBaseUrl}/api/platform/plugins`)
+      .then(res => res.ok ? res.json() : null)
+      .then(data => setPlatformPlugins(Array.isArray(data?.plugins) ? data.plugins : []))
+      .catch(() => setPlatformPlugins([]));
 
     // 3. Fetch database aggregates
     fetch('/api/stats')
@@ -1805,6 +1837,9 @@ export default function App() {
       }))
     : [];
   const platformFeatures = Array.isArray(platformInfo?.features) ? platformInfo.features : [];
+  const platformDocSections = Array.isArray(platformDocs?.sections) ? platformDocs.sections : [];
+  const platformScopes = Array.isArray(platformDocs?.scopes) ? platformDocs.scopes : [];
+  const featuredPlugins = platformPlugins.slice(0, 4);
 
   return (
     <div 
@@ -1983,6 +2018,26 @@ export default function App() {
                   </div>
                 </div>
 
+                <div className="flex flex-wrap gap-2">
+                  {[
+                    ['operations', 'Operations'],
+                    ['search', 'Search + AI'],
+                    ['workspace', 'Workspace'],
+                    ['platform', 'Platform'],
+                    ['stage', 'Stage'],
+                  ].map(([id, label]) => (
+                    <button
+                      key={id}
+                      type="button"
+                      onClick={() => toggleBridgeSection(id)}
+                      className={`rounded-lg border px-3 py-2 text-xs font-black ${bridgeSections[id] ? 'border-white/20 bg-white/10 text-white' : 'border-white/10 bg-black/25 text-zinc-500'}`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+
+                {bridgeSections.operations && (
                 <section className="rounded-lg border border-white/10 bg-zinc-950/55 p-4 shadow-[0_0_42px_rgba(0,0,0,0.32)]">
                   <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
                     <div className="space-y-4">
@@ -2090,7 +2145,9 @@ export default function App() {
                     </aside>
                   </div>
                 </section>
+                )}
 
+                {bridgeSections.search && (
                 <section className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.05fr)_minmax(320px,0.95fr)]">
                   <div className="rounded-lg border border-white/10 bg-zinc-950/55 p-4">
                     <div className="flex items-center justify-between gap-3">
@@ -2167,6 +2224,9 @@ export default function App() {
                         </div>
                         <Mic size={18} className={voiceListening ? 'animate-pulse text-emerald-200' : 'text-emerald-300'} />
                       </div>
+                      <p className={`mt-2 text-[11px] font-bold uppercase ${voiceStatus === 'unsupported' || voiceStatus === 'error' ? 'text-amber-300' : voiceStatus === 'listening' ? 'text-emerald-200' : 'text-zinc-500'}`}>
+                        {voiceStatus === 'unsupported' ? 'Browser unsupported' : voiceStatus === 'error' ? 'Needs attention' : voiceStatus === 'listening' ? 'Listening now' : 'Ready'}
+                      </p>
                       <div className="mt-3 flex gap-2">
                         <button
                           type="button"
@@ -2190,7 +2250,9 @@ export default function App() {
                     </div>
                   </div>
                 </section>
+                )}
 
+                {bridgeSections.workspace && (
                 <section className="rounded-lg border border-white/10 bg-zinc-950/55 p-4">
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div>
@@ -2219,7 +2281,9 @@ export default function App() {
                     ))}
                   </div>
                 </section>
+                )}
 
+                {bridgeSections.platform && (
                 <section className="grid grid-cols-1 gap-4 xl:grid-cols-2">
                   <div className="rounded-lg border border-white/10 bg-zinc-950/55 p-4">
                     <div className="flex items-center justify-between gap-3">
@@ -2284,8 +2348,73 @@ export default function App() {
                       </p>
                     </div>
                   </div>
-                </section>
 
+                  <div className="rounded-lg border border-white/10 bg-zinc-950/55 p-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-[11px] font-bold uppercase text-sky-300">Developer Docs</p>
+                        <h2 className="text-base font-black text-white">Public API guide</h2>
+                      </div>
+                      <HelpCircle size={18} className="text-sky-300" />
+                    </div>
+                    <div className="mt-3 space-y-2">
+                      {(platformDocSections.length ? platformDocSections : [
+                        { id: 'auth', title: 'OAuth Apps', summary: 'Shared SPMT identity for ecosystem apps.', endpoints: ['/api/oauth/authorize'] },
+                        { id: 'apps', title: 'App Registry', summary: 'Read and launch registered apps.', endpoints: ['/api/apps'] },
+                      ]).slice(0, 5).map((section: any) => (
+                        <div key={section.id} className="rounded-md border border-white/10 bg-black/25 p-3">
+                          <div className="flex items-center justify-between gap-3">
+                            <p className="text-xs font-black text-white">{section.title}</p>
+                            <span className="rounded-full border border-sky-300/20 px-2 py-0.5 text-[9px] font-bold uppercase text-sky-200">{section.path}</span>
+                          </div>
+                          <p className="mt-1 text-xs leading-relaxed text-zinc-500">{section.summary}</p>
+                          <p className="mt-2 truncate text-[10px] font-mono text-zinc-600">{(section.endpoints || []).join('  ')}</p>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="mt-3 flex flex-wrap gap-1">
+                      {platformScopes.slice(0, 7).map((scope: string) => (
+                        <span key={scope} className="rounded-full border border-white/10 bg-white/[0.04] px-2 py-0.5 text-[9px] font-bold text-zinc-300">{scope}</span>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="rounded-lg border border-white/10 bg-zinc-950/55 p-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-[11px] font-bold uppercase text-emerald-300">Plugin Marketplace</p>
+                        <h2 className="text-base font-black text-white">Installable platform skills</h2>
+                      </div>
+                      <Sliders size={18} className="text-emerald-300" />
+                    </div>
+                    <div className="mt-3 grid grid-cols-1 gap-2">
+                      {(featuredPlugins.length ? featuredPlugins : [
+                        { id: 'athena-briefs', name: 'Athena Briefs', category: 'AI', description: 'Creator briefs from app status and Commlink.', scopes: ['athena:write'] },
+                      ]).map((plugin: any) => (
+                        <div key={plugin.id} className="rounded-md border border-white/10 bg-black/25 p-3">
+                          <div className="flex items-center justify-between gap-3">
+                            <div className="min-w-0">
+                              <p className="truncate text-xs font-black text-white">{plugin.name}</p>
+                              <p className="mt-1 text-[10px] uppercase text-emerald-300">{plugin.category}</p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => notify('Plugin selected', `${plugin.name} is ready to install after sign-in.`)}
+                              className="shrink-0 rounded-lg border border-emerald-300/25 bg-emerald-300/10 px-2 py-1 text-[10px] font-black text-emerald-200"
+                            >
+                              Manage
+                            </button>
+                          </div>
+                          <p className="mt-2 line-clamp-2 text-xs text-zinc-500">{plugin.description}</p>
+                          <p className="mt-2 truncate text-[10px] font-mono text-zinc-600">{(plugin.scopes || []).join(', ')}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </section>
+                )}
+
+                {bridgeSections.stage && (
                 <button
                   id="arenaRocketTrigger"
                   type="button"
@@ -2321,6 +2450,7 @@ export default function App() {
                     </p>
                   </div>
                 </button>
+                )}
 
                 <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_340px] gap-4">
                   <section className="rounded-lg border border-white/10 bg-zinc-950/50 overflow-hidden">
