@@ -9,6 +9,8 @@ import { users, communityTools, userPreferences } from './src/db/schema.js';
 import { eq } from 'drizzle-orm';
 
 const PORT = Number(process.env.PORT || 3000);
+const DSH_COMMUNITY_SPOTLIGHT_URL = process.env.DSH_COMMUNITY_SPOTLIGHT_URL || 'https://discord-stream-hub-new.fly.dev/api/community-spotlight';
+const DSH_COMMUNITY_ONLINE_URL = process.env.DSH_COMMUNITY_ONLINE_URL || 'https://discord-stream-hub-new.fly.dev/api/community-online';
 
 type AppStatusType = 'live' | 'warn' | 'pink' | 'default';
 
@@ -380,6 +382,105 @@ function mapCommunityShoutoutRow(row: any) {
     updatedAt: row.updatedAt,
     createdAt: row.createdAt,
   };
+}
+
+async function fetchDshCommunityStatus() {
+  const urls = [DSH_COMMUNITY_SPOTLIGHT_URL, DSH_COMMUNITY_ONLINE_URL].filter(Boolean);
+  for (const url of urls) {
+    try {
+      const response = await fetch(url, { signal: AbortSignal.timeout(2500) });
+      if (!response.ok) continue;
+      const data = await response.json();
+      const users = Array.isArray(data?.users) ? data.users : [];
+      return {
+        source: data?.source || 'discord-stream-hub',
+        users,
+        spotlight: data?.spotlight || null,
+      };
+    } catch (error) {
+      console.warn('[Community] DSH status fetch failed:', url, error);
+    }
+  }
+  return null;
+}
+
+function normalizeIdentity(value: any) {
+  return String(value || '').trim().toLowerCase();
+}
+
+function rowMatchesDshUser(row: any, user: any) {
+  const rowDiscordId = normalizeIdentity(row.discordUserId);
+  const rowTwitchLogin = normalizeIdentity(row.twitchLogin);
+  const userDiscordId = normalizeIdentity(user.id || user.discordUserId || user.userId);
+  const userTwitchLogin = normalizeIdentity(user.twitchLogin || user.twitchUsername || user.login);
+  return Boolean((rowDiscordId && userDiscordId && rowDiscordId === userDiscordId) || (rowTwitchLogin && userTwitchLogin && rowTwitchLogin === userTwitchLogin));
+}
+
+function reconcileCommunityRowsWithDsh(rows: any[], dshStatus: any) {
+  const users = Array.isArray(dshStatus?.users) ? dshStatus.users : [];
+  if (users.length === 0) {
+    return { rows, liveRows: rows.filter((row: any) => row.isLive) };
+  }
+
+  const rowsWithDshState = rows.map((row: any) => {
+    const liveUser = users.find((user: any) => rowMatchesDshUser(row, user));
+    return {
+      ...row,
+      isLive: Boolean(liveUser),
+      groupName: liveUser?.group || row.groupName,
+    };
+  });
+
+  const liveRows = rowsWithDshState.filter((row: any) => row.isLive);
+  const existingKeys = new Set(liveRows.map((row: any) => `${normalizeIdentity(row.discordUserId)}:${normalizeIdentity(row.twitchLogin)}`));
+  const syntheticRows = users
+    .filter((user: any) => {
+      const key = `${normalizeIdentity(user.id || user.discordUserId)}:${normalizeIdentity(user.twitchLogin)}`;
+      return !existingKeys.has(key);
+    })
+    .map((user: any) => ({
+      id: `dsh_live_${user.id || user.twitchLogin}`,
+      category: 'mountaineers',
+      groupName: user.group || 'Community',
+      twitchLogin: user.twitchLogin || null,
+      displayName: user.username || user.displayName || user.twitchLogin || 'Live creator',
+      title: null,
+      description: 'Live in Discord Stream Hub.',
+      gameName: null,
+      viewerCount: 0,
+      streamUrl: user.twitchLogin ? `https://twitch.tv/${user.twitchLogin}` : null,
+      avatarUrl: user.avatarUrl || getTwitchAvatarFallback(user.twitchLogin),
+      imageUrl: null,
+      videoUrl: null,
+      bannerUrl: null,
+      sourceMessageUrl: null,
+      discordUserId: user.id || user.discordUserId || null,
+      serverId: dshStatus?.serverId || null,
+      isLive: true,
+      isSpotlight: false,
+      startedAt: null,
+      updatedAt: new Date().toISOString(),
+      createdAt: new Date().toISOString(),
+    }));
+
+  return {
+    rows: [...rowsWithDshState, ...syntheticRows],
+    liveRows: [...liveRows, ...syntheticRows],
+  };
+}
+
+function getDshSpotlightRows(liveRows: any[], dshStatus: any) {
+  const spotlight = dshStatus?.spotlight;
+  const spotlightUser = spotlight?.user;
+  const spotlightId = normalizeIdentity(spotlight?.userId || spotlightUser?.id);
+  const spotlightLogin = normalizeIdentity(spotlight?.twitchLogin || spotlightUser?.twitchLogin);
+  if (spotlightId || spotlightLogin) {
+    const matched = liveRows.find((row: any) => {
+      return (spotlightId && normalizeIdentity(row.discordUserId) === spotlightId) || (spotlightLogin && normalizeIdentity(row.twitchLogin) === spotlightLogin);
+    });
+    if (matched) return [{ ...matched, isSpotlight: true, category: 'spotlight' }];
+  }
+  return liveRows.filter((row: any) => row.isSpotlight || row.category === 'spotlight');
 }
 
 function normalizeMessageHandle(value: unknown, fallback = 'spmtmessaging') {
@@ -801,7 +902,7 @@ async function startServer() {
     }
   });
 
-  app.get('/api/community/shoutouts', (req, res) => {
+  app.get('/api/community/shoutouts', async (req, res) => {
     try {
       const rows = sqlite.prepare(`
         SELECT
@@ -831,27 +932,31 @@ async function startServer() {
         ORDER BY datetime(updated_at) DESC, datetime(created_at) DESC
         LIMIT 80
       `).all().map(mapCommunityShoutoutRow);
+      const dshStatus = await fetchDshCommunityStatus();
+      const reconciled = reconcileCommunityRowsWithDsh(rows, dshStatus);
+      const displayRows = reconciled.rows;
+      const liveRows = reconciled.liveRows;
 
-      const categoryCounts = rows.reduce((counts: Record<string, number>, row: any) => {
+      const categoryCounts = displayRows.reduce((counts: Record<string, number>, row: any) => {
         counts[row.category] = (counts[row.category] || 0) + 1;
         return counts;
       }, {});
-      const liveRows = rows.filter((row: any) => row.isLive);
-      const spotlight = liveRows.filter((row: any) => row.isSpotlight || row.category === 'spotlight');
+      const spotlight = getDshSpotlightRows(liveRows, dshStatus);
       const partners = liveRows.filter((row: any) => row.category === 'partners');
       const crew = liveRows.filter((row: any) => row.category === 'crew');
       const mountaineers = liveRows.filter((row: any) => !['spotlight', 'partners', 'crew'].includes(row.category));
 
       res.json({
-        shoutouts: rows,
+        shoutouts: displayRows,
         spotlight: spotlight.slice(0, 3),
         partners: partners.slice(0, 8),
         crew: crew.slice(0, 8),
         mountaineers: mountaineers.slice(0, 16),
         analytics: {
-          liveCount: rows.filter((row: any) => row.isLive).length,
-          totalViewers: rows.reduce((sum: number, row: any) => sum + (Number(row.viewerCount) || 0), 0),
-          lastUpdatedAt: rows[0]?.updatedAt || null,
+          liveCount: liveRows.length,
+          totalViewers: liveRows.reduce((sum: number, row: any) => sum + (Number(row.viewerCount) || 0), 0),
+          lastUpdatedAt: displayRows[0]?.updatedAt || null,
+          liveSource: dshStatus?.source || 'spacemountain-cache',
           categoryCounts,
         },
       });
