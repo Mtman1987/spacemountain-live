@@ -983,6 +983,26 @@ export default function App() {
     };
     recognition.start();
   };
+  const managePlatformPlugin = async (plugin: any) => {
+    const token = getStoredSpmtToken();
+    if (!token) {
+      notify('Sign in required', 'Sign in with SPMT to install platform plugins.');
+      return;
+    }
+
+    try {
+      const response = await fetch(`${spmtBaseUrl}/api/platform/plugins/${plugin.id}/install`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        credentials: 'include',
+      });
+      if (!response.ok) throw new Error('Plugin install failed');
+      setPlatformPlugins((plugins) => plugins.map((item) => item.id === plugin.id ? { ...item, installed: true, enabled: true } : item));
+      notify('Plugin installed', `${plugin.name} is enabled for your SPMT account.`);
+    } catch {
+      notify('Plugin install failed', `${plugin.name} could not be enabled right now.`);
+    }
+  };
   useEffect(() => {
     const token = getStoredSpmtToken();
     const query = bridgeSearch.trim();
@@ -2399,10 +2419,10 @@ export default function App() {
                             </div>
                             <button
                               type="button"
-                              onClick={() => notify('Plugin selected', `${plugin.name} is ready to install after sign-in.`)}
-                              className="shrink-0 rounded-lg border border-emerald-300/25 bg-emerald-300/10 px-2 py-1 text-[10px] font-black text-emerald-200"
+                              onClick={() => managePlatformPlugin(plugin)}
+                              className={`shrink-0 rounded-lg border px-2 py-1 text-[10px] font-black ${plugin.installed ? 'border-white/10 bg-white/[0.04] text-zinc-300' : 'border-emerald-300/25 bg-emerald-300/10 text-emerald-200'}`}
                             >
-                              Manage
+                              {plugin.installed ? 'Enabled' : 'Install'}
                             </button>
                           </div>
                           <p className="mt-2 line-clamp-2 text-xs text-zinc-500">{plugin.description}</p>
