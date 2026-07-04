@@ -743,6 +743,24 @@ async function startServer() {
     }
   });
 
+  app.post('/api/integrations/dsh/points/:action', async (req, res) => {
+    const action = String(req.params.action || '');
+    if (!['balance', 'add', 'set'].includes(action)) {
+      return res.status(404).json({ error: 'Unknown DSH points action' });
+    }
+
+    try {
+      const result = await fetchJsonFromApp(`https://discord-stream-hub-new.fly.dev/api/points/${action}`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${process.env.DSH_POINTS_TOKEN || '1234'}` },
+        body: JSON.stringify(req.body || {}),
+      });
+      res.status(result.status).json(result.payload);
+    } catch (err) {
+      res.status(502).json({ error: 'Could not reach Discord Stream Hub points route' });
+    }
+  });
+
   // ─── Integration Hub Routes ───
   app.get('/api/integrations/hearmeout/rooms', async (req, res) => {
     try {

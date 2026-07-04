@@ -510,9 +510,9 @@ export default function App() {
         .then(r => r.ok ? r.json() : null)
         .then(spmtUser => {
           if (!spmtUser?.discord_id) return;
-          return fetch('https://discord-stream-hub-new.fly.dev/api/points/balance', {
+          return fetch('/api/integrations/dsh/points/balance', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer 1234' },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ userId: spmtUser.discord_id, username: user.username }),
           });
         })
@@ -897,6 +897,7 @@ export default function App() {
   const [voiceListening, setVoiceListening] = useState(false);
   const [athenaOs, setAthenaOs] = useState<any | null>(null);
   const [platformInfo, setPlatformInfo] = useState<any | null>(null);
+  const [bridgeRemoteResults, setBridgeRemoteResults] = useState<any | null>(null);
   const notify = (title: string, body: string) => {
     setNotifications((items) => [{ id: Date.now(), title, body, createdAt: new Date().toISOString() }, ...items].slice(0, 8));
   };
@@ -958,6 +959,31 @@ export default function App() {
     recognition.onend = () => setVoiceListening(false);
     recognition.start();
   };
+  useEffect(() => {
+    const token = getStoredSpmtToken();
+    const query = bridgeSearch.trim();
+    if (!token || query.length < 2) {
+      setBridgeRemoteResults(null);
+      return;
+    }
+
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => {
+      fetch(`${spmtBaseUrl}/api/search?${new URLSearchParams({ q: query, limit: '8' }).toString()}`, {
+        headers: { Authorization: `Bearer ${token}` },
+        credentials: 'include',
+        signal: controller.signal,
+      })
+        .then((res) => res.ok ? res.json() : null)
+        .then((data) => setBridgeRemoteResults(data))
+        .catch(() => {});
+    }, 250);
+
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
+  }, [bridgeSearch]);
   const sendEmbeddedAuth = React.useCallback((frame: HTMLIFrameElement | null) => {
     if (!frame?.contentWindow) return;
     const token = getStoredSpmtToken();
@@ -1237,9 +1263,9 @@ export default function App() {
         if (lookup.ok) {
           const spmtUser = await lookup.json();
           if (spmtUser?.discord_id) {
-            await fetch('https://discord-stream-hub-new.fly.dev/api/points/add', {
+            await fetch('/api/integrations/dsh/points/add', {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json', Authorization: 'Bearer 1234' },
+              headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
                 userId: spmtUser.discord_id,
                 username: user.username,
@@ -1311,9 +1337,9 @@ export default function App() {
       const spmtUser = await lookup.json();
       if (!spmtUser?.discord_id) return false;
 
-      const balanceResponse = await fetch('https://discord-stream-hub-new.fly.dev/api/points/balance', {
+      const balanceResponse = await fetch('/api/integrations/dsh/points/balance', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer 1234' },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId: spmtUser.discord_id, username: user.username, displayName: user.displayName }),
       });
       if (!balanceResponse.ok) return false;
@@ -1322,9 +1348,9 @@ export default function App() {
       if (currentPoints < amount) return false;
 
       const nextPoints = currentPoints - amount;
-      const setResponse = await fetch('https://discord-stream-hub-new.fly.dev/api/points/set', {
+      const setResponse = await fetch('/api/integrations/dsh/points/set', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer 1234' },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           userId: spmtUser.discord_id,
           username: user.username,
@@ -1698,6 +1724,27 @@ export default function App() {
   ];
   const bridgeSearchTerm = bridgeSearch.trim().toLowerCase();
   const bridgeSearchResults = [
+    ...(bridgeRemoteResults?.messages || []).map((message: any) => ({
+      id: `remote-message-${message.id}`,
+      title: message.subject || 'SPMT message',
+      type: 'SPMT',
+      detail: `${message.from_user || 'unknown'}: ${message.body || ''}`,
+      action: () => setActiveTab('inbox'),
+    })),
+    ...(bridgeRemoteResults?.notifications || []).map((item: any) => ({
+      id: `remote-notification-${item.id}`,
+      title: item.title || 'Notification',
+      type: 'Notice',
+      detail: item.body || item.source_app || 'SPMT notification',
+      action: () => setActiveTab('inbox'),
+    })),
+    ...(bridgeRemoteResults?.forums || []).map((thread: any) => ({
+      id: `remote-forum-${thread.id}`,
+      title: thread.title || 'Forum thread',
+      type: 'Forum',
+      detail: thread.category || thread.author || 'SPMT forum',
+      action: () => setActiveTab('forums'),
+    })),
     ...tools.map((tool) => ({
       id: `tool-${tool.id}`,
       title: tool.name,
