@@ -1,20 +1,30 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://ai.google.dev/static/site-assets/images/share-ais-513315318.png" />
-</div>
+# SpaceMountain.live
 
-# Run and deploy your AI Studio app
+SpaceMountain.live is the Command Bridge for the SpaceMountain ecosystem.
 
-This contains everything you need to run your app locally.
+It is the user-facing workspace where creators launch apps, read Commlink messages, manage notifications, view docs, work with Athena, and control connected creator tools.
 
-View your app in AI Studio: https://ai.studio/apps/048ffd31-5f8c-4d75-8a73-c3e5199626c6
+## Relationship To SPMT
 
-## Run Locally
+SPMT is the Creator Cloud.
 
-**Prerequisites:**  Node.js
+SpaceMountain.live is the Command Bridge.
 
+Apps are specialized modules connected through SPMT.
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+## Core Areas
+
+- Dashboard
+- Shipyard
+- Commlink
+- Athena
+- Docs
+- Notifications
+- Docked apps
+- Creator workspace
+
+## Documentation
+
+Start with `docs/DOCS_HOME.md`.
+
+The docs are organized for creators, developers, contributors, and product/marketing work.
