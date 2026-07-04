@@ -613,6 +613,9 @@ export default function App() {
         installed: app.installed,
         enabled: app.enabled,
         permissions: app.permissions,
+        version: app.version,
+        latestVersion: app.latestVersion,
+        updateAvailable: app.updateAvailable,
         statusText: app.installed === false ? 'Available' : app.enabled === false ? 'Disabled' : tool.statusText,
       };
     });
@@ -636,6 +639,9 @@ export default function App() {
         installed: app.installed,
         enabled: app.enabled,
         permissions: app.permissions,
+        version: app.version,
+        latestVersion: app.latestVersion,
+        updateAvailable: app.updateAvailable,
       });
     }
 
@@ -2039,8 +2045,22 @@ export default function App() {
                               <span className={`rounded-full border px-2 py-0.5 text-[9px] font-bold uppercase ${app.installed ? 'border-emerald-400/30 bg-emerald-400/10 text-emerald-300' : 'border-amber-400/30 bg-amber-400/10 text-amber-300'}`}>
                                 {app.installed ? (app.enabled === false ? 'Disabled' : 'Installed') : 'Available'}
                               </span>
+                              {app.version && (
+                                <span className="rounded-full border border-white/10 bg-white/[0.04] px-2 py-0.5 text-[9px] font-bold uppercase text-zinc-300">
+                                  v{app.version}
+                                </span>
+                              )}
+                              <span className={`rounded-full border px-2 py-0.5 text-[9px] font-bold uppercase ${app.updateAvailable ? 'border-sky-300/30 bg-sky-300/10 text-sky-200' : 'border-white/10 bg-white/[0.04] text-zinc-400'}`}>
+                                {app.updateAvailable ? `Update ${app.latestVersion || ''}`.trim() : 'Current'}
+                              </span>
                             </div>
                             <p className="mt-1 text-xs leading-relaxed text-zinc-400">{app.description}</p>
+                            {(app.updatedAt || app.releaseNotes?.length) && (
+                              <p className="mt-2 text-[11px] leading-relaxed text-zinc-500">
+                                {app.updatedAt ? `Updated ${app.updatedAt}` : 'Latest release'}
+                                {app.releaseNotes?.[0] ? ` - ${app.releaseNotes[0]}` : ''}
+                              </p>
+                            )}
                           </div>
                         </div>
                         <div className="mt-3">

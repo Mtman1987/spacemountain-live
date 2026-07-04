@@ -16,6 +16,9 @@ export interface CommunityTool {
   installed?: boolean;
   enabled?: boolean;
   permissions?: string[];
+  version?: string;
+  latestVersion?: string;
+  updateAvailable?: boolean;
 }
 
 export interface DashboardStats {
