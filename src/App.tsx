@@ -902,9 +902,9 @@ export default function App() {
   const [platformPlugins, setPlatformPlugins] = useState<any[]>([]);
   const [bridgeSections, setBridgeSections] = useState<Record<string, boolean>>({
     operations: true,
-    search: true,
+    search: false,
     workspace: true,
-    platform: true,
+    platform: false,
     stage: true,
   });
   const [voiceStatus, setVoiceStatus] = useState<'ready' | 'listening' | 'unsupported' | 'error'>('ready');
@@ -1802,7 +1802,7 @@ export default function App() {
       title: tool.name,
       type: 'App',
       detail: tool.description || tool.statusText,
-      action: () => tool.authUrl || tool.appUrl ? window.open(tool.authUrl || tool.appUrl, '_blank') : setActiveTab(tool.route.replace('/', '') || 'dashboard'),
+      action: () => tool.appUrl || tool.authUrl ? window.open(tool.appUrl || tool.authUrl, '_blank') : setActiveTab(tool.route.replace('/', '') || 'dashboard'),
     })),
     ...mails.slice(0, 8).map((message) => ({
       id: `mail-${message.id}`,
