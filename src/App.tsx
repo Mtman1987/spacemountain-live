@@ -2397,6 +2397,15 @@ export default function App() {
                         <span key={scope} className="rounded-full border border-white/10 bg-white/[0.04] px-2 py-0.5 text-[9px] font-bold text-zinc-300">{scope}</span>
                       ))}
                     </div>
+                    <a
+                      href="/docs.html"
+                      target="_blank"
+                      rel="noreferrer"
+                      className="mt-3 inline-flex items-center gap-2 rounded-lg border border-sky-300/25 bg-sky-300/10 px-3 py-2 text-xs font-black text-sky-100 transition-colors hover:border-sky-200/50 hover:bg-sky-300/15"
+                    >
+                      Open docs
+                      <ArrowRight size={14} />
+                    </a>
                   </div>
 
                   <div className="rounded-lg border border-white/10 bg-zinc-950/55 p-4">
