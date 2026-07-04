@@ -901,11 +901,11 @@ export default function App() {
   const [platformDocs, setPlatformDocs] = useState<any | null>(null);
   const [platformPlugins, setPlatformPlugins] = useState<any[]>([]);
   const [bridgeSections, setBridgeSections] = useState<Record<string, boolean>>({
-    operations: true,
+    operations: false,
     search: false,
-    workspace: true,
+    workspace: false,
     platform: false,
-    stage: true,
+    stage: false,
   });
   const [voiceStatus, setVoiceStatus] = useState<'ready' | 'listening' | 'unsupported' | 'error'>('ready');
   const notify = (title: string, body: string) => {
@@ -1849,6 +1849,12 @@ export default function App() {
     { label: 'Forums', value: `${forumThreads.length + forwardedForumPosts.length} threads`, action: () => setActiveTab('forums') },
     { label: 'Dock Slots', value: `${embedSlots.filter((slot) => !slot.collapsed).length} active`, action: () => setActiveTab('crew') },
   ];
+  const homePageLinks = [
+    { label: 'Shipyard', detail: 'Apps, installs, ChatTag, StreamWeaver, and DSH tools', action: () => setActiveTab('apps') },
+    { label: 'Community', detail: 'Spotlight, crew groups, forums, and forwarded Discord posts', action: () => setActiveTab('forums') },
+    { label: 'Commlink', detail: 'Messages, notifications, and app conversations', action: () => setActiveTab('inbox') },
+    { label: 'Command Bridge', detail: 'Advanced status, search, Athena, and platform panels', action: () => setBridgeSections((current) => ({ ...current, operations: true, search: true, workspace: true })) },
+  ];
   const athenaCapabilities = athenaOs?.capabilities
     ? Object.entries(athenaOs.capabilities).map(([key, value]) => ({
         key,
@@ -2037,6 +2043,89 @@ export default function App() {
                     </button>
                   </div>
                 </div>
+
+                <section className="relative overflow-hidden rounded-lg border border-white/10 bg-black/45 shadow-[0_0_48px_rgba(0,0,0,0.45)]">
+                  <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_18%,rgba(255,255,255,0.16),transparent_34%)]" />
+                  <div className="absolute inset-0 bg-gradient-to-b from-black/5 via-black/35 to-black/80" />
+                  <div className="relative grid min-h-[520px] grid-cols-1 gap-6 px-5 py-8 lg:grid-cols-[minmax(0,0.95fr)_minmax(420px,1.05fr)] lg:px-8">
+                    <div className="flex flex-col justify-center">
+                      <img
+                        src="/assets/space-logo-main.png"
+                        alt="SpaceMountain"
+                        className="h-28 w-auto max-w-[82vw] object-contain drop-shadow-[0_0_28px_rgba(255,255,255,0.22)] md:h-40"
+                      />
+                      <div className="mt-5 inline-flex w-fit items-center gap-2 rounded-full border border-white/10 bg-black/45 px-4 py-2 text-xs font-black uppercase tracking-[0.16em] text-white">
+                        <Rocket size={15} style={{ color: currentTheme.glowHex }} />
+                        Live App Hub
+                      </div>
+                      <p className="mt-4 max-w-xl text-sm leading-relaxed text-zinc-300 md:text-base">
+                        One front door for SPMT identity, docked app workspaces, Commlink, creator tools, and Athena-routed commands.
+                      </p>
+                      <div className="mt-6 flex flex-wrap gap-2">
+                        {homePageLinks.map((link) => (
+                          <button
+                            key={link.label}
+                            type="button"
+                            onClick={link.action}
+                            className="rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-left text-xs font-bold text-zinc-200 hover:border-cyan-300/40 hover:bg-cyan-300/10"
+                            title={link.detail}
+                          >
+                            {link.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <p className="text-[11px] font-bold uppercase text-fuchsia-300">Docked Workspaces</p>
+                          <h2 className="text-base font-black text-white">Your three active embeds</h2>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setActiveTab('crew')}
+                          className="rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-black text-zinc-200 hover:bg-white/10"
+                        >
+                          Edit Slots
+                        </button>
+                      </div>
+                      {embedSlots.map((slot) => (
+                        <div key={slot.id} className={`rounded-lg border bg-zinc-950/70 p-4 ${slot.collapsed ? 'border-white/10' : 'border-fuchsia-300/35'}`}>
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <p className="text-[10px] font-black uppercase text-zinc-500">Slot {slot.id}</p>
+                              <h3 className="mt-1 truncate text-sm font-black text-white">{slot.title}</h3>
+                              <p className="mt-1 truncate text-xs text-zinc-500">{slot.url}</p>
+                            </div>
+                            <span className="rounded-full border border-white/10 bg-white/[0.04] px-2 py-0.5 text-[9px] font-bold uppercase text-zinc-300">
+                              {slot.kind}
+                            </span>
+                          </div>
+                          <div className="mt-4 flex flex-wrap gap-2">
+                            <button
+                              type="button"
+                              onClick={() => updateEmbedSlot(slot.id, { collapsed: false })}
+                              className="rounded-lg bg-fuchsia-300 px-3 py-2 text-xs font-black text-zinc-950"
+                            >
+                              Dock
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setActiveEmbedSlot(slot.id)}
+                              className="rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-bold text-zinc-200 hover:bg-white/10"
+                            >
+                              Use Slot
+                            </button>
+                            <a href={slot.url} target="_blank" rel="noreferrer" className="rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-xs font-bold text-zinc-300 no-underline hover:text-white">
+                              Pop Out
+                            </a>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </section>
 
                 <div className="flex flex-wrap gap-2">
                   {[
