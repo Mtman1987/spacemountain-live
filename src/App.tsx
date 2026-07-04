@@ -895,6 +895,8 @@ export default function App() {
   const [athenaResponse, setAthenaResponse] = useState('Athena is standing by for cross-app commands, routing questions, and creator workflow prompts.');
   const [voiceTranscript, setVoiceTranscript] = useState('');
   const [voiceListening, setVoiceListening] = useState(false);
+  const [athenaOs, setAthenaOs] = useState<any | null>(null);
+  const [platformInfo, setPlatformInfo] = useState<any | null>(null);
   const notify = (title: string, body: string) => {
     setNotifications((items) => [{ id: Date.now(), title, body, createdAt: new Date().toISOString() }, ...items].slice(0, 8));
   };
@@ -1113,6 +1115,14 @@ export default function App() {
       .catch(err => console.error('Tools fetch failed:', err));
 
     refreshSpmtApps().catch(() => {});
+    fetch(`${spmtBaseUrl}/api/athena/os`)
+      .then(res => res.ok ? res.json() : null)
+      .then(data => setAthenaOs(data))
+      .catch(() => setAthenaOs(null));
+    fetch(`${spmtBaseUrl}/api/platform`)
+      .then(res => res.ok ? res.json() : null)
+      .then(data => setPlatformInfo(data))
+      .catch(() => setPlatformInfo(null));
 
     // 3. Fetch database aggregates
     fetch('/api/stats')
@@ -1740,6 +1750,14 @@ export default function App() {
     { label: 'Forums', value: `${forumThreads.length + forwardedForumPosts.length} threads`, action: () => setActiveTab('forums') },
     { label: 'Dock Slots', value: `${embedSlots.filter((slot) => !slot.collapsed).length} active`, action: () => setActiveTab('crew') },
   ];
+  const athenaCapabilities = athenaOs?.capabilities
+    ? Object.entries(athenaOs.capabilities).map(([key, value]) => ({
+        key,
+        label: key.replace(/([A-Z])/g, ' $1').replace(/^./, (char) => char.toUpperCase()),
+        enabled: Boolean(value),
+      }))
+    : [];
+  const platformFeatures = Array.isArray(platformInfo?.features) ? platformInfo.features : [];
 
   return (
     <div 
@@ -2152,6 +2170,72 @@ export default function App() {
                         <span className="mt-2 block text-sm font-black text-white">{item.value}</span>
                       </button>
                     ))}
+                  </div>
+                </section>
+
+                <section className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+                  <div className="rounded-lg border border-white/10 bg-zinc-950/55 p-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-[11px] font-bold uppercase text-violet-300">Athena OS</p>
+                        <h2 className="text-base font-black text-white">Cross-app AI layer</h2>
+                      </div>
+                      <Bot size={18} className="text-violet-300" />
+                    </div>
+                    <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                      {(athenaCapabilities.length ? athenaCapabilities : [
+                        { key: 'sharedMemory', label: 'Shared Memory', enabled: false },
+                        { key: 'appAwareness', label: 'App Awareness', enabled: false },
+                        { key: 'automation', label: 'Automation', enabled: false },
+                        { key: 'creatorAssistant', label: 'Creator Assistant', enabled: false },
+                      ]).map((capability) => (
+                        <div key={capability.key} className="flex items-center justify-between gap-3 rounded-md border border-white/10 bg-black/25 px-3 py-2">
+                          <span className="text-xs font-bold text-zinc-200">{capability.label}</span>
+                          <span className={`text-[10px] font-black uppercase ${capability.enabled ? 'text-emerald-300' : 'text-zinc-500'}`}>
+                            {capability.enabled ? 'Ready' : 'Loading'}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-3">
+                      {(athenaOs?.crew || []).slice(0, 3).map((agent: any) => (
+                        <div key={agent.id} className="rounded-md bg-white/[0.04] p-3">
+                          <p className="text-xs font-black text-white">{agent.name}</p>
+                          <p className="mt-1 text-[10px] uppercase text-zinc-500">{agent.role}</p>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {(athenaOs?.skills || []).slice(0, 4).map((skill: any) => (
+                        <span key={skill.id} className="rounded-full border border-violet-300/20 bg-violet-300/10 px-2 py-1 text-[10px] font-bold text-violet-200">
+                          {skill.name}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="rounded-lg border border-white/10 bg-zinc-950/55 p-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-[11px] font-bold uppercase text-cyan-300">SpaceMountain Platform</p>
+                        <h2 className="text-base font-black text-white">Developer ecosystem</h2>
+                      </div>
+                      <Compass size={18} className="text-cyan-300" />
+                    </div>
+                    <div className="mt-3 grid grid-cols-2 gap-2">
+                      {(platformFeatures.length ? platformFeatures : ['Public SDK', 'Public API', 'Developer Portal', 'Webhooks']).map((feature: string) => (
+                        <div key={feature} className="rounded-md border border-white/10 bg-black/25 px-3 py-2">
+                          <p className="text-xs font-bold text-zinc-200">{feature}</p>
+                          <p className="mt-1 text-[10px] font-black uppercase text-emerald-300">Open</p>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="mt-3 rounded-md border border-cyan-300/20 bg-cyan-300/10 p-3">
+                      <p className="text-xs font-black text-cyan-100">{platformInfo?.name || 'SpaceMountain Platform'}</p>
+                      <p className="mt-1 text-xs text-cyan-100/70">
+                        SDK, public API, OAuth apps, app submissions, plugin marketplace, webhooks, and docs are exposed through SPMT.
+                      </p>
+                    </div>
                   </div>
                 </section>
 
