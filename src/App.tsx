@@ -1602,6 +1602,41 @@ export default function App() {
   const quackverseUpdatedAt = quackverseState?.updatedAt || quackverseState?.state?.updatedAt || quackverseState?.state?.lastUpdatedAt || null;
   const chatTagCurrentName = currentItPlayer?.displayName || currentItPlayer?.twitchUsername || currentItPlayer?.username || currentItPlayer?.name || chatTagState?.currentIt || 'Free for all';
   const chatTagLastEventTime = recentTags[0]?.timestamp || recentTags[0]?.createdAt || chatTagState?.lastTagTime || null;
+  const commandWidgets = [
+    { label: 'Online Apps', value: `${stats.onlineApps}/${stats.checkedApps || tools.length || 0}`, tone: 'text-emerald-300' },
+    { label: 'Unread', value: commlinkNotifications.filter((item) => !item.read_at).length.toLocaleString(), tone: 'text-sky-300' },
+    { label: 'Live Shoutouts', value: liveShoutouts.length.toLocaleString(), tone: 'text-amber-300' },
+    { label: 'Dock Slots', value: embedSlots.filter((slot) => !slot.collapsed).length.toLocaleString(), tone: 'text-fuchsia-300' },
+  ];
+  const liveStatusTools = tools
+    .filter((tool) => tool.statusType === 'live' || tool.installed || tool.enabled !== undefined)
+    .slice(0, 6);
+  const bridgeActivity = [
+    ...commlinkNotifications.slice(0, 2).map((item) => ({
+      id: `note-${item.id}`,
+      title: item.title || 'Commlink notification',
+      body: item.body || item.source_app || 'SPMT notification',
+      time: formatShoutoutTime(item.created_at),
+    })),
+    ...recentTags.slice(0, 2).map((event: any, index) => ({
+      id: `tag-${event.id || index}`,
+      title: 'ChatTag event',
+      body: formatChatTagEvent(event),
+      time: formatRelativeMinutes(event.timestamp || event.createdAt),
+    })),
+    ...forwardedForumPosts.slice(0, 2).map((post: any, index) => ({
+      id: `forum-${post.id || index}`,
+      title: post.sourceChannelName || 'Forum forward',
+      body: post.title || post.content || 'New forwarded post',
+      time: formatShoutoutTime(post.postedAt || post.createdAt),
+    })),
+  ].slice(0, 5);
+  const commandDockTargets = [
+    { title: 'DSH Dashboard', url: dshDashboardUrl, kind: 'dashboard' as const },
+    { title: 'StreamWeaver Commands', url: streamweaverCommandsUrl, kind: 'app' as const },
+    { title: 'Quackverse Game', url: '/chat-tag/quackverse', kind: 'game' as const },
+    { title: 'HearMeOut Rooms', url: 'https://hearmeout-main.fly.dev', kind: 'app' as const },
+  ];
 
   return (
     <div 
@@ -1755,10 +1790,10 @@ export default function App() {
                 <div className="flex flex-wrap items-center justify-between gap-4 border-b border-white/10 pb-4">
                   <div>
                     <h1 className="text-2xl md:text-4xl font-display font-black tracking-tight text-white">
-                      SpaceMountain Live Stage
+                      SpaceMountain Command Bridge
                     </h1>
                     <p className="mt-1 max-w-2xl text-sm text-zinc-400">
-                      Discord Stream Hub shoutouts land here first, then branch into ChatTag, Quackverse, rooms, forums, and the rest of the ecosystem.
+                      The operating dashboard for live apps, docked workspaces, Commlink activity, and ecosystem status.
                     </p>
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
@@ -1779,6 +1814,114 @@ export default function App() {
                     </button>
                   </div>
                 </div>
+
+                <section className="rounded-lg border border-white/10 bg-zinc-950/55 p-4 shadow-[0_0_42px_rgba(0,0,0,0.32)]">
+                  <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+                        {commandWidgets.map((widget) => (
+                          <div key={widget.label} className="rounded-lg border border-white/10 bg-black/30 p-3">
+                            <p className="text-[10px] font-bold uppercase tracking-wide text-zinc-500">{widget.label}</p>
+                            <p className={`mt-2 text-2xl font-black ${widget.tone}`}>{widget.value}</p>
+                          </div>
+                        ))}
+                      </div>
+
+                      <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+                        <div className="rounded-lg border border-white/10 bg-black/25 p-4">
+                          <div className="flex items-center justify-between gap-3">
+                            <div>
+                              <p className="text-[11px] font-bold uppercase text-cyan-300">Live Status</p>
+                              <h2 className="text-base font-black text-white">Registered app health</h2>
+                            </div>
+                            <Activity size={18} className="text-cyan-300" />
+                          </div>
+                          <div className="mt-3 space-y-2">
+                            {liveStatusTools.map((tool) => (
+                              <div key={tool.id} className="flex items-center justify-between gap-3 rounded-md bg-white/[0.04] px-3 py-2 text-xs">
+                                <span className="min-w-0 truncate font-bold text-zinc-200">{tool.name}</span>
+                                <span className={`shrink-0 font-black uppercase ${tool.enabled === false ? 'text-red-300' : tool.installed === false ? 'text-amber-300' : tool.statusType === 'live' ? 'text-emerald-300' : 'text-zinc-400'}`}>
+                                  {tool.enabled === false ? 'Disabled' : tool.installed === false ? 'Available' : tool.statusType === 'live' ? 'Live' : tool.statusText}
+                                </span>
+                              </div>
+                            ))}
+                            {liveStatusTools.length === 0 && (
+                              <p className="text-xs text-zinc-500">No registered app status has loaded yet.</p>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="rounded-lg border border-white/10 bg-black/25 p-4">
+                          <div className="flex items-center justify-between gap-3">
+                            <div>
+                              <p className="text-[11px] font-bold uppercase text-amber-300">Activity Feed</p>
+                              <h2 className="text-base font-black text-white">Recent routing events</h2>
+                            </div>
+                            <MessageSquare size={18} className="text-amber-300" />
+                          </div>
+                          <div className="mt-3 space-y-2">
+                            {bridgeActivity.map((item) => (
+                              <div key={item.id} className="rounded-md bg-white/[0.04] px-3 py-2">
+                                <div className="flex items-center justify-between gap-3">
+                                  <p className="truncate text-xs font-black text-white">{item.title}</p>
+                                  <span className="shrink-0 text-[10px] text-zinc-500">{item.time}</span>
+                                </div>
+                                <p className="mt-1 line-clamp-2 text-xs text-zinc-400">{item.body}</p>
+                              </div>
+                            ))}
+                            {bridgeActivity.length === 0 && (
+                              <p className="text-xs text-zinc-500">Commlink, forum, and game activity will appear here as it arrives.</p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <aside className="rounded-lg border border-white/10 bg-black/30 p-4">
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <p className="text-[11px] font-bold uppercase text-fuchsia-300">Dockable Apps</p>
+                          <h2 className="text-base font-black text-white">Workspace slots</h2>
+                        </div>
+                        <Layout size={18} className="text-fuchsia-300" />
+                      </div>
+                      <div className="mt-3 grid grid-cols-3 gap-2">
+                        {embedSlots.map((slot) => (
+                          <button
+                            key={slot.id}
+                            type="button"
+                            onClick={() => updateEmbedSlot(slot.id, { collapsed: !slot.collapsed })}
+                            className={`rounded-md border px-2 py-2 text-left ${slot.collapsed ? 'border-white/10 bg-white/[0.03]' : 'border-fuchsia-300/40 bg-fuchsia-300/10'}`}
+                            title={`${slot.collapsed ? 'Show' : 'Hide'} ${slot.title}`}
+                          >
+                            <span className="block text-[10px] font-black text-white">Slot {slot.id}</span>
+                            <span className="mt-1 block truncate text-[9px] text-zinc-500">{slot.collapsed ? 'Hidden' : 'Docked'}</span>
+                          </button>
+                        ))}
+                      </div>
+                      <div className="mt-4 space-y-2">
+                        {commandDockTargets.map((target) => (
+                          <button
+                            key={target.title}
+                            type="button"
+                            onClick={() => openEmbeddedApp(target.title, target.url, target.kind)}
+                            className="flex w-full items-center justify-between gap-3 rounded-md border border-white/10 bg-white/[0.04] px-3 py-2 text-left hover:border-fuchsia-300/40 hover:bg-fuchsia-300/10"
+                          >
+                            <span className="text-xs font-bold text-zinc-200">{target.title}</span>
+                            <Play size={13} className="text-fuchsia-300" />
+                          </button>
+                        ))}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setActiveTab('crew')}
+                        className="mt-4 w-full rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-black text-zinc-200 hover:bg-white/10"
+                      >
+                        Manage Dock
+                      </button>
+                    </aside>
+                  </div>
+                </section>
 
                 <button
                   id="arenaRocketTrigger"
