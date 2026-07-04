@@ -3,7 +3,8 @@ import { motion, AnimatePresence } from 'motion/react';
 import { 
   Sparkles, LayoutGrid, Mail, MessageSquare, Headphones, Glasses, Users, 
   Settings, HelpCircle, Rocket, Play, Activity, CheckCircle2, Sliders, 
-  Send, Plus, Trash2, ArrowRight, Heart, RefreshCw, Star, Compass, Volume2, Gamepad2, Eye, Layout 
+  Send, Plus, Trash2, ArrowRight, Heart, RefreshCw, Star, Compass, Volume2, Gamepad2, Eye, Layout,
+  Search, Mic, Bot
 } from 'lucide-react';
 import {
   CommunityTool,
@@ -889,6 +890,11 @@ export default function App() {
   });
   const [activeEmbedSlot, setActiveEmbedSlot] = useState(2);
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
+  const [bridgeSearch, setBridgeSearch] = useState('');
+  const [athenaPrompt, setAthenaPrompt] = useState('');
+  const [athenaResponse, setAthenaResponse] = useState('Athena is standing by for cross-app commands, routing questions, and creator workflow prompts.');
+  const [voiceTranscript, setVoiceTranscript] = useState('');
+  const [voiceListening, setVoiceListening] = useState(false);
   const notify = (title: string, body: string) => {
     setNotifications((items) => [{ id: Date.now(), title, body, createdAt: new Date().toISOString() }, ...items].slice(0, 8));
   };
@@ -906,6 +912,49 @@ export default function App() {
   };
   const updateEmbedSlot = (slotId: number, patch: Partial<EmbedSlot>) => {
     setEmbedSlots((slots) => slots.map((slot) => slot.id === slotId ? { ...slot, ...patch } : slot));
+  };
+  const runBridgeCommand = (command: string) => {
+    const clean = command.trim().toLowerCase();
+    if (!clean) return;
+    if (clean.includes('shipyard') || clean.includes('apps')) setActiveTab('apps');
+    else if (clean.includes('inbox') || clean.includes('message') || clean.includes('commlink')) setActiveTab('inbox');
+    else if (clean.includes('forum')) setActiveTab('forums');
+    else if (clean.includes('room') || clean.includes('hearmeout')) setActiveTab('rooms');
+    else if (clean.includes('arena')) setActiveTab('arena');
+    else if (clean.includes('crew') || clean.includes('workspace')) setActiveTab('crew');
+    else if (clean.includes('dsh') || clean.includes('discord')) openEmbeddedApp('DSH Dashboard', dshDashboardUrl, 'dashboard');
+    else if (clean.includes('streamweaver')) openEmbeddedApp('StreamWeaver Commands', streamweaverCommandsUrl, 'app');
+    else if (clean.includes('quackverse')) openEmbeddedApp('Quackverse Game', '/chat-tag/quackverse', 'game');
+    else notify('Command received', command);
+  };
+  const submitAthenaPrompt = () => {
+    const prompt = athenaPrompt.trim();
+    if (!prompt) return;
+    runBridgeCommand(prompt);
+    setAthenaResponse(`Athena routed "${prompt}" across the Command Bridge. Use the dock, inbox, forums, or app suite panels for the active workspace.`);
+    notify('Athena command routed', prompt);
+    setAthenaPrompt('');
+  };
+  const startVoiceCommander = () => {
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      setVoiceTranscript('Voice input is not available in this browser. Type the command in Athena instead.');
+      return;
+    }
+
+    const recognition = new SpeechRecognition();
+    recognition.lang = 'en-US';
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+    setVoiceListening(true);
+    recognition.onresult = (event: any) => {
+      const transcript = event.results?.[0]?.[0]?.transcript || '';
+      setVoiceTranscript(transcript);
+      runBridgeCommand(transcript);
+    };
+    recognition.onerror = () => setVoiceTranscript('Voice command failed. Try again or use Athena text input.');
+    recognition.onend = () => setVoiceListening(false);
+    recognition.start();
   };
   const sendEmbeddedAuth = React.useCallback((frame: HTMLIFrameElement | null) => {
     if (!frame?.contentWindow) return;
@@ -1637,6 +1686,60 @@ export default function App() {
     { title: 'Quackverse Game', url: '/chat-tag/quackverse', kind: 'game' as const },
     { title: 'HearMeOut Rooms', url: 'https://hearmeout-main.fly.dev', kind: 'app' as const },
   ];
+  const bridgeSearchTerm = bridgeSearch.trim().toLowerCase();
+  const bridgeSearchResults = [
+    ...tools.map((tool) => ({
+      id: `tool-${tool.id}`,
+      title: tool.name,
+      type: 'App',
+      detail: tool.description || tool.statusText,
+      action: () => tool.authUrl || tool.appUrl ? window.open(tool.authUrl || tool.appUrl, '_blank') : setActiveTab(tool.route.replace('/', '') || 'dashboard'),
+    })),
+    ...mails.slice(0, 8).map((message) => ({
+      id: `mail-${message.id}`,
+      title: message.subject,
+      type: 'Commlink',
+      detail: `${message.from}: ${message.preview}`,
+      action: () => setActiveTab('inbox'),
+    })),
+    ...forumThreads.slice(0, 8).map((thread) => ({
+      id: `thread-${thread.id}`,
+      title: thread.title,
+      type: 'Forum',
+      detail: thread.category || 'Forum thread',
+      action: () => setActiveTab('forums'),
+    })),
+    ...forwardedForumPosts.slice(0, 8).map((post: any, index) => ({
+      id: `forward-${post.id || index}`,
+      title: post.title || post.sourceChannelName || 'Forwarded Discord post',
+      type: 'Forwarded',
+      detail: post.content || post.sourceChannelName || 'Discord forum forward',
+      action: () => setActiveTab('forums'),
+    })),
+    ...hearmeoutRooms.slice(0, 6).map((room) => ({
+      id: `room-${room.id}`,
+      title: room.name,
+      type: 'Room',
+      detail: room.description || 'HearMeOut room',
+      action: () => setActiveTab('rooms'),
+    })),
+    ...embedSlots.map((slot) => ({
+      id: `slot-${slot.id}`,
+      title: slot.title,
+      type: 'Dock',
+      detail: slot.url,
+      action: () => updateEmbedSlot(slot.id, { collapsed: false }),
+    })),
+  ].filter((item) => {
+    if (!bridgeSearchTerm) return true;
+    return `${item.title} ${item.type} ${item.detail}`.toLowerCase().includes(bridgeSearchTerm);
+  }).slice(0, 8);
+  const creatorWorkspaceItems = [
+    { label: 'Launch Apps', value: `${spmtApps.filter((app) => app.installed && app.enabled !== false).length}/${spmtApps.length || tools.length}`, action: () => setActiveTab('apps') },
+    { label: 'Commlink', value: `${mails.length} messages`, action: () => setActiveTab('inbox') },
+    { label: 'Forums', value: `${forumThreads.length + forwardedForumPosts.length} threads`, action: () => setActiveTab('forums') },
+    { label: 'Dock Slots', value: `${embedSlots.filter((slot) => !slot.collapsed).length} active`, action: () => setActiveTab('crew') },
+  ];
 
   return (
     <div 
@@ -1920,6 +2023,135 @@ export default function App() {
                         Manage Dock
                       </button>
                     </aside>
+                  </div>
+                </section>
+
+                <section className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.05fr)_minmax(320px,0.95fr)]">
+                  <div className="rounded-lg border border-white/10 bg-zinc-950/55 p-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-[11px] font-bold uppercase text-sky-300">Search Everywhere</p>
+                        <h2 className="text-base font-black text-white">Apps, messages, forums, rooms, dock slots</h2>
+                      </div>
+                      <Search size={18} className="text-sky-300" />
+                    </div>
+                    <div className="mt-3 flex items-center gap-2 rounded-lg border border-white/10 bg-black/30 px-3 py-2">
+                      <Search size={15} className="shrink-0 text-zinc-500" />
+                      <input
+                        value={bridgeSearch}
+                        onChange={(event) => setBridgeSearch(event.target.value)}
+                        placeholder="Search the bridge"
+                        className="w-full bg-transparent text-sm font-semibold text-white outline-none placeholder:text-zinc-600"
+                      />
+                    </div>
+                    <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-2">
+                      {bridgeSearchResults.map((item) => (
+                        <button
+                          key={item.id}
+                          type="button"
+                          onClick={item.action}
+                          className="min-h-[68px] rounded-md border border-white/10 bg-white/[0.035] px-3 py-2 text-left hover:border-sky-300/40 hover:bg-sky-300/10"
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="truncate text-xs font-black text-white">{item.title}</span>
+                            <span className="shrink-0 rounded-full border border-white/10 px-2 py-0.5 text-[9px] font-bold uppercase text-sky-200">{item.type}</span>
+                          </div>
+                          <p className="mt-1 line-clamp-2 text-xs text-zinc-500">{item.detail}</p>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-4">
+                    <div className="rounded-lg border border-white/10 bg-zinc-950/55 p-4">
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <p className="text-[11px] font-bold uppercase text-violet-300">Athena Panel</p>
+                          <h2 className="text-base font-black text-white">Command routing</h2>
+                        </div>
+                        <Bot size={18} className="text-violet-300" />
+                      </div>
+                      <p className="mt-3 rounded-md border border-white/10 bg-black/25 p-3 text-xs leading-relaxed text-zinc-400">
+                        {athenaResponse}
+                      </p>
+                      <div className="mt-3 flex gap-2">
+                        <input
+                          value={athenaPrompt}
+                          onChange={(event) => setAthenaPrompt(event.target.value)}
+                          onKeyDown={(event) => {
+                            if (event.key === 'Enter') submitAthenaPrompt();
+                          }}
+                          placeholder="Ask Athena to open apps, search, or route work"
+                          className="min-w-0 flex-1 rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm text-white outline-none placeholder:text-zinc-600 focus:border-violet-300/50"
+                        />
+                        <button
+                          type="button"
+                          onClick={submitAthenaPrompt}
+                          className="rounded-lg bg-violet-300 px-3 py-2 text-xs font-black text-zinc-950"
+                        >
+                          Send
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="rounded-lg border border-white/10 bg-zinc-950/55 p-4">
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <p className="text-[11px] font-bold uppercase text-emerald-300">Voice Commander</p>
+                          <h2 className="text-base font-black text-white">Speak a bridge command</h2>
+                        </div>
+                        <Mic size={18} className={voiceListening ? 'animate-pulse text-emerald-200' : 'text-emerald-300'} />
+                      </div>
+                      <div className="mt-3 flex gap-2">
+                        <button
+                          type="button"
+                          onClick={startVoiceCommander}
+                          className="rounded-lg border border-emerald-300/30 bg-emerald-300/10 px-3 py-2 text-xs font-black text-emerald-200 hover:bg-emerald-300/15"
+                        >
+                          {voiceListening ? 'Listening' : 'Start Voice'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => runBridgeCommand(voiceTranscript)}
+                          disabled={!voiceTranscript.trim()}
+                          className="rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-bold text-zinc-300 hover:bg-white/10 disabled:opacity-40"
+                        >
+                          Run Last
+                        </button>
+                      </div>
+                      <p className="mt-3 min-h-[38px] rounded-md bg-black/25 p-3 text-xs text-zinc-400">
+                        {voiceTranscript || 'Try: open inbox, launch StreamWeaver, show forums, open arena.'}
+                      </p>
+                    </div>
+                  </div>
+                </section>
+
+                <section className="rounded-lg border border-white/10 bg-zinc-950/55 p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <p className="text-[11px] font-bold uppercase text-amber-300">Creator Workspace</p>
+                      <h2 className="text-base font-black text-white">Daily operating lanes</h2>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab('crew')}
+                      className="rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-black text-zinc-200 hover:bg-white/10"
+                    >
+                      Open Crew Desk
+                    </button>
+                  </div>
+                  <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-4">
+                    {creatorWorkspaceItems.map((item) => (
+                      <button
+                        key={item.label}
+                        type="button"
+                        onClick={item.action}
+                        className="rounded-md border border-white/10 bg-black/25 p-3 text-left hover:border-amber-300/40 hover:bg-amber-300/10"
+                      >
+                        <span className="block text-[10px] font-bold uppercase text-zinc-500">{item.label}</span>
+                        <span className="mt-2 block text-sm font-black text-white">{item.value}</span>
+                      </button>
+                    ))}
                   </div>
                 </section>
 
