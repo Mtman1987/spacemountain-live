@@ -1056,7 +1056,12 @@ export default function App() {
       type: 'SPACEMOUNTAIN_AUTH',
       source: 'spacemountain.live',
       token,
-      profile,
+      profile: profile ? {
+        ...profile,
+        discordUserId: profile.discordId || (profile as any).discordUserId || null,
+        discordUsername: profile.discordUsername || null,
+        twitchUsername: profile.twitchUsername || null,
+      } : null,
     }, targetOrigin);
   }, [identity]);
 
