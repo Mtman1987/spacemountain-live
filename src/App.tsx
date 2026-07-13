@@ -983,8 +983,6 @@ export default function App() {
   const [overlayWorkspaceLoaded, setOverlayWorkspaceLoaded] = useState(false);
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [bridgeSearch, setBridgeSearch] = useState('');
-  const [athenaPrompt, setAthenaPrompt] = useState('');
-  const [athenaResponse, setAthenaResponse] = useState('Athena is standing by for cross-app commands, routing questions, and creator workflow prompts.');
   const [voiceTranscript, setVoiceTranscript] = useState('');
   const [voiceListening, setVoiceListening] = useState(false);
   const [athenaOs, setAthenaOs] = useState<any | null>(null);
@@ -1055,14 +1053,6 @@ export default function App() {
     else if (clean.includes('streamweaver')) openEmbeddedApp('StreamWeaver Commands', streamweaverCommandsUrl, 'app');
     else if (clean.includes('quackverse')) openEmbeddedApp('Quackverse Game', '/chat-tag/quackverse', 'game');
     else notify('Command received', command);
-  };
-  const submitAthenaPrompt = () => {
-    const prompt = athenaPrompt.trim();
-    if (!prompt) return;
-    runBridgeCommand(prompt);
-    setAthenaResponse(`Athena routed "${prompt}" across the Command Bridge. Use the dock, inbox, forums, or app suite panels for the active workspace.`);
-    notify('Athena command routed', prompt);
-    setAthenaPrompt('');
   };
   const startVoiceCommander = () => {
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
@@ -2019,11 +2009,15 @@ export default function App() {
     { label: 'Command Bridge', detail: 'Advanced status, search, Athena, and platform panels', action: () => setBridgeSections((current) => ({ ...current, operations: true, search: true, workspace: true })) },
   ];
   const athenaCapabilities = athenaOs?.capabilities
-    ? Object.entries(athenaOs.capabilities).map(([key, value]) => ({
-        key,
-        label: key.replace(/([A-Z])/g, ' $1').replace(/^./, (char) => char.toUpperCase()),
-        enabled: Boolean(value),
-      }))
+    ? Object.entries(athenaOs.capabilities).map(([key, value]) => {
+        const state = typeof value === 'string' ? value : value ? 'ready' : 'unavailable';
+        return {
+          key,
+          label: key.replace(/([A-Z])/g, ' $1').replace(/^./, (char) => char.toUpperCase()),
+          state,
+          enabled: state === 'ready',
+        };
+      })
     : [];
   const platformFeatures = Array.isArray(platformInfo?.features) ? platformInfo.features : [];
   const platformDocSections = Array.isArray(platformDocs?.sections) ? platformDocs.sections : [];
@@ -2231,7 +2225,7 @@ export default function App() {
                         Live App Hub
                       </div>
                       <p className="mt-4 max-w-xl text-sm leading-relaxed text-zinc-300 md:text-base">
-                        One front door for SPMT identity, docked app workspaces, Commlink, creator tools, and Athena-routed commands.
+                        One front door for SPMT identity, docked app workspaces, Commlink, creator tools, and the developing Athena control plane.
                       </p>
                       <div className="mt-6 flex flex-wrap gap-2">
                         {homePageLinks.map((link) => (
@@ -2470,31 +2464,13 @@ export default function App() {
                       <div className="flex items-center justify-between gap-3">
                         <div>
                           <p className="text-[11px] font-bold uppercase text-violet-300">Athena Panel</p>
-                          <h2 className="text-base font-black text-white">Command routing</h2>
+                          <h2 className="text-base font-black text-white">Command routing foundation</h2>
                         </div>
                         <Bot size={18} className="text-violet-300" />
                       </div>
-                      <p className="mt-3 rounded-md border border-white/10 bg-black/25 p-3 text-xs leading-relaxed text-zinc-400">
-                        {athenaResponse}
+                      <p className="mt-3 rounded-md border border-amber-300/20 bg-amber-300/5 p-3 text-xs leading-relaxed text-amber-100/80">
+                        Unavailable: Athena can store context and expose its capability catalog, but durable command jobs and app dispatch are not implemented. No command entered here would run an app yet.
                       </p>
-                      <div className="mt-3 flex gap-2">
-                        <input
-                          value={athenaPrompt}
-                          onChange={(event) => setAthenaPrompt(event.target.value)}
-                          onKeyDown={(event) => {
-                            if (event.key === 'Enter') submitAthenaPrompt();
-                          }}
-                          placeholder="Ask Athena to open apps, search, or route work"
-                          className="min-w-0 flex-1 rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm text-white outline-none placeholder:text-zinc-600 focus:border-violet-300/50"
-                        />
-                        <button
-                          type="button"
-                          onClick={submitAthenaPrompt}
-                          className="rounded-lg bg-violet-300 px-3 py-2 text-xs font-black text-zinc-950"
-                        >
-                          Send
-                        </button>
-                      </div>
                     </div>
 
                     <div className="rounded-lg border border-white/10 bg-zinc-950/55 p-4">
@@ -2570,21 +2546,21 @@ export default function App() {
                     <div className="flex items-center justify-between gap-3">
                       <div>
                         <p className="text-[11px] font-bold uppercase text-violet-300">Athena OS</p>
-                        <h2 className="text-base font-black text-white">Cross-app AI layer</h2>
+                        <h2 className="text-base font-black text-white">Control-plane foundation</h2>
                       </div>
                       <Bot size={18} className="text-violet-300" />
                     </div>
                     <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
                       {(athenaCapabilities.length ? athenaCapabilities : [
-                        { key: 'sharedMemory', label: 'Shared Memory', enabled: false },
-                        { key: 'appAwareness', label: 'App Awareness', enabled: false },
-                        { key: 'automation', label: 'Automation', enabled: false },
-                        { key: 'creatorAssistant', label: 'Creator Assistant', enabled: false },
+                        { key: 'sharedMemory', label: 'Shared Memory', state: 'unavailable', enabled: false },
+                        { key: 'appAwareness', label: 'App Awareness', state: 'unavailable', enabled: false },
+                        { key: 'automation', label: 'Automation', state: 'unavailable', enabled: false },
+                        { key: 'creatorAssistant', label: 'Creator Assistant', state: 'unavailable', enabled: false },
                       ]).map((capability) => (
                         <div key={capability.key} className="flex items-center justify-between gap-3 rounded-md border border-white/10 bg-black/25 px-3 py-2">
                           <span className="text-xs font-bold text-zinc-200">{capability.label}</span>
-                          <span className={`text-[10px] font-black uppercase ${capability.enabled ? 'text-emerald-300' : 'text-zinc-500'}`}>
-                            {capability.enabled ? 'Ready' : 'Loading'}
+                          <span className={`text-[10px] font-black uppercase ${capability.state === 'ready' ? 'text-emerald-300' : capability.state === 'configured' ? 'text-sky-300' : capability.state === 'degraded' ? 'text-amber-300' : 'text-zinc-500'}`}>
+                            {capability.state.replace(/_/g, ' ')}
                           </span>
                         </div>
                       ))}
