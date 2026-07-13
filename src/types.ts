@@ -179,3 +179,65 @@ export interface UserPreferences {
   animationSpeed: number;
   pushToTalk: boolean;
 }
+
+export type EmbeddedAppTarget = {
+  title: string;
+  url: string;
+  kind: 'app' | 'game' | 'overlay' | 'dashboard';
+};
+
+export type EmbedSlot = EmbeddedAppTarget & {
+  id: number;
+  collapsed: boolean;
+  volume: number;
+  muted: boolean;
+};
+
+export type WorkspaceAppearanceV1 = {
+  themeId: string;
+  glowIntensity: number;
+  starDensity: number;
+  glassOpacity: number;
+  blurStrength: number;
+  nebulaIntensity: number;
+  parallaxDepth: number;
+  borderStrength: number;
+  cornerRadius: UserPreferences['cornerRadius'];
+  density: UserPreferences['uiDensity'];
+  sidebarCollapsed: boolean;
+  sidebarStyle: UserPreferences['sidebarStyle'];
+  sidebarPosition: UserPreferences['sidebarPosition'];
+  topbarStyle: UserPreferences['topbarStyle'];
+  tabStyle: UserPreferences['tabStyle'];
+  tabPosition: UserPreferences['tabPosition'];
+  chatTransparency: number;
+  showAvatars: boolean;
+  smoothTransitions: boolean;
+  pushToTalk: boolean;
+  animation: {
+    enabled: boolean;
+    speed: number;
+    particles: boolean;
+    shootingStars: boolean;
+  };
+};
+
+export type WorkspaceDockSlotV1 = {
+  id: 1 | 2 | 3;
+  title: string;
+  url: string;
+  collapsed: boolean;
+  volume: number;
+  muted: boolean;
+};
+
+export type WorkspaceProfileV1 = {
+  schemaVersion: 1;
+  revision: number;
+  appearance: WorkspaceAppearanceV1;
+  dockSlots: WorkspaceDockSlotV1[];
+  activeOverlaySceneId: string | null;
+  ttsSubscriptions: string[];
+  appThemeMappings: Record<string, string>;
+  updatedAt: string;
+};

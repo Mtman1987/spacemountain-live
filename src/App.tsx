@@ -17,6 +17,8 @@ import {
   CommunityShoutout,
   CommunityShoutoutFeed,
   QuackverseSummary,
+  EmbeddedAppTarget,
+  EmbedSlot,
 } from './types';
 
 // Importing high-fidelity sub components
@@ -28,6 +30,7 @@ import RightSidebar from './components/RightSidebar';
 import Shop from './components/Shop';
 import Arena from './components/Arena';
 import OverlayWorkspace, { OverlayWidget } from './components/OverlayWorkspace';
+import { usePortableWorkspace } from './hooks/usePortableWorkspace';
 
 const sleekRocketIcon = '/assets/model-rocket.png';
 
@@ -143,17 +146,6 @@ function normalizeSpmtAppId(id: string) {
   return id;
 }
 
-type EmbeddedAppTarget = {
-  title: string;
-  url: string;
-  kind: 'app' | 'game' | 'overlay' | 'dashboard';
-};
-
-type EmbedSlot = EmbeddedAppTarget & {
-  id: number;
-  collapsed: boolean;
-};
-
 type AppNotification = {
   id: number | string;
   title: string;
@@ -182,10 +174,38 @@ type WorkflowStep = {
 };
 
 const defaultEmbedSlots: EmbedSlot[] = [
-  { id: 1, title: 'ChatTag Overlay', url: 'https://chat-tag-new.fly.dev/overlay', kind: 'overlay', collapsed: true },
-  { id: 2, title: 'Quackverse Game', url: '/chat-tag/quackverse', kind: 'game', collapsed: false },
-  { id: 3, title: 'DSH Dashboard', url: dshDashboardUrl, kind: 'dashboard', collapsed: true },
+  { id: 1, title: 'ChatTag Overlay', url: 'https://chat-tag-new.fly.dev/overlay', kind: 'overlay', collapsed: true, volume: 1, muted: false },
+  { id: 2, title: 'Quackverse Game', url: 'https://spacemountain.live/chat-tag/quackverse', kind: 'game', collapsed: false, volume: 1, muted: false },
+  { id: 3, title: 'DSH Dashboard', url: dshDashboardUrl, kind: 'dashboard', collapsed: true, volume: 1, muted: false },
 ];
+
+const defaultUserPreferences: UserPreferences = {
+  userId: 'u_novastar',
+  theme: 'solar-flare',
+  glowIntensity: 80,
+  starDensity: 70,
+  shootingStars: true,
+  sidebarCollapsed: false,
+  glassOpacity: 65,
+  blurStrength: 22,
+  nebulaIntensity: 80,
+  parallaxDepth: 65,
+  uiDensity: 'comfortable',
+  borderStrength: 60,
+  cornerRadius: 'md',
+  sidebarStyle: 'docked',
+  sidebarPosition: 'left',
+  topbarStyle: 'transparent',
+  tabStyle: 'pills',
+  tabPosition: 'top',
+  chatTransparency: 65,
+  showAvatars: true,
+  uiAnimations: true,
+  particleEffects: true,
+  smoothTransitions: true,
+  animationSpeed: 85,
+  pushToTalk: true,
+};
 
 const defaultOverlayWidgets: OverlayWidget[] = [
   {
@@ -579,33 +599,7 @@ export default function App() {
   const [identity, setIdentity] = useState<UserProfile | null>(null);
 
   // User Preferences / Appearance states matching the customizable customizer exactly
-  const [preferences, setPreferences] = useState<UserPreferences>({
-    userId: 'u_novastar',
-    theme: 'solar-flare',
-    glowIntensity: 80,
-    starDensity: 70,
-    shootingStars: true,
-    sidebarCollapsed: false,
-    glassOpacity: 65,
-    blurStrength: 22,
-    nebulaIntensity: 80,
-    parallaxDepth: 65,
-    uiDensity: 'comfortable',
-    borderStrength: 60,
-    cornerRadius: 'md',
-    sidebarStyle: 'docked',
-    sidebarPosition: 'left',
-    topbarStyle: 'transparent',
-    tabStyle: 'pills',
-    tabPosition: 'top',
-    chatTransparency: 65,
-    showAvatars: true,
-    uiAnimations: true,
-    particleEffects: true,
-    smoothTransitions: true,
-    animationSpeed: 85,
-    pushToTalk: true
-  });
+  const [preferences, setPreferences] = useState<UserPreferences>(() => ({ ...defaultUserPreferences }));
 
   // Backend branding config fallback state
   const [branding, setBranding] = useState<BrandingConfig>({
@@ -959,19 +953,7 @@ export default function App() {
   // ChatTag tracker state
   const [chatTagState, setChatTagState] = useState<ChatTagState | null>(null);
   const [chatTagLoading, setChatTagLoading] = useState(false);
-  const [embedSlots, setEmbedSlots] = useState<EmbedSlot[]>(() => {
-    try {
-      const saved = JSON.parse(localStorage.getItem('spmtEmbedSlots') || 'null');
-      if (Array.isArray(saved) && saved.length === 3) {
-        return saved.map((slot, index) => ({
-          ...defaultEmbedSlots[index],
-          ...slot,
-          id: index + 1,
-        }));
-      }
-    } catch {}
-    return defaultEmbedSlots;
-  });
+  const [embedSlots, setEmbedSlots] = useState<EmbedSlot[]>(() => defaultEmbedSlots.map((slot) => ({ ...slot })));
   const [activeEmbedSlot, setActiveEmbedSlot] = useState(2);
   const [overlayWorkspaceEnabled, setOverlayWorkspaceEnabled] = useState(true);
   const [overlayEditing, setOverlayEditing] = useState(false);
@@ -981,6 +963,17 @@ export default function App() {
     trigger: 'Shared chat message', condition: 'Any connected source', action: 'Add to bot context', destination: 'StreamWeaver memory',
   });
   const [overlayWorkspaceLoaded, setOverlayWorkspaceLoaded] = useState(false);
+  const portableWorkspace = usePortableWorkspace({
+    identityId: identity?.id || null,
+    token: identity ? getStoredSpmtToken() : '',
+    baseUrl: spmtBaseUrl,
+    preferences,
+    embedSlots,
+    defaultPreferences: defaultUserPreferences,
+    defaultEmbedSlots,
+    setPreferences,
+    setEmbedSlots,
+  });
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [bridgeSearch, setBridgeSearch] = useState('');
   const [voiceTranscript, setVoiceTranscript] = useState('');
@@ -1167,10 +1160,6 @@ export default function App() {
       } : null,
     }, targetOrigin);
   }, [identity]);
-
-  useEffect(() => {
-    localStorage.setItem('spmtEmbedSlots', JSON.stringify(embedSlots));
-  }, [embedSlots]);
 
   useEffect(() => {
     const token = getStoredSpmtToken();
@@ -1401,19 +1390,7 @@ export default function App() {
 
   // Update preferences local handler
   const handleUpdatePreferences = (updated: Partial<UserPreferences>) => {
-    setPreferences(prev => {
-      const next = { ...prev, ...updated };
-      
-      // If user is registered in database, we can dispatch updates to `/api/user/:id/preference`
-      if (identity && identity.id !== 'u_novastar') {
-        fetch(`/api/user/${identity.id}/preference`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(next)
-        }).catch(err => console.warn('Preference sync to SQLite bypassed:', err));
-      }
-      return next;
-    });
+    setPreferences(prev => ({ ...prev, ...updated }));
   };
 
   // Change preset configs matching Solar Flare, Nebula Purple etc.
@@ -4141,6 +4118,47 @@ export default function App() {
                 exit={{ opacity: 0, y: -15 }}
                 transition={{ duration: 0.3 }}
               >
+                <div className="mb-4 rounded-2xl border border-cyan-400/20 bg-cyan-400/[0.04] p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className={`h-2.5 w-2.5 rounded-full ${portableWorkspace.status === 'saved' ? 'bg-emerald-400' : portableWorkspace.status === 'saving' || portableWorkspace.status === 'loading' ? 'bg-amber-300 animate-pulse' : portableWorkspace.status === 'signed-out' ? 'bg-zinc-500' : 'bg-red-400'}`} />
+                        <h3 className="text-sm font-bold text-white">Portable SPMT workspace</h3>
+                      </div>
+                      <p className="mt-1 text-xs text-zinc-400">
+                        {portableWorkspace.status === 'signed-out' && 'Sign in with SPMT to sync themes and all three dock slots across devices.'}
+                        {portableWorkspace.status === 'loading' && 'Loading the account-backed workspace…'}
+                        {portableWorkspace.status === 'saving' && 'Saving this workspace to SPMT…'}
+                        {portableWorkspace.status === 'unsaved' && 'Changes are waiting to save.'}
+                        {portableWorkspace.status === 'saved' && `Saved to SPMT${portableWorkspace.lastSavedAt ? ` at ${new Date(portableWorkspace.lastSavedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}` : ''}.`}
+                        {portableWorkspace.status === 'offline' && 'Offline: changes are cached on this device and need a retry.'}
+                        {portableWorkspace.status === 'conflict' && 'Another device saved a newer revision. Choose retry or reload.'}
+                        {portableWorkspace.status === 'error' && 'The workspace could not be synchronized.'}
+                      </p>
+                      {portableWorkspace.error && <p className="mt-2 text-xs text-red-300">{portableWorkspace.error}</p>}
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {['offline', 'conflict', 'error'].includes(portableWorkspace.status) && (
+                        <button type="button" onClick={portableWorkspace.retry} className="rounded-xl border border-amber-300/30 bg-amber-300/10 px-3 py-2 text-xs font-bold text-amber-100">Retry save</button>
+                      )}
+                      {portableWorkspace.status === 'conflict' && (
+                        <button type="button" onClick={portableWorkspace.reload} className="rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-xs font-bold text-zinc-200">Use other device version</button>
+                      )}
+                      {identity && portableWorkspace.loaded && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (window.confirm('Reset the account workspace theme and all three dock slots to their defaults?')) void portableWorkspace.reset();
+                          }}
+                          disabled={portableWorkspace.status === 'saving' || portableWorkspace.status === 'loading'}
+                          className="rounded-xl border border-red-400/20 bg-red-400/[0.06] px-3 py-2 text-xs font-bold text-red-200 disabled:opacity-40"
+                        >
+                          Reset workspace
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
                 <SettingsPanel 
                   preferences={preferences} 
                   onUpdatePreferences={handleUpdatePreferences} 
