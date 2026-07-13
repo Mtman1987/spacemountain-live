@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
-  Home, Mail, MessageSquare, Headphones, Settings, HelpCircle, ChevronDown, ChevronUp, Users, Workflow, Glasses, Compass, Award, ChevronRight, Check, ShoppingCart
+  Home, Mail, MessageSquare, Settings, HelpCircle, ChevronDown, ChevronUp, Users, Workflow, Compass, Award, ChevronRight, Check, ShoppingCart
 } from 'lucide-react';
 import { UserProfile, UserPreferences } from '../types';
 
@@ -45,9 +45,7 @@ export default function RocketDock({
     { id: 'apps', label: 'Apps', icon: <Compass size={15} /> },
     { id: 'inbox', label: 'Inbox', icon: <Mail size={15} /> },
     { id: 'forums', label: 'Forums', icon: <MessageSquare size={15} /> },
-    { id: 'rooms', label: 'Rooms', icon: <Headphones size={15} /> },
     { id: 'builder', label: 'Builder', icon: <Workflow size={15} /> },
-    { id: 'mtnview', label: 'MtnView', icon: <Glasses size={15} /> },
     { id: 'crew', label: 'Crew Desk', icon: <Users size={15} /> },
     { id: 'shop', label: 'Shop', icon: <ShoppingCart size={15} /> },
     { id: 'settings', label: 'Settings', icon: <Settings size={15} /> },

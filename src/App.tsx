@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Sparkles, LayoutGrid, Mail, MessageSquare, Headphones, Glasses, Users, 
@@ -27,6 +27,7 @@ import SettingsPanel from './components/SettingsPanel';
 import RightSidebar from './components/RightSidebar';
 import Shop from './components/Shop';
 import Arena from './components/Arena';
+import OverlayWorkspace, { OverlayWidget } from './components/OverlayWorkspace';
 
 const sleekRocketIcon = '/assets/model-rocket.png';
 
@@ -171,10 +172,43 @@ type CommlinkNotification = {
   created_at: string;
 };
 
+type WorkflowStep = {
+  id: string;
+  trigger: string;
+  condition: string;
+  action: string;
+  destination: string;
+  enabled: boolean;
+};
+
 const defaultEmbedSlots: EmbedSlot[] = [
   { id: 1, title: 'ChatTag Overlay', url: 'https://chat-tag-new.fly.dev/overlay', kind: 'overlay', collapsed: true },
   { id: 2, title: 'Quackverse Game', url: '/chat-tag/quackverse', kind: 'game', collapsed: false },
   { id: 3, title: 'DSH Dashboard', url: dshDashboardUrl, kind: 'dashboard', collapsed: true },
+];
+
+const defaultOverlayWidgets: OverlayWidget[] = [
+  {
+    id: 'chat-tag-overlay', title: 'ChatTag Overlay', kind: 'chat', url: 'https://chat-tag-new.fly.dev/overlay',
+    visible: false, locked: false, interactive: false, x: 72, y: 66, width: 360, height: 220, opacity: 1,
+  },
+  {
+    id: 'hearmeout-now-playing', title: 'HearMeOut Now Playing', kind: 'media', url: 'https://hearmeout-main.fly.dev/overlay/spacemountain?media=music',
+    visible: false, locked: false, interactive: false, x: 2, y: 12, width: 420, height: 240, opacity: 1,
+  },
+  {
+    id: 'streamweaver-avatar', title: 'StreamWeaver Bot Avatar', kind: 'avatar', url: 'https://streamweaver-new.fly.dev/tts-listener',
+    visible: false, locked: false, interactive: true, x: 75, y: 54, width: 320, height: 320, opacity: 1,
+  },
+  {
+    id: 'streamweaver-tts-mixer', title: 'StreamWeaver Shared TTS Mixer', kind: 'audio', url: 'https://streamweaver-new.fly.dev/tts-mixer',
+    visible: false, locked: false, interactive: true, x: 2, y: 64, width: 520, height: 300, opacity: 1,
+  },
+];
+
+const defaultWorkflowSteps: WorkflowStep[] = [
+  { id: 'shared-chat-context', trigger: 'Shared chat message', condition: 'Any connected source', action: 'Add to bot context', destination: 'StreamWeaver memory', enabled: true },
+  { id: 'chat-tag-overlay', trigger: 'ChatTag event', condition: 'Player tagged', action: 'Show overlay widget', destination: 'ChatTag Overlay', enabled: true },
 ];
 
 const embedPresets: EmbeddedAppTarget[] = [
@@ -725,6 +759,7 @@ export default function App() {
   const [composeGroupTitle, setComposeGroupTitle] = useState('');
   const [isComposing, setIsComposing] = useState(false);
   const [commlinkNotifications, setCommlinkNotifications] = useState<CommlinkNotification[]>([]);
+  const [platformEvents, setPlatformEvents] = useState<any[]>([]);
   const [commlinkSearch, setCommlinkSearch] = useState('');
   const [commlinkFilter, setCommlinkFilter] = useState<'all' | 'unread' | 'direct' | 'app'>('all');
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
@@ -768,7 +803,7 @@ export default function App() {
   const refreshSpmtInbox = async () => {
     const token = getStoredSpmtToken();
     if (token) {
-      const [conversationResponse, notificationResponse] = await Promise.all([
+      const [conversationResponse, notificationResponse, eventResponse] = await Promise.all([
         fetch(`${spmtBaseUrl}/api/messages?${new URLSearchParams({
           ...(commlinkSearch.trim() ? { q: commlinkSearch.trim() } : {}),
           ...(commlinkFilter === 'unread' ? { unread: 'true' } : {}),
@@ -781,13 +816,19 @@ export default function App() {
           headers: { Authorization: `Bearer ${token}` },
           credentials: 'include',
         }),
+        fetch(`${spmtBaseUrl}/api/events?limit=60`, {
+          headers: { Authorization: `Bearer ${token}` },
+          credentials: 'include',
+        }),
       ]);
       const messageData = conversationResponse.ok ? await conversationResponse.json() : { messages: [] };
       const notificationData = notificationResponse.ok ? await notificationResponse.json() : { notifications: [] };
+      const eventData = eventResponse.ok ? await eventResponse.json() : { events: [] };
       const messages = Array.isArray(messageData?.messages) ? messageData.messages : [];
       const nextNotifications = Array.isArray(notificationData?.notifications) ? notificationData.notifications : [];
 
       setCommlinkNotifications(nextNotifications);
+      setPlatformEvents(Array.isArray(eventData?.events) ? eventData.events : []);
       setMails(messages.map((message: any) => ({
         id: message.id,
         folder: 'commlink',
@@ -824,6 +865,49 @@ export default function App() {
       time: new Date(m.createdAt || m.created_at || Date.now()).toLocaleString(),
       tag: m.fromType === 'bot' ? 'AI Bot' : m.toType === 'app' ? 'App' : 'SPMT',
     })));
+  };
+
+  const markCommlinkNotificationRead = async (notificationId: string, refresh = true) => {
+    const token = getStoredSpmtToken();
+    if (!token) return;
+
+    const response = await fetch(`${spmtBaseUrl}/api/notifications/${encodeURIComponent(notificationId)}/read`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+      credentials: 'include',
+    });
+    if (!response.ok) throw new Error('Unable to clear notification');
+
+    const readAt = new Date().toISOString();
+    setCommlinkNotifications((current) => current.map((item) => (
+      item.id === notificationId ? { ...item, read_at: item.read_at || readAt } : item
+    )));
+    if (refresh) refreshSpmtInbox().catch(() => {});
+  };
+
+  const markAllCommlinkNotificationsRead = async () => {
+    const token = getStoredSpmtToken();
+    if (!token) return;
+
+    const response = await fetch(`${spmtBaseUrl}/api/notifications/read-all`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+      credentials: 'include',
+    });
+    if (!response.ok) throw new Error('Unable to clear notifications');
+
+    const readAt = new Date().toISOString();
+    setCommlinkNotifications((current) => current.map((item) => ({
+      ...item,
+      read_at: item.read_at || readAt,
+    })));
+    refreshSpmtInbox().catch(() => {});
+  };
+
+  const openCommlinkNotification = async (notification: CommlinkNotification) => {
+    await markCommlinkNotificationRead(notification.id, false);
+    const conversationId = notification.link_url?.match(/^\/messages\/([^/?#]+)/)?.[1];
+    if (conversationId) await openCommlinkThread(conversationId);
   };
 
   // Forums Threads state - fetched from spmt.live
@@ -889,6 +973,14 @@ export default function App() {
     return defaultEmbedSlots;
   });
   const [activeEmbedSlot, setActiveEmbedSlot] = useState(2);
+  const [overlayWorkspaceEnabled, setOverlayWorkspaceEnabled] = useState(true);
+  const [overlayEditing, setOverlayEditing] = useState(false);
+  const [overlayWidgets, setOverlayWidgets] = useState<OverlayWidget[]>(defaultOverlayWidgets);
+  const [workflowSteps, setWorkflowSteps] = useState<WorkflowStep[]>(defaultWorkflowSteps);
+  const [workflowDraft, setWorkflowDraft] = useState<Omit<WorkflowStep, 'id' | 'enabled'>>({
+    trigger: 'Shared chat message', condition: 'Any connected source', action: 'Add to bot context', destination: 'StreamWeaver memory',
+  });
+  const [overlayWorkspaceLoaded, setOverlayWorkspaceLoaded] = useState(false);
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [bridgeSearch, setBridgeSearch] = useState('');
   const [athenaPrompt, setAthenaPrompt] = useState('');
@@ -925,6 +1017,27 @@ export default function App() {
   };
   const updateEmbedSlot = (slotId: number, patch: Partial<EmbedSlot>) => {
     setEmbedSlots((slots) => slots.map((slot) => slot.id === slotId ? { ...slot, ...patch } : slot));
+  };
+  const updateOverlayWidget = useCallback((widgetId: string, patch: Partial<OverlayWidget>) => {
+    setOverlayWidgets((widgets) => widgets.map((widget) => widget.id === widgetId ? { ...widget, ...patch } : widget));
+  }, []);
+  const addOverlayWidget = (preset?: Partial<OverlayWidget>) => {
+    const id = `custom-${Date.now()}`;
+    setOverlayWidgets((widgets) => [...widgets, {
+      id,
+      title: preset?.title || 'Custom Overlay',
+      kind: preset?.kind || 'custom',
+      url: preset?.url || 'about:blank',
+      visible: true,
+      locked: false,
+      interactive: false,
+      x: 12 + (widgets.length % 4) * 8,
+      y: 16 + (widgets.length % 4) * 8,
+      width: 360,
+      height: 220,
+      opacity: 1,
+      ...preset,
+    }]);
   };
   const toggleBridgeSection = (section: string) => {
     setBridgeSections((current) => ({ ...current, [section]: !current[section] }));
@@ -1068,6 +1181,46 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('spmtEmbedSlots', JSON.stringify(embedSlots));
   }, [embedSlots]);
+
+  useEffect(() => {
+    const token = getStoredSpmtToken();
+    if (!token || !identity) return;
+    setOverlayWorkspaceLoaded(false);
+    fetch(`${spmtBaseUrl}/api/overlay-workspace`, {
+      headers: { Authorization: `Bearer ${token}` },
+      credentials: 'include',
+    })
+      .then((response) => response.ok ? response.json() : null)
+      .then((data) => {
+        const layout = data?.layout;
+        if (typeof layout?.enabled === 'boolean') setOverlayWorkspaceEnabled(layout.enabled);
+        if (Array.isArray(layout?.widgets)) {
+          setOverlayWidgets(layout.widgets.map((widget: OverlayWidget, index: number) => ({
+            ...defaultOverlayWidgets[index],
+            ...widget,
+          })));
+        }
+        if (Array.isArray(layout?.workflows)) setWorkflowSteps(layout.workflows);
+      })
+      .finally(() => setOverlayWorkspaceLoaded(true));
+  }, [identity?.id]);
+
+  useEffect(() => {
+    if (!overlayWorkspaceLoaded || !identity) return;
+    const token = getStoredSpmtToken();
+    if (!token) return;
+    const timer = window.setTimeout(() => {
+      fetch(`${spmtBaseUrl}/api/overlay-workspace`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        credentials: 'include',
+        body: JSON.stringify({ layout: { enabled: overlayWorkspaceEnabled, widgets: overlayWidgets, workflows: workflowSteps } }),
+      }).catch(() => {});
+    }, 700);
+    return () => window.clearTimeout(timer);
+  }, [identity, overlayWidgets, overlayWorkspaceEnabled, overlayWorkspaceLoaded, workflowSteps]);
+
+  const handleArenaCollision = useCallback(() => setActiveTab('arena'), []);
 
   useEffect(() => {
     function handleEmbeddedAuthRequest(event: MessageEvent) {
@@ -1552,6 +1705,11 @@ export default function App() {
       headers: { Authorization: `Bearer ${token}` },
       credentials: 'include',
     }).catch(() => {});
+    await Promise.all(
+      commlinkNotifications
+        .filter((item) => !item.read_at && item.link_url === `/messages/${conversationId}`)
+        .map((item) => markCommlinkNotificationRead(item.id, false).catch(() => {})),
+    );
     refreshSpmtInbox().catch(() => {});
   };
 
@@ -1967,6 +2125,15 @@ export default function App() {
           </div>
         )}
       </div>
+
+      <OverlayWorkspace
+        enabled={overlayWorkspaceEnabled}
+        editing={overlayEditing}
+        widgets={overlayWidgets}
+        accentColor={currentTheme.glowHex}
+        onChange={updateOverlayWidget}
+        onFinishEditing={() => setOverlayEditing(false)}
+      />
 
       {/* Floating Interactive Points Indicators (+XP) */}
       <AnimatePresence>
@@ -2538,16 +2705,13 @@ export default function App() {
                 )}
 
                 {bridgeSections.stage && (
-                <button
+                <section
                   id="arenaRocketTrigger"
-                  type="button"
-                  onClick={() => setActiveTab('arena')}
-                  onDoubleClick={() => setActiveTab('arena')}
-                  className="group relative min-h-[260px] overflow-hidden rounded-lg border border-white/10 bg-black/45 text-left shadow-[0_0_48px_rgba(0,0,0,0.45)]"
+                  className="relative min-h-[260px] overflow-hidden rounded-lg border border-white/10 bg-black/45 text-left shadow-[0_0_48px_rgba(0,0,0,0.45)]"
                   style={{
                     boxShadow: `0 0 42px ${rgbaFromHex(currentTheme.glowHex, 0.16)}`,
                   }}
-                  title="Enter Rocket Arena"
+                  aria-label="SpaceMountain flight deck"
                 >
                   <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_35%,rgba(255,255,255,0.16),transparent_42%)]" />
                   <div className="absolute inset-0 bg-gradient-to-b from-black/10 via-black/20 to-black/70" />
@@ -2559,20 +2723,20 @@ export default function App() {
                     />
                     <motion.img
                       src={sleekRocketIcon}
-                      alt="Rocket Arena launcher"
+                      alt="SpaceMountain model rocket"
                       className="absolute right-[14%] top-10 h-20 w-20 object-contain drop-shadow-[0_0_24px_rgba(250,204,21,0.55)] md:h-28 md:w-28"
                       animate={{ y: [0, -10, 0], rotate: [10, 15, 10] }}
                       transition={{ duration: 3.4, repeat: Infinity, ease: 'easeInOut' }}
                     />
                     <div className="mt-4 inline-flex items-center gap-2 rounded-full border border-white/10 bg-black/45 px-4 py-2 text-xs font-black uppercase tracking-[0.16em] text-white">
                       <Rocket size={15} style={{ color: currentTheme.glowHex }} />
-                      Rocket Arena
+                      SpaceMountain Flight Deck
                     </div>
                     <p className="mt-3 max-w-xl text-sm font-semibold text-zinc-300">
-                      Battle arena entry point for inventory, XP, and rocket combat testing.
+                      Mission control, community status, and a docked rocket ready for launch.
                     </p>
                   </div>
-                </button>
+                </section>
                 )}
 
                 <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_340px] gap-4">
@@ -3195,19 +3359,59 @@ export default function App() {
                       <div className="mb-3 rounded-2xl border border-cyan-400/15 bg-cyan-400/[0.04] p-4">
                         <div className="mb-3 flex items-center justify-between gap-3">
                           <h3 className="text-sm font-bold text-white">Notifications</h3>
-                          <span className="rounded-full border border-white/10 bg-black/30 px-2 py-1 text-[10px] font-bold text-cyan-200">
-                            {commlinkNotifications.filter((item) => !item.read_at).length} unread
-                          </span>
+                          <div className="flex items-center gap-2">
+                            <span className="rounded-full border border-white/10 bg-black/30 px-2 py-1 text-[10px] font-bold text-cyan-200">
+                              {commlinkNotifications.filter((item) => !item.read_at).length} unread
+                            </span>
+                            {commlinkNotifications.some((item) => !item.read_at) && (
+                              <button
+                                type="button"
+                                onClick={() => markAllCommlinkNotificationsRead().catch(() => {})}
+                                className="rounded-lg border border-cyan-400/20 bg-cyan-400/10 px-2 py-1 text-[10px] font-bold text-cyan-200 hover:bg-cyan-400/20"
+                              >
+                                Clear unread
+                              </button>
+                            )}
+                          </div>
                         </div>
                         <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
                           {commlinkNotifications.slice(0, 4).map((item) => (
-                            <div key={item.id} className="rounded-xl border border-white/10 bg-black/25 p-3">
+                            <button
+                              key={item.id}
+                              type="button"
+                              onClick={() => openCommlinkNotification(item).catch(() => {})}
+                              className={`rounded-xl border bg-black/25 p-3 text-left transition-colors hover:border-cyan-300/40 ${item.read_at ? 'border-white/5 opacity-60' : 'border-cyan-400/20'}`}
+                              title={item.read_at ? 'Open notification' : 'Mark read and open'}
+                            >
                               <div className="flex items-center justify-between gap-2">
                                 <span className="truncate text-xs font-bold text-white">{item.title}</span>
                                 <span className="shrink-0 text-[9px] uppercase tracking-wider text-zinc-500">{item.type}</span>
                               </div>
                               <p className="mt-1 line-clamp-2 text-xs text-zinc-400">{item.body}</p>
                               <p className="mt-2 text-[10px] text-zinc-500">{new Date(item.created_at).toLocaleString()}</p>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {platformEvents.length > 0 && (
+                      <div className="mb-3 rounded-2xl border border-fuchsia-400/15 bg-fuchsia-400/[0.035] p-4">
+                        <div className="mb-3 flex items-center justify-between gap-3">
+                          <div>
+                            <h3 className="text-sm font-bold text-white">Combined app activity</h3>
+                            <p className="mt-1 text-[10px] text-zinc-500">SPMT events from connected apps, shown beside messages and notifications.</p>
+                          </div>
+                          <span className="rounded-full border border-white/10 bg-black/30 px-2 py-1 text-[10px] font-bold text-fuchsia-200">{platformEvents.length} events</span>
+                        </div>
+                        <div className="flex max-h-[320px] flex-col gap-2 overflow-y-auto pr-1">
+                          {platformEvents.slice(0, 20).map((event) => (
+                            <div key={event.id} className="rounded-xl border border-white/10 bg-black/25 p-3">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <span className="rounded bg-fuchsia-400/10 px-2 py-0.5 text-[9px] font-black uppercase text-fuchsia-200">{event.sourceApp || 'spmt'}</span>
+                                <span className="text-xs font-bold text-white">{event.type}</span>
+                                <span className="ml-auto text-[9px] text-zinc-500">{new Date(event.timestamp || event.createdAt).toLocaleString()}</span>
+                              </div>
+                              <p className="mt-2 text-xs text-zinc-400">{event.payload?.summary || event.payload?.title || event.payload?.message || 'App event received'}</p>
                             </div>
                           ))}
                         </div>
@@ -3759,10 +3963,11 @@ export default function App() {
                   <div>
                     <h2 className="text-xl font-sans font-bold text-white flex items-center gap-2">
                       <Glasses className="text-cyan-400" size={20} />
-                      MountainView AI Smart Glasses
+                      MountainView AI Mobile Bridge
                     </h2>
-                    <p className="text-xs text-zinc-400 mt-0.5">Pairing utilities for MountainView mobile and glasses flows</p>
+                    <p className="text-xs text-zinc-400 mt-0.5">Phone-camera vision, Bluetooth-headset voice, StreamWeaver commands, and ecosystem event routing</p>
                   </div>
+                  <span className="rounded-full border border-emerald-400/25 bg-emerald-400/10 px-3 py-1 text-[10px] font-black uppercase tracking-wider text-emerald-300">Active development + testing</span>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-2">
@@ -3779,7 +3984,7 @@ export default function App() {
                     
                     {/* Holographic glowing display representation */}
                     <div className="w-20 h-20 rounded-full border border-dashed border-cyan-500/30 flex items-center justify-center mb-4">
-                      <span className="text-3xl text-cyan-400 animate-bounce">👓</span>
+                      <span className="text-3xl text-cyan-400 animate-bounce">📱</span>
                     </div>
 
                     <span className="text-xs font-bold text-white">Target Anchor: SpaceMountain account</span>
@@ -3791,7 +3996,7 @@ export default function App() {
                     <div>
                       <span className="text-[10px] font-mono font-bold text-zinc-500 block mb-3">CUSTOM QR MACRO SEED</span>
                       <p className="text-xs text-zinc-400 leading-relaxed mb-4">
-                        Generate a pairing seed you can point your glasses camera at. This value is kept local until a device endpoint is connected.
+                        Generate a pairing seed for the MountainView phone bridge. The phone handles camera and headset access, then calls StreamWeaver without exposing service credentials in this page.
                       </p>
 
                       <div className="flex flex-col gap-3">
@@ -3819,6 +4024,19 @@ export default function App() {
                   </div>
 
                 </div>
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+                  {[
+                    ['Voice command bridge', '/api/mountainview/voice-commander', 'Dictation, translation, bot commands, AI replies, Discord delivery, and TTS routing.'],
+                    ['Image relay', '/api/mountainview/image-relay', 'Phone camera frames are forwarded to StreamWeaver for analysis; this hub does not perform face recognition.'],
+                    ['Shared event context', '/api/integrations/social-stream', 'Normalized combined-chat events can feed the same StreamWeaver memory used by MountainView and the bots.'],
+                  ].map(([title, endpoint, description]) => (
+                    <div key={endpoint} className="rounded-2xl border border-cyan-400/15 bg-cyan-400/[0.035] p-4">
+                      <span className="text-xs font-black text-white">{title}</span>
+                      <code className="mt-2 block text-[10px] text-cyan-300">StreamWeaver {endpoint}</code>
+                      <p className="mt-2 text-xs leading-relaxed text-zinc-400">{description}</p>
+                    </div>
+                  ))}
+                </div>
               </motion.div>
             )}
 
@@ -3835,31 +4053,70 @@ export default function App() {
                   <div>
                     <h2 className="text-xl font-sans font-bold text-white flex items-center gap-2">
                       <Rocket className="text-orange-400" size={20} />
-                      Integration Map
+                      Event Flow Builder
                     </h2>
-                     <p className="text-xs text-zinc-400 mt-0.5">How the SpaceMountain apps hand work to each other</p>
+                     <p className="text-xs text-zinc-400 mt-0.5">Build shared-chat and app automations as trigger → filter → action → destination flows</p>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {[
-                    ['ChatTag -> DSH', 'ChatTag forwards Twitch/chat game events into Discord Stream Hub so points and leaderboards stay connected.', 'Open tracker', 'apps'],
-                    ['DSH -> Website Forum', 'Discord Stream Hub sends forwarded channel activity into the website forum through the forum intake endpoint.', 'View forum', 'forums'],
-                    ['HearMeOut -> Rooms', 'Open HearMeOut rooms can be joined from the hub, with overlay links for watch, music, and now-playing views.', 'Join rooms', 'rooms'],
-                    ['MountainView -> StreamWeaver', 'Glasses voice/image commands route through StreamWeaver for bot commands, visual context, overlays, and automation.', 'Pair glasses', 'mtnview'],
-                  ].map(([title, body, label, tab]) => (
-                    <div key={title} className="rounded-2xl border border-white/5 bg-white/[0.02] p-5">
-                      <span className="text-xs font-bold text-white">{title}</span>
-                      <p className="text-xs text-zinc-400 leading-relaxed mt-2">{body}</p>
-                      <button
-                        type="button"
-                        onClick={() => setActiveTab(tab)}
-                        className="mt-4 px-3 py-1.5 rounded-xl bg-orange-500/10 border border-orange-500/20 text-xs font-bold text-orange-300 hover:bg-orange-500/15"
-                      >
-                        {label}
-                      </button>
+                <div className="rounded-2xl border border-orange-400/15 bg-orange-400/[0.035] p-4">
+                  <div className="grid grid-cols-1 gap-3 lg:grid-cols-4">
+                    {[
+                      ['Trigger', 'trigger', ['Shared chat message', 'App event', 'ChatTag event', 'HearMeOut now playing', 'MountainView command', 'Commlink message']],
+                      ['Filter', 'condition', ['Any connected source', 'Contains keyword', 'Donation or membership', 'Message mentions bot', 'Player tagged', 'Room is live']],
+                      ['Action', 'action', ['Add to bot context', 'Read aloud with TTS', 'Show overlay widget', 'Send message', 'Run bot command', 'Create notification']],
+                      ['Destination', 'destination', ['StreamWeaver memory', 'Shared TTS mixer', 'ChatTag Overlay', 'Discord Stream Hub', 'HearMeOut room', 'MountainView AI']],
+                    ].map(([label, field, options]) => (
+                      <label key={field as string} className="text-[10px] font-black uppercase tracking-wider text-zinc-500">
+                        {label as string}
+                        <select
+                          value={workflowDraft[field as keyof typeof workflowDraft]}
+                          onChange={(event) => setWorkflowDraft((current) => ({ ...current, [field as string]: event.target.value }))}
+                          className="mt-2 w-full rounded-xl border border-white/10 bg-zinc-950 px-3 py-2 text-xs font-bold normal-case tracking-normal text-white outline-none focus:border-orange-400/50"
+                        >
+                          {(options as string[]).map((option) => <option key={option}>{option}</option>)}
+                        </select>
+                      </label>
+                    ))}
+                  </div>
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setWorkflowSteps((steps) => [...steps, { id: `flow-${Date.now()}`, ...workflowDraft, enabled: true }])}
+                      className="rounded-xl bg-orange-400 px-4 py-2 text-xs font-black text-zinc-950"
+                    >
+                      Add flow
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => notify('Test event sent', `${workflowDraft.trigger} → ${workflowDraft.destination}`)}
+                      className="rounded-xl border border-white/10 bg-white/[0.04] px-4 py-2 text-xs font-bold text-zinc-200"
+                    >
+                      Test draft
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-3">
+                  {workflowSteps.map((step, index) => (
+                    <div key={step.id} className={`rounded-2xl border p-4 ${step.enabled ? 'border-orange-400/20 bg-black/30' : 'border-white/5 bg-black/15 opacity-55'}`}>
+                      <div className="flex flex-wrap items-center gap-2 text-xs">
+                        <span className="rounded-lg bg-orange-400/10 px-2 py-1 font-black text-orange-200">{index + 1}. {step.trigger}</span>
+                        <ArrowRight size={13} className="text-zinc-600" />
+                        <span className="rounded-lg bg-white/[0.04] px-2 py-1 font-bold text-zinc-300">{step.condition}</span>
+                        <ArrowRight size={13} className="text-zinc-600" />
+                        <span className="rounded-lg bg-cyan-400/10 px-2 py-1 font-bold text-cyan-200">{step.action}</span>
+                        <ArrowRight size={13} className="text-zinc-600" />
+                        <span className="rounded-lg bg-fuchsia-400/10 px-2 py-1 font-bold text-fuchsia-200">{step.destination}</span>
+                        <div className="ml-auto flex gap-3">
+                          <button type="button" onClick={() => notify('Flow tested', `${step.trigger} → ${step.destination}`)} className="text-[10px] font-bold text-cyan-300">Test</button>
+                          <button type="button" onClick={() => setWorkflowSteps((steps) => steps.map((item) => item.id === step.id ? { ...item, enabled: !item.enabled } : item))} className="text-[10px] font-bold text-amber-300">{step.enabled ? 'Disable' : 'Enable'}</button>
+                          <button type="button" onClick={() => setWorkflowSteps((steps) => steps.filter((item) => item.id !== step.id))} className="text-[10px] font-bold text-red-300">Remove</button>
+                        </div>
+                      </div>
                     </div>
                   ))}
+                  {workflowSteps.length === 0 && <p className="rounded-2xl border border-dashed border-white/10 p-6 text-center text-xs text-zinc-500">No flows yet. Build one above.</p>}
                 </div>
               </motion.div>
             )}
@@ -3988,6 +4245,75 @@ export default function App() {
                 </div>
 
                 <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 mt-2">
+                  <div className="xl:col-span-3 rounded-2xl border border-cyan-400/15 bg-cyan-400/[0.035] p-4">
+                    <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/5 pb-3">
+                      <div>
+                        <h3 className="text-sm font-bold text-white">Personal overlay canvas</h3>
+                        <p className="mt-1 text-xs text-zinc-500">A transparent full-screen layer for movable app widgets. Layout is saved to your SPMT account.</p>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setOverlayWorkspaceEnabled((value) => !value)}
+                          className={`rounded-xl border px-3 py-2 text-xs font-bold ${overlayWorkspaceEnabled ? 'border-emerald-400/30 bg-emerald-400/10 text-emerald-200' : 'border-white/10 bg-black/30 text-zinc-400'}`}
+                        >
+                          Canvas {overlayWorkspaceEnabled ? 'On' : 'Off'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setOverlayWorkspaceEnabled(true);
+                            setOverlayEditing(true);
+                          }}
+                          className="rounded-xl border border-cyan-400/30 bg-cyan-400/10 px-3 py-2 text-xs font-bold text-cyan-200"
+                        >
+                          Arrange on screen
+                        </button>
+                        <button type="button" onClick={() => addOverlayWidget()} className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-bold text-zinc-200">
+                          Add URL widget
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-2">
+                      {overlayWidgets.map((widget) => (
+                        <div key={widget.id} className="rounded-xl border border-white/10 bg-black/30 p-3">
+                          <div className="flex items-center justify-between gap-3">
+                            <input
+                              value={widget.title}
+                              onChange={(event) => updateOverlayWidget(widget.id, { title: event.target.value })}
+                              className="min-w-0 flex-1 bg-transparent text-xs font-black text-white outline-none"
+                              aria-label="Overlay widget title"
+                            />
+                            <div className="flex gap-2">
+                              <button type="button" onClick={() => updateOverlayWidget(widget.id, { visible: !widget.visible })} className={`text-[10px] font-bold ${widget.visible ? 'text-emerald-300' : 'text-zinc-500'}`}>
+                                {widget.visible ? 'Visible' : 'Hidden'}
+                              </button>
+                              <button type="button" onClick={() => updateOverlayWidget(widget.id, { locked: !widget.locked })} className={`text-[10px] font-bold ${widget.locked ? 'text-amber-300' : 'text-zinc-500'}`}>
+                                {widget.locked ? 'Locked' : 'Unlocked'}
+                              </button>
+                              {widget.kind === 'custom' && (
+                                <button type="button" onClick={() => setOverlayWidgets((items) => items.filter((item) => item.id !== widget.id))} className="text-[10px] font-bold text-red-300">Remove</button>
+                              )}
+                            </div>
+                          </div>
+                          <input
+                            value={widget.url}
+                            onChange={(event) => updateOverlayWidget(widget.id, { url: event.target.value })}
+                            className="mt-2 w-full rounded-lg border border-white/10 bg-black/40 px-2 py-1.5 text-[10px] text-zinc-300 outline-none focus:border-cyan-400/50"
+                            aria-label={`${widget.title} URL`}
+                          />
+                          <div className="mt-3 grid grid-cols-2 gap-3 text-[10px] text-zinc-500 sm:grid-cols-4">
+                            <label>Width<input type="number" min="120" value={Math.round(widget.width)} onChange={(event) => updateOverlayWidget(widget.id, { width: Number(event.target.value) || 120 })} className="mt-1 w-full rounded bg-black/40 px-2 py-1 text-zinc-200" /></label>
+                            <label>Height<input type="number" min="72" value={Math.round(widget.height)} onChange={(event) => updateOverlayWidget(widget.id, { height: Number(event.target.value) || 72 })} className="mt-1 w-full rounded bg-black/40 px-2 py-1 text-zinc-200" /></label>
+                            <label>Opacity<input type="range" min="10" max="100" value={Math.round(widget.opacity * 100)} onChange={(event) => updateOverlayWidget(widget.id, { opacity: Number(event.target.value) / 100 })} className="mt-2 w-full" /></label>
+                            <label className="flex items-center gap-2 pt-4"><input type="checkbox" checked={widget.interactive} onChange={(event) => updateOverlayWidget(widget.id, { interactive: event.target.checked })} /> Interactive</label>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
                   <div className="xl:col-span-2 rounded-2xl border border-white/5 bg-white/[0.02] p-4">
                     <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/5 pb-3">
                       <div>
@@ -4211,6 +4537,7 @@ export default function App() {
         rocketFlying={rocketFlying}
         setRocketFlying={setRocketFlying}
         rocketStateRef={rocketStateRef}
+        onArenaCollision={handleArenaCollision}
       />
 
     </div>
@@ -4221,9 +4548,10 @@ interface AppRocketLogicProps {
   rocketFlying: boolean;
   setRocketFlying: (flying: boolean) => void;
   rocketStateRef: React.MutableRefObject<any>;
+  onArenaCollision: () => void;
 }
 
-function AppRocketLogic({ rocketFlying, setRocketFlying, rocketStateRef }: AppRocketLogicProps) {
+function AppRocketLogic({ rocketFlying, setRocketFlying, rocketStateRef, onArenaCollision }: AppRocketLogicProps) {
   useEffect(() => {
     const rocket = document.getElementById('rocketLauncher');
     if (!rocket) return;
@@ -4620,12 +4948,13 @@ function AppRocketLogic({ rocketFlying, setRocketFlying, rocketStateRef }: AppRo
       if (rocket && arenaTrigger && state.mode === 'free') {
         const r = rocket.getBoundingClientRect();
         const t = arenaTrigger.getBoundingClientRect();
-        const rx = r.left + r.width / 2;
-        const ry = r.top + r.height / 2;
-        const tx = t.left + t.width / 2;
-        const ty = t.top + t.height / 2;
-        if (Math.hypot(rx - tx, ry - ty) < 40) {
-          window.location.href = '/arena';
+        const collisionPadding = 10;
+        const collided = r.right - collisionPadding >= t.left
+          && r.left + collisionPadding <= t.right
+          && r.bottom - collisionPadding >= t.top
+          && r.top + collisionPadding <= t.bottom;
+        if (collided) {
+          onArenaCollision();
           return;
         }
       }
@@ -4655,7 +4984,7 @@ function AppRocketLogic({ rocketFlying, setRocketFlying, rocketStateRef }: AppRo
     
     followRocket();
     return () => cancelAnimationFrame(animationFrameId);
-  }, [rocketStateRef]);
+  }, [onArenaCollision, rocketStateRef]);
 
   return null;
 }
