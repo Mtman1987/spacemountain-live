@@ -164,6 +164,120 @@ type CommlinkNotification = {
   created_at: string;
 };
 
+type PlatformEvent = {
+  id: string;
+  type: string;
+  sourceApp?: string | null;
+  timestamp?: string | null;
+  createdAt?: string | null;
+  payload?: Record<string, unknown> | null;
+};
+
+type SdkStatusCardData = {
+  id: string;
+  name: string;
+  sourceApp: string;
+  eventType: string;
+  author: string | null;
+  summary: string | null;
+  updatedAt: string | null;
+  metrics: Array<{ label: string; value: string }>;
+};
+
+function firstPayloadValue(payload: Record<string, unknown>, keys: string[]) {
+  for (const key of keys) {
+    const value = payload[key];
+    if (value !== undefined && value !== null && String(value).trim() !== '') return value;
+  }
+  return null;
+}
+
+function displayPayloadValue(value: unknown) {
+  if (typeof value === 'boolean') return value ? 'Yes' : 'No';
+  if (typeof value === 'number') return value.toLocaleString();
+  return String(value);
+}
+
+function payloadLabel(key: string) {
+  return key
+    .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+    .replace(/[_-]+/g, ' ')
+    .replace(/^./, (character) => character.toUpperCase());
+}
+
+function buildSdkStatusCards(events: PlatformEvent[]): SdkStatusCardData[] {
+  const latestByName = new Map<string, SdkStatusCardData>();
+
+  for (const event of events) {
+    const eventType = String(event.type || '').toLowerCase();
+    if (eventType !== 'status' && !eventType.endsWith('.status')) continue;
+
+    const payload = event.payload && typeof event.payload === 'object' && !Array.isArray(event.payload)
+      ? event.payload
+      : {};
+    const sourceApp = String(event.sourceApp || 'sdk-app');
+    const name = String(firstPayloadValue(payload, [
+      'AppName', 'appName', 'ApplicationName', 'applicationName', 'Name', 'name',
+    ]) || sourceApp);
+    const cardKey = name.trim().toLowerCase();
+    if (!cardKey || latestByName.has(cardKey)) continue;
+
+    const usedKeys = new Set([
+      'AppName', 'appName', 'ApplicationName', 'applicationName', 'Name', 'name',
+      'Author', 'author', 'DeveloperName', 'developerName', 'summary', 'Summary',
+      'LastUpdated', 'lastUpdated', 'updatedAt',
+    ]);
+    const metrics: Array<{ label: string; value: string }> = [];
+    const addMetric = (label: string, value: unknown, keys: string[]) => {
+      keys.forEach((key) => usedKeys.add(key));
+      if (value === null || value === undefined || String(value).trim() === '') return;
+      metrics.push({ label, value: displayPayloadValue(value) });
+    };
+
+    const playerDisplay = firstPayloadValue(payload, ['PlayerDisplay', 'playerDisplay']);
+    const onlinePlayers = firstPayloadValue(payload, ['OnlinePlayers', 'onlinePlayers']);
+    const maxPlayers = firstPayloadValue(payload, ['MaxPlayers', 'maxPlayers']);
+    const playerCount = firstPayloadValue(payload, ['PlayerCount', 'playerCount']);
+    addMetric(
+      'Players',
+      playerDisplay || (onlinePlayers !== null && maxPlayers !== null ? `${onlinePlayers}/${maxPlayers}` : onlinePlayers ?? playerCount),
+      ['PlayerDisplay', 'playerDisplay', 'OnlinePlayers', 'onlinePlayers', 'MaxPlayers', 'maxPlayers', 'PlayerCount', 'playerCount'],
+    );
+
+    const year = firstPayloadValue(payload, ['Year', 'year']);
+    const day = firstPayloadValue(payload, ['DayOfYear', 'dayOfYear']);
+    addMetric(
+      'World',
+      year !== null || day !== null ? [year !== null ? `Year ${year}` : '', day !== null ? `Day ${day}` : ''].filter(Boolean).join(', ') : null,
+      ['Year', 'year', 'DayOfYear', 'dayOfYear'],
+    );
+    addMetric('Season', firstPayloadValue(payload, ['Season', 'season']), ['Season', 'season']);
+    addMetric('Rift', firstPayloadValue(payload, ['RiftActivity', 'riftActivity']), ['RiftActivity', 'riftActivity']);
+    addMetric('Storm', firstPayloadValue(payload, ['IsTemporalStormActive', 'isTemporalStormActive']), ['IsTemporalStormActive', 'isTemporalStormActive']);
+    addMetric('Version', firstPayloadValue(payload, ['ServerVersion', 'serverVersion', 'Version', 'version']), ['ServerVersion', 'serverVersion', 'Version', 'version']);
+    addMetric('Loaded mods', firstPayloadValue(payload, ['LoadedMods', 'loadedMods']), ['LoadedMods', 'loadedMods']);
+
+    for (const [key, value] of Object.entries(payload)) {
+      if (metrics.length >= 8 || usedKeys.has(key) || value === null || value === undefined) continue;
+      if (!['string', 'number', 'boolean'].includes(typeof value)) continue;
+      metrics.push({ label: payloadLabel(key), value: displayPayloadValue(value) });
+    }
+
+    latestByName.set(cardKey, {
+      id: event.id,
+      name,
+      sourceApp,
+      eventType: event.type,
+      author: String(firstPayloadValue(payload, ['Author', 'author', 'DeveloperName', 'developerName']) || '').trim() || null,
+      summary: String(firstPayloadValue(payload, ['summary', 'Summary']) || '').trim() || null,
+      updatedAt: String(firstPayloadValue(payload, ['LastUpdated', 'lastUpdated', 'updatedAt']) || event.timestamp || event.createdAt || '').trim() || null,
+      metrics,
+    });
+  }
+
+  return Array.from(latestByName.values());
+}
+
 type WorkflowStep = {
   id: string;
   trigger: string;
@@ -753,7 +867,9 @@ export default function App() {
   const [composeGroupTitle, setComposeGroupTitle] = useState('');
   const [isComposing, setIsComposing] = useState(false);
   const [commlinkNotifications, setCommlinkNotifications] = useState<CommlinkNotification[]>([]);
-  const [platformEvents, setPlatformEvents] = useState<any[]>([]);
+  const [platformEvents, setPlatformEvents] = useState<PlatformEvent[]>([]);
+  const [platformEventsCheckedAt, setPlatformEventsCheckedAt] = useState<string | null>(null);
+  const [platformEventsListening, setPlatformEventsListening] = useState(false);
   const [commlinkSearch, setCommlinkSearch] = useState('');
   const [commlinkFilter, setCommlinkFilter] = useState<'all' | 'unread' | 'direct' | 'app'>('all');
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
@@ -793,6 +909,57 @@ export default function App() {
   const removeComposeRecipient = (handle: string) => {
     setComposeRecipients((current) => current.filter((item) => item !== handle));
   };
+
+  const refreshPlatformEvents = useCallback(async () => {
+    const token = getStoredSpmtToken();
+    if (!token) {
+      setPlatformEventsListening(false);
+      return;
+    }
+
+    const response = await fetch(`${spmtBaseUrl}/api/events?limit=100`, {
+      headers: { Authorization: `Bearer ${token}` },
+      credentials: 'include',
+    });
+    if (!response.ok) throw new Error(`SPMT event feed returned ${response.status}`);
+
+    const data = await response.json();
+    setPlatformEvents(Array.isArray(data?.events) ? data.events : []);
+    setPlatformEventsCheckedAt(new Date().toISOString());
+    setPlatformEventsListening(true);
+  }, []);
+
+  useEffect(() => {
+    let stopped = false;
+    let inFlight = false;
+    const refresh = async () => {
+      if (stopped || inFlight || document.visibilityState === 'hidden') return;
+      inFlight = true;
+      try {
+        await refreshPlatformEvents();
+      } catch (error) {
+        console.warn('SPMT live status refresh failed', error);
+        setPlatformEventsListening(false);
+      } finally {
+        inFlight = false;
+      }
+    };
+    const handleFocus = () => void refresh();
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') void refresh();
+    };
+
+    void refresh();
+    const interval = window.setInterval(() => void refresh(), 4000);
+    window.addEventListener('focus', handleFocus);
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => {
+      stopped = true;
+      window.clearInterval(interval);
+      window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
+  }, [refreshPlatformEvents]);
 
   const refreshSpmtInbox = async () => {
     const token = getStoredSpmtToken();
@@ -1869,6 +2036,7 @@ export default function App() {
   const quackverseUpdatedAt = quackverseState?.updatedAt || quackverseState?.state?.updatedAt || quackverseState?.state?.lastUpdatedAt || null;
   const chatTagCurrentName = currentItPlayer?.displayName || currentItPlayer?.twitchUsername || currentItPlayer?.username || currentItPlayer?.name || chatTagState?.currentIt || 'Free for all';
   const chatTagLastEventTime = recentTags[0]?.timestamp || recentTags[0]?.createdAt || chatTagState?.lastTagTime || null;
+  const sdkStatusCards = useMemo(() => buildSdkStatusCards(platformEvents), [platformEvents]);
   const commandWidgets = [
     { label: 'Online Apps', value: `${stats.onlineApps}/${stats.checkedApps || tools.length || 0}`, tone: 'text-emerald-300' },
     { label: 'Unread', value: commlinkNotifications.filter((item) => !item.read_at).length.toLocaleString(), tone: 'text-sky-300' },
@@ -2268,6 +2436,77 @@ export default function App() {
                       ))}
                     </div>
                   </div>
+                </section>
+
+                <section className="rounded-lg border border-emerald-300/20 bg-zinc-950/60 p-4 shadow-[0_0_42px_rgba(16,185,129,0.08)]">
+                  <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 pb-4">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className={`h-2.5 w-2.5 rounded-full ${platformEventsListening ? 'animate-pulse bg-emerald-300' : 'bg-amber-300'}`} />
+                        <p className="text-[11px] font-black uppercase tracking-[0.14em] text-emerald-300">SDK live status</p>
+                      </div>
+                      <h2 className="mt-1 text-lg font-black text-white">Connected app status cards</h2>
+                      <p className="mt-1 text-xs text-zinc-500">
+                        Card names come from <span className="font-mono text-zinc-300">AppName</span> or <span className="font-mono text-zinc-300">Name</span> in each status payload. The newest call replaces the previous card data.
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="rounded-full border border-white/10 bg-black/30 px-2 py-1 text-[10px] font-bold uppercase text-zinc-400">
+                        {platformEventsListening
+                          ? `Listening · ${platformEventsCheckedAt ? formatShoutoutTime(platformEventsCheckedAt) : 'now'}`
+                          : identity ? 'Connecting' : 'Sign in to listen'}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => refreshPlatformEvents().catch((error) => console.warn('Manual status refresh failed', error))}
+                        className="rounded-lg border border-emerald-300/25 bg-emerald-300/10 p-2 text-emerald-200 hover:bg-emerald-300/15"
+                        title="Refresh SDK status cards"
+                      >
+                        <RefreshCw size={14} />
+                      </button>
+                    </div>
+                  </div>
+
+                  {sdkStatusCards.length > 0 ? (
+                    <div className="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-2">
+                      {sdkStatusCards.map((card) => (
+                        <article key={`${card.sourceApp}-${card.name}`} className="rounded-lg border border-emerald-300/15 bg-black/35 p-4">
+                          <div className="flex flex-wrap items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <h3 className="truncate text-base font-black text-white">{card.name}</h3>
+                                <span className="rounded-full border border-emerald-300/25 bg-emerald-300/10 px-2 py-0.5 text-[9px] font-black uppercase text-emerald-200">Receiving</span>
+                              </div>
+                              {card.summary && <p className="mt-1 text-xs leading-relaxed text-zinc-400">{card.summary}</p>}
+                            </div>
+                            <Activity size={18} className="shrink-0 text-emerald-300" />
+                          </div>
+
+                          <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                            {card.metrics.map((metric) => (
+                              <div key={metric.label} className="rounded-md border border-white/5 bg-white/[0.04] p-2">
+                                <p className="text-[9px] font-bold uppercase tracking-wide text-zinc-500">{metric.label}</p>
+                                <p className="mt-1 truncate text-xs font-black text-zinc-100" title={metric.value}>{metric.value}</p>
+                              </div>
+                            ))}
+                          </div>
+
+                          <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-white/5 pt-3 text-[10px] text-zinc-500">
+                            <span className="font-mono text-emerald-200/70">{card.sourceApp}</span>
+                            <span>{card.eventType}</span>
+                            {card.author && <span>By {card.author}</span>}
+                            <span className="ml-auto">Updated {formatShoutoutTime(card.updatedAt)}</span>
+                          </div>
+                        </article>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="mt-4 rounded-lg border border-dashed border-white/10 bg-black/25 px-4 py-6 text-center">
+                      <Activity size={22} className="mx-auto text-zinc-600" />
+                      <p className="mt-2 text-sm font-black text-zinc-300">Waiting for the first SDK status call</p>
+                      <p className="mt-1 text-xs text-zinc-500">Publish an event whose type ends in <span className="font-mono text-zinc-300">.status</span>; the card will appear here automatically.</p>
+                    </div>
+                  )}
                 </section>
 
                 <div className="flex flex-wrap gap-2">
