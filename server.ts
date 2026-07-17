@@ -3,6 +3,7 @@ import path from 'path';
 import fs from 'fs';
 import http from 'http';
 import https from 'https';
+import crypto from 'crypto';
 import { createServer as createViteServer } from 'vite';
 import { db, sqlite } from './src/db/connection.js';
 import { users, communityTools, userPreferences } from './src/db/schema.js';
@@ -11,6 +12,20 @@ import { eq } from 'drizzle-orm';
 const PORT = Number(process.env.PORT || 3000);
 const DSH_COMMUNITY_SPOTLIGHT_URL = process.env.DSH_COMMUNITY_SPOTLIGHT_URL || 'https://discord-stream-hub-new.fly.dev/api/community-spotlight';
 const DSH_COMMUNITY_ONLINE_URL = process.env.DSH_COMMUNITY_ONLINE_URL || 'https://discord-stream-hub-new.fly.dev/api/community-online';
+const SPMT_BASE_URL = 'https://spmt.live';
+const SPMT_SESSION_COOKIE = 'spacemountain_spmt_session';
+
+function readCookie(header: string | undefined, name: string) {
+  for (const part of String(header || '').split(';')) {
+    const [key, ...rest] = part.trim().split('=');
+    if (key === name) return decodeURIComponent(rest.join('='));
+  }
+  return '';
+}
+
+function sessionCookieOptions() {
+  return { httpOnly: true, secure: true, sameSite: 'lax' as const, path: '/', maxAge: 30 * 24 * 60 * 60 * 1000 };
+}
 
 type AppStatusType = 'live' | 'warn' | 'pink' | 'default';
 
@@ -558,17 +573,93 @@ async function startServer() {
     res.json({ status: 'ok', app: 'spacemountain-live', uptime: process.uptime() });
   });
 
-  // OAuth2 callback - handles redirect from spmt.live after user authorizes
-  app.get('/auth/callback', (req, res) => {
-    const { code, token, state } = req.query;
-    const sessionToken = token || code;
-    res.redirect(`/?auth_code=${encodeURIComponent(String(sessionToken || ''))}${state ? `&state=${encodeURIComponent(String(state))}` : ''}`);
+  // OAuth2 callback exchanges the one-time code server-side and keeps the SPMT token HttpOnly.
+  app.get('/auth/callback', async (req, res) => {
+    const code = String(req.query.code || '');
+    const state = String(req.query.state || '');
+    const expectedState = readCookie(req.headers.cookie, 'spacemountain_oauth_state');
+    if (!code || !state || !expectedState || state !== expectedState) return res.status(400).send('Invalid or expired SPMT sign-in state.');
+    const clientSecret = process.env.SPACEMOUNTAIN_CLIENT_SECRET;
+    if (!clientSecret) return res.status(503).send('SpaceMountain SPMT OAuth is not configured.');
+    try {
+      const exchange = await fetch(`${SPMT_BASE_URL}/api/oauth/token`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify({ code, client_id: 'spacemountain-live', client_secret: clientSecret, redirect_uri: 'https://spacemountain.live/auth/callback' }),
+      });
+      const data = await exchange.json() as any;
+      if (!exchange.ok || !data?.access_token) return res.status(401).send('SPMT sign-in exchange failed.');
+      res.cookie(SPMT_SESSION_COOKIE, data.access_token, sessionCookieOptions());
+      res.clearCookie('spacemountain_oauth_state', { ...sessionCookieOptions(), maxAge: 0 });
+      res.redirect('/');
+    } catch {
+      res.status(502).send('SPMT sign-in is temporarily unavailable.');
+    }
   });
 
   // OAuth2 login redirect - sends user to spmt.live to authenticate
   app.get('/auth/login', (req, res) => {
-    const returnUrl = `/api/oauth/authorize?client_id=spacemountain-live&redirect_uri=${encodeURIComponent('https://spacemountain.live/auth/callback')}&state=${Math.random().toString(36).slice(2)}`;
+    const state = crypto.randomBytes(24).toString('base64url');
+    res.cookie('spacemountain_oauth_state', state, { ...sessionCookieOptions(), maxAge: 10 * 60 * 1000 });
+    const returnUrl = `/api/oauth/authorize?client_id=spacemountain-live&redirect_uri=${encodeURIComponent('https://spacemountain.live/auth/callback')}&state=${encodeURIComponent(state)}`;
     res.redirect(`https://spmt.live/?return=${encodeURIComponent(returnUrl)}`);
+  });
+
+  app.get('/api/session', async (req, res) => {
+    const token = readCookie(req.headers.cookie, SPMT_SESSION_COOKIE);
+    if (!token) return res.status(401).json({ error: 'Not authenticated' });
+    try {
+      const response = await fetch(`${SPMT_BASE_URL}/api/me`, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' } });
+      const data = await response.json();
+      if (!response.ok) {
+        res.clearCookie(SPMT_SESSION_COOKIE, { ...sessionCookieOptions(), maxAge: 0 });
+        return res.status(401).json({ error: 'SPMT session expired' });
+      }
+      res.json(data);
+    } catch {
+      res.status(502).json({ error: 'SPMT session validation unavailable' });
+    }
+  });
+
+  app.post('/api/session/upgrade', async (req, res) => {
+    const token = String(req.body?.token || '').trim();
+    if (!token) return res.status(400).json({ error: 'Legacy SPMT token required' });
+    try {
+      const response = await fetch(`${SPMT_BASE_URL}/api/me`, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' } });
+      const data = await response.json();
+      if (!response.ok || !data?.user?.id) return res.status(401).json({ error: 'Legacy SPMT token is invalid or expired' });
+      res.cookie(SPMT_SESSION_COOKIE, token, sessionCookieOptions());
+      res.json({ ok: true, user: data.user });
+    } catch {
+      res.status(502).json({ error: 'SPMT legacy session validation unavailable' });
+    }
+  });
+
+  app.post('/api/session/logout', (req, res) => {
+    res.clearCookie(SPMT_SESSION_COOKIE, { ...sessionCookieOptions(), maxAge: 0 });
+    res.json({ ok: true });
+  });
+
+  app.use('/api/spmt', async (req, res) => {
+    const token = readCookie(req.headers.cookie, SPMT_SESSION_COOKIE);
+    if (!token) return res.status(401).json({ error: 'Not authenticated' });
+    try {
+      const target = new URL(req.originalUrl.replace(/^\/api\/spmt/, ''), SPMT_BASE_URL);
+      const response = await fetch(target, {
+        method: req.method,
+        headers: { Authorization: `Bearer ${token}`, Accept: 'application/json', ...(req.method === 'GET' || req.method === 'HEAD' ? {} : { 'Content-Type': 'application/json' }) },
+        body: req.method === 'GET' || req.method === 'HEAD' ? undefined : JSON.stringify(req.body ?? {}),
+      });
+      const body = Buffer.from(await response.arrayBuffer());
+      res.status(response.status);
+      const contentType = response.headers.get('content-type');
+      const etag = response.headers.get('etag');
+      if (contentType) res.setHeader('content-type', contentType);
+      if (etag) res.setHeader('etag', etag);
+      res.send(body);
+    } catch {
+      res.status(502).json({ error: 'SPMT request failed' });
+    }
   });
 
   // API Route: Domain-specific branding

@@ -28,11 +28,9 @@ export default function CosmicHeader({ activeTab, setActiveTab, accentColor, ide
 
   const logoutFromSpmt = async () => {
     try {
-      const token = localStorage.getItem('spmtToken');
-      await fetch('https://spmt.live/api/auth/logout', {
+      await fetch('/api/session/logout', {
         method: 'POST',
         credentials: 'include',
-        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
       });
     } catch {}
 
@@ -225,7 +223,7 @@ export default function CosmicHeader({ activeTab, setActiveTab, accentColor, ide
         </div>
       ) : (
         <a
-          href="https://spmt.live/api/oauth/authorize?client_id=spacemountain-live&redirect_uri=https%3A%2F%2Fspacemountain.live%2Fauth%2Fcallback"
+          href="/auth/login"
           className="flex items-center gap-2 px-4 py-2 rounded-xl font-sans font-extrabold text-xs text-black transition-all transform hover:-translate-y-0.5 no-underline shadow-lg shrink-0"
           style={{ backgroundColor: accentColor, boxShadow: `0 4px 16px ${accentColor}44` }}
         >

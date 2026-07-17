@@ -104,16 +104,20 @@ const streamweaverCommandsUrl = 'https://streamweaver-new.fly.dev/login?next=%2F
 const streamweaverCommunityUrl = 'https://streamweaver-new.fly.dev/login?next=%2Fcommunity';
 const streamweaverIntegrationsUrl = 'https://streamweaver-new.fly.dev/login?next=%2Fintegrations';
 const streamweaverWorkflowsUrl = 'https://streamweaver-new.fly.dev/login?next=%2Factive-commands';
-const spmtBaseUrl = 'https://spmt.live';
+const spmtBaseUrl = '/api/spmt';
 
 function getStoredSpmtToken() {
+  return 'http-only-session';
+}
+
+function getLegacySpmtToken() {
   return localStorage.getItem('spmtToken') || localStorage.getItem('spmt_token') || '';
 }
 
-function storeSpmtSession(token: string, profile: UserProfile) {
-  localStorage.setItem('spmtToken', token);
-  localStorage.setItem('spmt_token', token);
-  localStorage.setItem('spmtIdentity', JSON.stringify(profile));
+function storeSpmtSession(_token: string, _profile: UserProfile) {
+  localStorage.removeItem('spmtToken');
+  localStorage.removeItem('spmt_token');
+  localStorage.removeItem('spmtIdentity');
 }
 
 function clearSpmtSession() {
@@ -562,6 +566,9 @@ const ShoutoutProfileCard: React.FC<{
 };
 
 export default function App() {
+  // SPMT is the authoritative identity; the browser only receives the profile, never the session token.
+  const [identity, setIdentity] = useState<UserProfile | null>(null);
+
   // Navigation & Interactive Tabs
   const [activeTab, setActiveTab] = useState<string>(() => {
     if (typeof window !== 'undefined') {
@@ -669,12 +676,9 @@ export default function App() {
 
   // Fetch points from DSH on every tab change
   useEffect(() => {
-    const cachedUser = localStorage.getItem('spmtIdentity');
-    if (!cachedUser) return;
-    try {
-      const user = JSON.parse(cachedUser);
-      if (!user.username) return;
-      fetch(`https://spmt.live/api/user/lookup?username=${encodeURIComponent(user.username)}`)
+    const user = identity;
+    if (!user?.username) return;
+      fetch(`/api/spmt/api/user/lookup?username=${encodeURIComponent(user.username)}`)
         .then(r => r.ok ? r.json() : null)
         .then(spmtUser => {
           if (!spmtUser?.discord_id) return;
@@ -691,8 +695,7 @@ export default function App() {
           }
         })
         .catch(() => {});
-    } catch {}
-  }, [activeTab]);
+  }, [activeTab, identity?.username]);
 
   useEffect(() => {
     const handlePopState = () => {
@@ -709,9 +712,6 @@ export default function App() {
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
   
-  // Identity States - null until signed in via spmt.live
-  const [identity, setIdentity] = useState<UserProfile | null>(null);
-
   // User Preferences / Appearance states matching the customizable customizer exactly
   const [preferences, setPreferences] = useState<UserPreferences>(() => ({ ...defaultUserPreferences }));
 
@@ -806,17 +806,20 @@ export default function App() {
   const refreshSpmtIdentity = React.useCallback(async (token = getStoredSpmtToken()) => {
     if (!token) return null;
 
-    const refreshResponse = await fetch(`${spmtBaseUrl}/api/auth/refresh`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${token}` },
-      credentials: 'include',
-    });
-    const response = refreshResponse.ok
-      ? refreshResponse
-      : await fetch(`${spmtBaseUrl}/api/me`, {
-          headers: { Authorization: `Bearer ${token}` },
+    let response = await fetch('/api/session', { credentials: 'include' });
+
+    if (!response.ok) {
+      const legacyToken = getLegacySpmtToken();
+      if (legacyToken) {
+        const upgrade = await fetch('/api/session/upgrade', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token: legacyToken }),
           credentials: 'include',
-        });
+        }).catch(() => null);
+        if (upgrade?.ok) response = await fetch('/api/session', { credentials: 'include' });
+      }
+    }
 
     if (!response.ok) {
       clearSpmtSession();
@@ -826,7 +829,7 @@ export default function App() {
 
     const data = await response.json();
     const profile = mapSpmtUserToProfile(data.user, identity);
-    const nextToken = data.token || token;
+    const nextToken = token;
     storeSpmtSession(nextToken, profile);
     setIdentity(profile);
     const apps = Array.isArray(data?.apps) ? data.apps : await refreshSpmtApps(nextToken);
@@ -878,14 +881,6 @@ export default function App() {
 
   const getSpmtHandle = () => {
     if (identity?.username) return identity.username;
-
-    try {
-      const cached = JSON.parse(localStorage.getItem('spmtIdentity') || 'null');
-      if (cached?.username) return cached.username;
-    } catch {
-      // Fall through to the shared app inbox.
-    }
-
     return 'spmtmessaging';
   };
 
@@ -1293,19 +1288,8 @@ export default function App() {
   }, [bridgeSearch]);
   const sendEmbeddedAuth = React.useCallback((frame: HTMLIFrameElement | null) => {
     if (!frame?.contentWindow) return;
-    const token = getStoredSpmtToken();
-    const storedIdentity = window.localStorage.getItem('spmtIdentity');
-    let profile: UserProfile | null = identity;
-
-    if (!profile && storedIdentity) {
-      try {
-        profile = JSON.parse(storedIdentity) as UserProfile;
-      } catch {
-        profile = null;
-      }
-    }
-
-    if (!token && !profile) return;
+    const profile: UserProfile | null = identity;
+    if (!profile) return;
 
     const targetOrigin = (() => {
       try {
@@ -1318,7 +1302,6 @@ export default function App() {
     frame.contentWindow.postMessage({
       type: 'SPACEMOUNTAIN_AUTH',
       source: 'spacemountain.live',
-      token,
       profile: profile ? {
         ...profile,
         discordUserId: profile.discordId || (profile as any).discordUserId || null,
@@ -1462,16 +1445,6 @@ export default function App() {
 
   // Initialize: Check auth status and fetch data
   useEffect(() => {
-    // Check for OAuth callback code in URL
-    const params = new URLSearchParams(window.location.search);
-    const authCode = params.get('auth_code');
-    if (authCode) {
-      localStorage.setItem('spmtToken', authCode);
-      localStorage.setItem('spmt_token', authCode);
-      refreshSpmtIdentity(authCode)
-        .finally(() => window.history.replaceState({}, '', '/'));
-    }
-
     // 1. Fetch domain branding
     fetch('/api/branding')
       .then(res => res.json())
@@ -1527,7 +1500,7 @@ export default function App() {
     if (spmtToken) {
       refreshSpmtIdentity(spmtToken).catch(() => {});
       // 5. Fetch forum threads from spmt.live
-      fetch('https://spmt.live/api/forum/threads')
+      fetch('/api/spmt/api/forum/threads')
         .then(r => r.ok ? r.json() : [])
         .then(threads => {
           setForumThreads(threads.map((t: any) => ({
@@ -1543,16 +1516,6 @@ export default function App() {
         .catch(() => {});
     }
 
-    // Restore local user session if available
-    const cachedUser = localStorage.getItem('spmtIdentity');
-    if (cachedUser) {
-      try {
-        const parsed = JSON.parse(cachedUser);
-        setIdentity(parsed);
-      } catch (e) {
-        // No session
-      }
-    }
   }, []);
 
   // Update preferences local handler
@@ -1599,11 +1562,10 @@ export default function App() {
     const pointsIncrement = 5;
 
     // Push points to Discord Stream Hub using the existing DSH contract.
-    const cachedUser = localStorage.getItem('spmtIdentity');
-    if (cachedUser) {
+    const user = identity;
+    if (user) {
       try {
-        const user = JSON.parse(cachedUser);
-        const lookup = await fetch(`https://spmt.live/api/user/lookup?username=${encodeURIComponent(user.username)}`);
+        const lookup = await fetch(`/api/spmt/api/user/lookup?username=${encodeURIComponent(user.username)}`);
         if (lookup.ok) {
           const spmtUser = await lookup.json();
           if (spmtUser?.discord_id) {
@@ -1669,14 +1631,13 @@ export default function App() {
   };
 
   const handleSpendDshPoints = async (amount: number) => {
-    const cachedUser = localStorage.getItem('spmtIdentity');
-    if (!cachedUser || amount <= 0) return false;
+    const user = identity;
+    if (!user || amount <= 0) return false;
 
     try {
-      const user = JSON.parse(cachedUser);
       if (!user.username) return false;
 
-      const lookup = await fetch(`https://spmt.live/api/user/lookup?username=${encodeURIComponent(user.username)}`);
+      const lookup = await fetch(`/api/spmt/api/user/lookup?username=${encodeURIComponent(user.username)}`);
       if (!lookup.ok) return false;
       const spmtUser = await lookup.json();
       if (!spmtUser?.discord_id) return false;
@@ -1705,7 +1666,6 @@ export default function App() {
       if (!setResponse.ok) return false;
 
       setIdentity(prev => prev ? { ...prev, points: nextPoints } : prev);
-      localStorage.setItem('spmtIdentity', JSON.stringify({ ...user, points: nextPoints }));
       return true;
     } catch (err) {
       console.warn('Discord Stream Hub points spend failed', err);
@@ -1881,7 +1841,7 @@ export default function App() {
     if (!spmtToken) { alert('Please sign in first'); return; }
 
     try {
-      const res = await fetch('https://spmt.live/api/forum/threads', {
+      const res = await fetch('/api/spmt/api/forum/threads', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${spmtToken}` },
         body: JSON.stringify({ title: newThreadTitle, category: newThreadCategory, body: newThreadBody }),
@@ -1932,7 +1892,7 @@ export default function App() {
 
     setForumReplyBody('');
     await openForumThread(activeForumThread.id);
-    fetch('https://spmt.live/api/forum/threads')
+    fetch('/api/spmt/api/forum/threads')
       .then(r => r.ok ? r.json() : [])
       .then(threads => {
         setForumThreads(threads.map((t: any) => ({

@@ -144,7 +144,7 @@ export function workspaceDraftSignature(draft: WorkspaceProfileDraft) {
 
 export async function fetchWorkspaceProfile(baseUrl: string, token: string): Promise<WorkspaceProfileResponse> {
   const response = await fetch(`${baseUrl}/api/workspace-profile`, {
-    headers: { Authorization: `Bearer ${token}` },
+    headers: token && token !== 'http-only-session' ? { Authorization: `Bearer ${token}` } : {},
     credentials: 'include',
   });
   const data = await response.json().catch(() => ({}));
@@ -162,7 +162,7 @@ export async function patchWorkspaceProfile(
     method: 'PATCH',
     headers: {
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`,
+      ...(token && token !== 'http-only-session' ? { Authorization: `Bearer ${token}` } : {}),
       'If-Match': `"workspace-${revision}"`,
     },
     credentials: 'include',
@@ -184,7 +184,7 @@ export async function patchWorkspaceProfile(
 export async function resetWorkspaceProfile(baseUrl: string, token: string, revision: number): Promise<WorkspaceProfileResponse> {
   const response = await fetch(`${baseUrl}/api/workspace-profile/reset`, {
     method: 'POST',
-    headers: { Authorization: `Bearer ${token}`, 'If-Match': `"workspace-${revision}"` },
+    headers: { ...(token && token !== 'http-only-session' ? { Authorization: `Bearer ${token}` } : {}), 'If-Match': `"workspace-${revision}"` },
     credentials: 'include',
   });
   const data = await response.json().catch(() => ({}));

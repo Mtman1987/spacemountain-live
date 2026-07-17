@@ -74,7 +74,7 @@ const defaultInventory: Inventory = {
 const inventoryStorageKey = 'spmtArenaInventory';
 const statsStorageKey = 'spmtArenaStats';
 
-function loadInventory(): Inventory {
+function loadLegacyInventory(): Inventory {
   try {
     const saved = localStorage.getItem(inventoryStorageKey);
     return saved ? { ...defaultInventory, ...JSON.parse(saved) } : defaultInventory;
@@ -83,7 +83,7 @@ function loadInventory(): Inventory {
   }
 }
 
-function loadLocalStats() {
+function loadLegacyStats() {
   try {
     const saved = localStorage.getItem(statsStorageKey);
     return saved ? { kills: 0, deaths: 0, ...JSON.parse(saved) } : { kills: 0, deaths: 0 };
@@ -100,8 +100,10 @@ export default function Arena({ accentColor, points, username, displayName, onSp
   const [showShop, setShowShop] = useState(false);
   const [showInventory, setShowInventory] = useState(true);
   const [balance, setBalance] = useState(points);
-  const [inventory, setInventory] = useState<Inventory>(() => loadInventory());
-  const [localStats, setLocalStats] = useState(() => loadLocalStats());
+  const [inventory, setInventory] = useState<Inventory>(defaultInventory);
+  const [localStats, setLocalStats] = useState({ kills: 0, deaths: 0 });
+  const stateRevisionRef = useRef<number | null>(null);
+  const [stateLoaded, setStateLoaded] = useState(false);
   const [selectedWeapon, setSelectedWeapon] = useState<'bullet' | 'missile' | 'test'>('bullet');
   const [projectiles, setProjectiles] = useState<Projectile[]>([]);
   const [, setFrameTick] = useState(0);
@@ -131,7 +133,7 @@ export default function Arena({ accentColor, points, username, displayName, onSp
   const arenaRef = useRef<HTMLDivElement>(null);
   const posRef = useRef({ x: 400, y: 300, angle: 0 });
   const mouseRef = useRef({ x: 400, y: 300 });
-  const token = localStorage.getItem('spmtToken') || localStorage.getItem('spmt_token');
+  const token = 'http-only-session';
   const pilotName = displayName || username || 'Guest Captain';
 
   const visibleKills = Math.max(localStats.kills, ...players.map((p) => p.kills || 0), 0);
@@ -147,15 +149,59 @@ export default function Arena({ accentColor, points, username, displayName, onSp
   useEffect(() => { setBalance(points); }, [points]);
 
   useEffect(() => {
-    localStorage.setItem(inventoryStorageKey, JSON.stringify(inventory));
-  }, [inventory]);
+    let cancelled = false;
+    void (async () => {
+      const response = await fetch('/api/spmt/api/app-state/spacemountain-live/arena', { credentials: 'include' });
+      if (cancelled) return;
+      if (response.ok) {
+        const record = await response.json();
+        setInventory({ ...defaultInventory, ...(record.data?.inventory || {}) });
+        setLocalStats({ kills: 0, deaths: 0, ...(record.data?.stats || {}) });
+        stateRevisionRef.current = record.revision;
+      } else if (response.status === 404) {
+        const migratedInventory = loadLegacyInventory();
+        const migratedStats = loadLegacyStats();
+        const created = await fetch('/api/spmt/api/app-state/spacemountain-live/arena', {
+          method: 'PUT',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ schemaVersion: 1, data: { inventory: migratedInventory, stats: migratedStats } }),
+        });
+        if (created.ok && !cancelled) {
+          const record = await created.json();
+          setInventory(migratedInventory);
+          setLocalStats(migratedStats);
+          stateRevisionRef.current = record.revision;
+          localStorage.removeItem(inventoryStorageKey);
+          localStorage.removeItem(statsStorageKey);
+        }
+      }
+      if (!cancelled) setStateLoaded(true);
+    })().catch(() => { if (!cancelled) setStateLoaded(true); });
+    return () => { cancelled = true; };
+  }, []);
 
   useEffect(() => {
-    localStorage.setItem(statsStorageKey, JSON.stringify(localStats));
-  }, [localStats]);
+    if (!stateLoaded || stateRevisionRef.current == null) return;
+    const timer = window.setTimeout(async () => {
+      const revision = stateRevisionRef.current;
+      if (revision == null) return;
+      const response = await fetch('/api/spmt/api/app-state/spacemountain-live/arena', {
+        method: 'PUT',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json', 'If-Match': `"app-state-spacemountain-live-arena-${revision}"` },
+        body: JSON.stringify({ schemaVersion: 1, revision, data: { inventory, stats: localStats } }),
+      });
+      if (response.ok) {
+        const record = await response.json();
+        stateRevisionRef.current = record.revision;
+      }
+    }, 500);
+    return () => window.clearTimeout(timer);
+  }, [inventory, localStats, stateLoaded]);
 
   const apiCall = useCallback(async (path: string, opts?: any) => {
-    return fetch(`https://spmt.live${path}`, {
+    return fetch(`/api/spmt${path}`, {
       ...opts,
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}`, ...(opts?.headers || {}) },
       credentials: 'include',
@@ -376,7 +422,7 @@ export default function Arena({ accentColor, points, username, displayName, onSp
   };
 
   useEffect(() => {
-    fetch('https://spmt.live/api/arena/leaderboard').then(r => r.json()).then(setLeaderboard).catch(() => {});
+    fetch('/api/spmt/api/arena/leaderboard').then(r => r.json()).then(setLeaderboard).catch(() => {});
   }, [joined]);
 
   const localPlayer: Player = {
