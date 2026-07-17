@@ -570,7 +570,25 @@ async function startServer() {
 
   // Health check endpoint
   app.get('/api/health', (req, res) => {
-    res.json({ status: 'ok', app: 'spacemountain-live', uptime: process.uptime() });
+    const requiredSecretNames = [
+      'SPACEMOUNTAIN_CLIENT_SECRET',
+      'DSH_POINTS_TOKEN',
+      'COMMUNITY_SHOUTOUT_TOKEN',
+      'FORUM_FORWARD_TOKEN',
+    ];
+    const missingSecretNames = process.env.NODE_ENV === 'production'
+      ? requiredSecretNames.filter((name) => !String(process.env[name] || '').trim())
+      : [];
+    res.status(missingSecretNames.length ? 503 : 200).json({
+      status: missingSecretNames.length ? 'not-ready' : 'ok',
+      app: 'spacemountain-live',
+      uptime: process.uptime(),
+      dependencies: {
+        serviceCredentials: missingSecretNames.length
+          ? { status: 'unavailable', missingSecretNames }
+          : { status: 'configured' },
+      },
+    });
   });
 
   // OAuth2 callback exchanges the one-time code server-side and keeps the SPMT token HttpOnly.
@@ -942,9 +960,13 @@ async function startServer() {
     }
 
     try {
+      const dshPointsToken = String(process.env.DSH_POINTS_TOKEN || '').trim();
+      if (!dshPointsToken) {
+        return res.status(503).json({ error: 'DSH points integration is not configured' });
+      }
       const result = await fetchJsonFromApp(`https://discord-stream-hub-new.fly.dev/api/points/${action}`, {
         method: 'POST',
-        headers: { Authorization: `Bearer ${process.env.DSH_POINTS_TOKEN || '1234'}` },
+        headers: { Authorization: `Bearer ${dshPointsToken}` },
         body: JSON.stringify(req.body || {}),
       });
       res.status(result.status).json(result.payload);
@@ -1057,9 +1079,12 @@ async function startServer() {
   });
 
   app.post(['/api/community/shoutouts', '/api/integrations/dsh/shoutout'], (req, res) => {
-    const expectedToken = process.env.COMMUNITY_SHOUTOUT_TOKEN;
+    const expectedToken = String(process.env.COMMUNITY_SHOUTOUT_TOKEN || '').trim();
+    if (!expectedToken) {
+      return res.status(503).json({ error: 'Community shoutout integration is not configured' });
+    }
     const bearerToken = String(req.get('authorization') || '').replace(/^Bearer\s+/i, '').trim();
-    if (expectedToken && bearerToken !== expectedToken) {
+    if (bearerToken !== expectedToken) {
       return res.status(401).json({ error: 'Invalid community shoutout token' });
     }
 
@@ -1166,9 +1191,12 @@ async function startServer() {
   });
 
   app.post(['/api/forum/forward', '/api/integrations/dsh/forum-forward'], async (req, res) => {
-    const expectedToken = process.env.FORUM_FORWARD_TOKEN;
+    const expectedToken = String(process.env.FORUM_FORWARD_TOKEN || '').trim();
+    if (!expectedToken) {
+      return res.status(503).json({ error: 'Forum forwarding integration is not configured' });
+    }
     const bearerToken = String(req.get('authorization') || '').replace(/^Bearer\s+/i, '').trim();
-    if (expectedToken && bearerToken !== expectedToken) {
+    if (bearerToken !== expectedToken) {
       return res.status(401).json({ error: 'Invalid forum forward token' });
     }
 
