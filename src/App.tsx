@@ -335,14 +335,40 @@ const defaultOverlayWidgets: OverlayWidget[] = [
     visible: false, locked: false, interactive: false, x: 2, y: 12, width: 420, height: 240, opacity: 1,
   },
   {
-    id: 'streamweaver-avatar', title: 'StreamWeaver Bot Avatar', kind: 'avatar', url: 'https://streamweaver-new.fly.dev/tts-listener',
+    id: 'streamweaver-avatar', title: 'StreamWeaver Bot Avatar', kind: 'avatar', url: 'https://streamweaver-new.fly.dev/overlay/avatar',
     visible: false, locked: false, interactive: true, x: 75, y: 54, width: 320, height: 320, opacity: 1,
   },
   {
-    id: 'streamweaver-tts-mixer', title: 'StreamWeaver Shared TTS Mixer', kind: 'audio', url: 'https://streamweaver-new.fly.dev/tts-mixer',
+    id: 'streamweaver-tts-mixer', title: 'StreamWeaver Live TTS', kind: 'audio', url: 'https://streamweaver-new.fly.dev/tts-player',
     visible: false, locked: false, interactive: true, x: 2, y: 64, width: 520, height: 300, opacity: 1,
   },
 ];
+
+function addStreamWeaverTenant(url: string, tenantId?: string | null) {
+  if (!tenantId || !url.startsWith('https://streamweaver-new.fly.dev/')) return url;
+  const nextUrl = new URL(url);
+  nextUrl.searchParams.set('tenant', tenantId);
+  return nextUrl.toString();
+}
+
+function normalizeOverlayWidgets(savedWidgets: OverlayWidget[] | null | undefined, tenantId?: string | null) {
+  const savedById = new Map((savedWidgets || []).map((widget) => [widget.id, widget]));
+  const normalizedDefaults = defaultOverlayWidgets.map((defaultWidget) => {
+    const saved = savedById.get(defaultWidget.id);
+    const widget = { ...defaultWidget, ...saved };
+    if (widget.id === 'streamweaver-avatar') {
+      widget.title = 'StreamWeaver Bot Avatar';
+      widget.url = addStreamWeaverTenant('https://streamweaver-new.fly.dev/overlay/avatar', tenantId);
+    }
+    if (widget.id === 'streamweaver-tts-mixer') {
+      widget.title = 'StreamWeaver Live TTS';
+      widget.url = addStreamWeaverTenant('https://streamweaver-new.fly.dev/tts-player', tenantId);
+    }
+    return widget;
+  });
+  const customWidgets = (savedWidgets || []).filter((widget) => !defaultOverlayWidgets.some((item) => item.id === widget.id));
+  return [...normalizedDefaults, ...customWidgets];
+}
 
 const defaultWorkflowSteps: WorkflowStep[] = [
   { id: 'shared-chat-context', trigger: 'Shared chat message', condition: 'Any connected source', action: 'Add to bot context', destination: 'StreamWeaver memory', enabled: true },
@@ -1314,37 +1340,57 @@ export default function App() {
   useEffect(() => {
     const token = getStoredSpmtToken();
     if (!token || !identity) return;
+    const cacheKey = `spacemountain:overlay-workspace:${identity.id}`;
+    try {
+      const cached = JSON.parse(localStorage.getItem(cacheKey) || 'null');
+      if (cached) {
+        if (typeof cached.enabled === 'boolean') setOverlayWorkspaceEnabled(cached.enabled);
+        setOverlayWidgets(normalizeOverlayWidgets(cached.widgets, identity.twitchId));
+        if (Array.isArray(cached.workflows)) setWorkflowSteps(cached.workflows);
+      }
+    } catch {}
     setOverlayWorkspaceLoaded(false);
     fetch(`${spmtBaseUrl}/api/overlay-workspace`, {
       headers: { Authorization: `Bearer ${token}` },
       credentials: 'include',
     })
-      .then((response) => response.ok ? response.json() : null)
+      .then((response) => {
+        if (!response.ok) throw new Error(`Overlay workspace load failed (${response.status})`);
+        return response.json();
+      })
       .then((data) => {
         const layout = data?.layout;
         if (typeof layout?.enabled === 'boolean') setOverlayWorkspaceEnabled(layout.enabled);
         if (Array.isArray(layout?.widgets)) {
-          setOverlayWidgets(layout.widgets.map((widget: OverlayWidget, index: number) => ({
-            ...defaultOverlayWidgets[index],
-            ...widget,
-          })));
+          setOverlayWidgets(normalizeOverlayWidgets(layout.widgets, identity.twitchId));
         }
         if (Array.isArray(layout?.workflows)) setWorkflowSteps(layout.workflows);
       })
+      .catch((error) => console.warn('Overlay workspace load failed; using local copy', error))
       .finally(() => setOverlayWorkspaceLoaded(true));
-  }, [identity?.id]);
+  }, [identity?.id, identity?.twitchId]);
 
   useEffect(() => {
     if (!overlayWorkspaceLoaded || !identity) return;
     const token = getStoredSpmtToken();
     if (!token) return;
+    const layout = {
+      enabled: overlayWorkspaceEnabled,
+      widgets: normalizeOverlayWidgets(overlayWidgets, identity.twitchId),
+      workflows: workflowSteps,
+    };
+    localStorage.setItem(`spacemountain:overlay-workspace:${identity.id}`, JSON.stringify(layout));
     const timer = window.setTimeout(() => {
       fetch(`${spmtBaseUrl}/api/overlay-workspace`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         credentials: 'include',
-        body: JSON.stringify({ layout: { enabled: overlayWorkspaceEnabled, widgets: overlayWidgets, workflows: workflowSteps } }),
-      }).catch(() => {});
+        body: JSON.stringify({ layout }),
+      })
+        .then((response) => {
+          if (!response.ok) throw new Error(`Overlay workspace save failed (${response.status})`);
+        })
+        .catch((error) => console.warn('Overlay workspace save failed; local copy retained', error));
     }, 700);
     return () => window.clearTimeout(timer);
   }, [identity, overlayWidgets, overlayWorkspaceEnabled, overlayWorkspaceLoaded, workflowSteps]);
@@ -1442,6 +1488,41 @@ export default function App() {
       setForwardedForumLoading(false);
     }
   };
+
+  useEffect(() => {
+    let stopped = false;
+    let inFlight = false;
+    const refreshLiveData = async () => {
+      if (stopped || inFlight || document.visibilityState === 'hidden') return;
+      inFlight = true;
+      try {
+        await Promise.allSettled([
+          refreshHearMeOutRooms(),
+          refreshChatTagState(),
+          refreshCommunityShoutouts(),
+          refreshQuackverseState(),
+          refreshForwardedForumPosts(),
+          refreshSpmtApps(),
+          refreshSpmtInbox(),
+        ]);
+      } finally {
+        inFlight = false;
+      }
+    };
+    const handleFocus = () => void refreshLiveData();
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') void refreshLiveData();
+    };
+    const interval = window.setInterval(() => void refreshLiveData(), 15_000);
+    window.addEventListener('focus', handleFocus);
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => {
+      stopped = true;
+      window.clearInterval(interval);
+      window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
+  }, [identity?.id, commlinkFilter, commlinkSearch]);
 
   // Initialize: Check auth status and fetch data
   useEffect(() => {
