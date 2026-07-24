@@ -323,6 +323,12 @@ export default function Arena({ accentColor, points, username, displayName, onSp
 
   const registerKill = (label: string) => {
     setLocalStats((prev) => ({ ...prev, kills: prev.kills + 1 }));
+    fetch('/api/arena/kill-xp', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ targetLabel: label }),
+    }).catch(() => {});
     setHitFeedback(`${label} destroyed. +1 level`);
     setTimeout(() => setHitFeedback(''), 1700);
   };

@@ -14,6 +14,7 @@ const DSH_COMMUNITY_SPOTLIGHT_URL = process.env.DSH_COMMUNITY_SPOTLIGHT_URL || '
 const DSH_COMMUNITY_ONLINE_URL = process.env.DSH_COMMUNITY_ONLINE_URL || 'https://discord-stream-hub-new.fly.dev/api/community-online';
 const SPMT_BASE_URL = 'https://spmt.live';
 const SPMT_SESSION_COOKIE = 'spacemountain_spmt_session';
+const SPMT_API_KEY = String(process.env.SPMT_API_KEY || '').trim();
 
 function readCookie(header: string | undefined, name: string) {
   for (const part of String(header || '').split(';')) {
@@ -191,6 +192,71 @@ async function fetchJsonFromApp(url: string, init: RequestInit = {}) {
     return { ok: response.ok, status: response.status, payload };
   } finally {
     clearTimeout(timer);
+  }
+}
+
+function cleanXpKeyPart(value: unknown): string {
+  return String(value || '').trim().toLowerCase().replace(/[^a-z0-9._:-]+/g, '-').replace(/^-+|-+$/g, '') || 'unknown';
+}
+
+async function getSpmtSessionUser(cookieHeader: string | undefined) {
+  const token = readCookie(cookieHeader, SPMT_SESSION_COOKIE);
+  if (!token) return null;
+  const response = await fetch(`${SPMT_BASE_URL}/api/me`, {
+    headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
+  });
+  if (!response.ok) return null;
+  const data = await response.json() as any;
+  return data?.user?.id ? data.user : null;
+}
+
+async function awardSpmtXp(input: {
+  userId: string;
+  eventType: 'spacemountain.tool.trigger' | 'spacemountain.arena.kill';
+  upstreamEventId: string;
+  delta: number;
+  metadata?: Record<string, unknown>;
+}) {
+  if (!SPMT_API_KEY) return { skipped: true, reason: 'SPMT_API_KEY not configured' };
+
+  const idempotencyKey = [
+    cleanXpKeyPart('spacemountain'),
+    cleanXpKeyPart(input.eventType),
+    cleanXpKeyPart(input.upstreamEventId),
+    cleanXpKeyPart(input.userId),
+  ].join(':').slice(0, 200);
+
+  try {
+    const response = await fetch(`${SPMT_BASE_URL}/api/platform/xp`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${SPMT_API_KEY}`,
+      },
+      body: JSON.stringify({
+        sourceApp: 'spacemountain',
+        userId: input.userId,
+        eventType: input.eventType,
+        idempotencyKey,
+        delta: input.delta,
+        metadata: {
+          schemaVersion: 1,
+          upstreamEventId: input.upstreamEventId,
+          ...(input.metadata || {}),
+        },
+      }),
+    });
+
+    if (!response.ok) {
+      const body = await response.text().catch(() => '');
+      console.warn('[SPMT] SpaceMountain XP award failed', { status: response.status, body });
+      return { skipped: false, ok: false, status: response.status };
+    }
+
+    return { skipped: false, ok: true, result: await response.json().catch(() => null) };
+  } catch (error) {
+    console.warn('[SPMT] SpaceMountain XP award error', error);
+    return { skipped: false, ok: false };
   }
 }
 
@@ -587,6 +653,7 @@ async function startServer() {
         serviceCredentials: missingSecretNames.length
           ? { status: 'unavailable', missingSecretNames }
           : { status: 'configured' },
+        spmtXpProducer: SPMT_API_KEY ? { status: 'configured' } : { status: 'degraded', reason: 'SPMT_API_KEY not configured' },
       },
     });
   });
@@ -744,9 +811,49 @@ async function startServer() {
         .set({ pointsFlow: updatedPoints })
         .where(eq(communityTools.id, id))
         .run();
-      res.json({ success: true, id, pointsFlow: updatedPoints });
+
+      let xp: Awaited<ReturnType<typeof awardSpmtXp>> | { skipped: true; reason: string } = { skipped: true, reason: 'not-authenticated' };
+      const spmtUser = await getSpmtSessionUser(req.headers.cookie).catch(() => null);
+      if (spmtUser?.id) {
+        xp = await awardSpmtXp({
+          userId: spmtUser.id,
+          eventType: 'spacemountain.tool.trigger',
+          upstreamEventId: `tool-${id}-${Date.now()}-${crypto.randomUUID()}`,
+          delta: increment,
+          metadata: {
+            toolId: id,
+            source: 'spacemountain-tools',
+          },
+        });
+      }
+
+      res.json({ success: true, id, pointsFlow: updatedPoints, xp });
     } catch (err) {
       res.status(500).json({ error: 'Failed to update points flow' });
+    }
+  });
+
+  app.post('/api/arena/kill-xp', async (req, res) => {
+    try {
+      const spmtUser = await getSpmtSessionUser(req.headers.cookie).catch(() => null);
+      if (!spmtUser?.id) return res.status(401).json({ error: 'Not authenticated' });
+
+      const targetLabel = String(req.body?.targetLabel || req.body?.target || 'arena-target').slice(0, 120);
+      const xp = await awardSpmtXp({
+        userId: spmtUser.id,
+        eventType: 'spacemountain.arena.kill',
+        upstreamEventId: `arena-kill-${spmtUser.id}-${Date.now()}-${crypto.randomUUID()}`,
+        delta: 1,
+        metadata: {
+          targetLabel,
+          source: 'spacemountain-arena',
+        },
+      });
+
+      res.json({ success: true, xp });
+    } catch (err) {
+      console.warn('[Arena] XP award failed:', err);
+      res.status(500).json({ error: 'Failed to award arena XP' });
     }
   });
 
