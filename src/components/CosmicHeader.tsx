@@ -72,6 +72,15 @@ export default function CosmicHeader({ activeTab, setActiveTab, accentColor, ide
       </div>
 
       <div className="flex items-center gap-3 ml-auto mr-3">
+        <a
+          href="/docs.html"
+          target="_blank"
+          rel="noreferrer"
+          className="hidden md:inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-[11px] font-extrabold text-zinc-200 hover:bg-white/10 no-underline"
+        >
+          <ExternalLink size={12} />
+          Docs
+        </a>
         <div className="relative flex items-center">
           <AnimatePresence>
             {isSearchExpanded ? (
