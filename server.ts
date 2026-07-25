@@ -8,6 +8,7 @@ import { createServer as createViteServer } from 'vite';
 import { db, sqlite } from './src/db/connection.js';
 import { users, communityTools, userPreferences } from './src/db/schema.js';
 import { eq } from 'drizzle-orm';
+import { mappedXpAwardV1, type XpMappedEventTypeV1 } from '@spmt/sdk';
 
 const PORT = Number(process.env.PORT || 3000);
 const DSH_COMMUNITY_SPOTLIGHT_URL = process.env.DSH_COMMUNITY_SPOTLIGHT_URL || 'https://discord-stream-hub-new.fly.dev/api/community-spotlight';
@@ -195,10 +196,6 @@ async function fetchJsonFromApp(url: string, init: RequestInit = {}) {
   }
 }
 
-function cleanXpKeyPart(value: unknown): string {
-  return String(value || '').trim().toLowerCase().replace(/[^a-z0-9._:-]+/g, '-').replace(/^-+|-+$/g, '') || 'unknown';
-}
-
 async function getSpmtSessionUser(cookieHeader: string | undefined) {
   const token = readCookie(cookieHeader, SPMT_SESSION_COOKIE);
   if (!token) return null;
@@ -212,19 +209,20 @@ async function getSpmtSessionUser(cookieHeader: string | undefined) {
 
 async function awardSpmtXp(input: {
   userId: string;
-  eventType: 'spacemountain.tool.trigger' | 'spacemountain.arena.kill';
+  eventType: Extract<XpMappedEventTypeV1, 'spacemountain.tool.trigger' | 'spacemountain.arena.kill'>;
   upstreamEventId: string;
   delta: number;
   metadata?: Record<string, unknown>;
 }) {
   if (!SPMT_API_KEY) return { skipped: true, reason: 'SPMT_API_KEY not configured' };
 
-  const idempotencyKey = [
-    cleanXpKeyPart('spacemountain'),
-    cleanXpKeyPart(input.eventType),
-    cleanXpKeyPart(input.upstreamEventId),
-    cleanXpKeyPart(input.userId),
-  ].join(':').slice(0, 200);
+  const award = mappedXpAwardV1({
+    userId: input.userId,
+    mappedEventType: input.eventType,
+    upstreamEventId: input.upstreamEventId,
+    deltaOverride: input.delta,
+    metadata: input.metadata,
+  });
 
   try {
     const response = await fetch(`${SPMT_BASE_URL}/api/platform/xp`, {
@@ -235,15 +233,7 @@ async function awardSpmtXp(input: {
       },
       body: JSON.stringify({
         sourceApp: 'spacemountain',
-        userId: input.userId,
-        eventType: input.eventType,
-        idempotencyKey,
-        delta: input.delta,
-        metadata: {
-          schemaVersion: 1,
-          upstreamEventId: input.upstreamEventId,
-          ...(input.metadata || {}),
-        },
+        ...award,
       }),
     });
 
