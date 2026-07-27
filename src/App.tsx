@@ -30,7 +30,7 @@ import RightSidebar from './components/RightSidebar';
 import Shop from './components/Shop';
 import Arena from './components/Arena';
 import OverlayWorkspace, { OverlayWidget } from './components/OverlayWorkspace';
-import { appSurfaces, canonicalEmbedPresets, normalizeAppSurface } from './lib/app-surfaces';
+import { appOrigins, appSurfaces, canonicalEmbedPresets, normalizeAppSurface } from './lib/app-surfaces';
 import { usePortableWorkspace } from './hooks/usePortableWorkspace';
 
 const sleekRocketIcon = '/assets/model-rocket.png';
@@ -1307,7 +1307,7 @@ export default function App() {
       controller.abort();
     };
   }, [bridgeSearch]);
-  const sendEmbeddedAuth = React.useCallback((frame: HTMLIFrameElement | null) => {
+  const sendEmbeddedAuth = React.useCallback(async (frame: HTMLIFrameElement | null) => {
     if (!frame?.contentWindow) return;
     const profile: UserProfile | null = identity;
     if (!profile) return;
@@ -1320,9 +1320,31 @@ export default function App() {
       }
     })();
 
+    let launchCode: string | null = null;
+    if (targetOrigin === appOrigins.streamweaver) {
+      try {
+        const launchResponse = await fetch('/api/embed/launch', {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            clientId: 'streamweaver',
+            targetOrigin,
+            scopes: ['identity:read', 'workspace:read', 'workspace:write', 'tts:control', 'overlay:control'],
+          }),
+        });
+        const launch = await launchResponse.json().catch(() => null);
+        if (launchResponse.ok && launch?.code) launchCode = String(launch.code);
+      } catch (error) {
+        console.warn('StreamWeaver embed launch bridge unavailable', error);
+      }
+    }
+
     frame.contentWindow.postMessage({
       type: 'SPACEMOUNTAIN_AUTH',
       source: 'spacemountain.live',
+      launchCode,
+      targetOrigin,
       profile: profile ? {
         ...profile,
         discordUserId: profile.discordId || (profile as any).discordUserId || null,
@@ -1331,6 +1353,12 @@ export default function App() {
       } : null,
     }, targetOrigin);
   }, [identity]);
+
+  useEffect(() => {
+    if (!identity) return;
+    document.querySelectorAll<HTMLIFrameElement>('[data-embed-slot-frame]')
+      .forEach((frame) => void sendEmbeddedAuth(frame));
+  }, [identity, sendEmbeddedAuth]);
 
   useEffect(() => {
     const token = getStoredSpmtToken();
@@ -1397,7 +1425,15 @@ export default function App() {
       if (event.data?.type !== 'SPACEMOUNTAIN_AUTH_REQUEST') return;
       const frame = Array.from(document.querySelectorAll<HTMLIFrameElement>('[data-embed-slot-frame]'))
         .find((item) => item.contentWindow === event.source);
-      sendEmbeddedAuth(frame || null);
+      if (!frame) return;
+      let expectedOrigin = '';
+      try {
+        expectedOrigin = new URL(frame.src, window.location.href).origin;
+      } catch {
+        return;
+      }
+      if (event.origin !== expectedOrigin) return;
+      void sendEmbeddedAuth(frame);
     }
 
     window.addEventListener('message', handleEmbeddedAuthRequest);
@@ -4731,7 +4767,7 @@ export default function App() {
                     src={slot.url}
                     title={slot.title}
                     data-embed-slot-frame={slot.id}
-                    onLoad={(event) => sendEmbeddedAuth(event.currentTarget)}
+                    onLoad={(event) => void sendEmbeddedAuth(event.currentTarget)}
                     className="h-[360px] w-full bg-black"
                     allow="autoplay; microphone; camera; fullscreen; clipboard-write"
                   />

@@ -726,6 +726,43 @@ async function startServer() {
     res.json({ ok: true });
   });
 
+  app.post('/api/embed/launch', async (req, res) => {
+    const token = readCookie(req.headers.cookie, SPMT_SESSION_COOKIE);
+    if (!token) return res.status(401).json({ error: 'Not authenticated' });
+    const clientId = String(req.body?.clientId || '').trim();
+    const targetOrigin = String(req.body?.targetOrigin || '').trim();
+    const allowedTargets: Record<string, string> = {
+      streamweaver: 'https://streamweaver-new.fly.dev',
+      'discord-stream-hub': 'https://discord-stream-hub-new.fly.dev',
+      hearmeout: 'https://hearmeout-main.fly.dev',
+      'chat-tag': 'https://chat-tag-new.fly.dev',
+    };
+    if (!allowedTargets[clientId] || allowedTargets[clientId] !== targetOrigin) {
+      return res.status(400).json({ error: 'Unsupported embedded app target' });
+    }
+    try {
+      const response = await fetch(`${SPMT_BASE_URL}/api/embed/launch`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          client_id: clientId,
+          target_origin: targetOrigin,
+          scopes: Array.isArray(req.body?.scopes) ? req.body.scopes : undefined,
+        }),
+      });
+      const body = Buffer.from(await response.arrayBuffer());
+      res.status(response.status);
+      res.setHeader('Content-Type', response.headers.get('content-type') || 'application/json');
+      return res.send(body);
+    } catch {
+      return res.status(502).json({ error: 'SPMT embed launch service unavailable' });
+    }
+  });
+
   app.use('/api/spmt', async (req, res) => {
     const token = readCookie(req.headers.cookie, SPMT_SESSION_COOKIE);
     if (!token) return res.status(401).json({ error: 'Not authenticated' });
