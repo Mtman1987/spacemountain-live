@@ -9,6 +9,7 @@ import { db, sqlite } from './src/db/connection.js';
 import { users, communityTools, userPreferences } from './src/db/schema.js';
 import { eq } from 'drizzle-orm';
 import { mappedXpAwardV1, type XpMappedEventTypeV1 } from '@spmt/sdk';
+import { buildSpmtProxyHeaders } from './src/lib/spmt-proxy.js';
 
 const PORT = Number(process.env.PORT || 3000);
 const DSH_COMMUNITY_SPOTLIGHT_URL = process.env.DSH_COMMUNITY_SPOTLIGHT_URL || 'https://discord-stream-hub-new.fly.dev/api/community-spotlight';
@@ -720,10 +721,11 @@ async function startServer() {
     if (!token) return res.status(401).json({ error: 'Not authenticated' });
     try {
       const target = new URL(req.originalUrl.replace(/^\/api\/spmt/, ''), SPMT_BASE_URL);
+      const hasBody = req.method !== 'GET' && req.method !== 'HEAD';
       const response = await fetch(target, {
         method: req.method,
-        headers: { Authorization: `Bearer ${token}`, Accept: 'application/json', ...(req.method === 'GET' || req.method === 'HEAD' ? {} : { 'Content-Type': 'application/json' }) },
-        body: req.method === 'GET' || req.method === 'HEAD' ? undefined : JSON.stringify(req.body ?? {}),
+        headers: buildSpmtProxyHeaders(req.headers, token, hasBody),
+        body: hasBody ? JSON.stringify(req.body ?? {}) : undefined,
       });
       const body = Buffer.from(await response.arrayBuffer());
       res.status(response.status);

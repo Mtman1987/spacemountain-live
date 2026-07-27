@@ -8,6 +8,7 @@ import {
   workspaceDraftSignature,
 } from '../src/lib/workspace-profile';
 import type { EmbedSlot, UserPreferences, WorkspaceProfileV1 } from '../src/types';
+import { buildSpmtProxyHeaders } from '../src/lib/spmt-proxy';
 
 const preferences: UserPreferences = {
   userId: 'workspace-smoke-user',
@@ -66,4 +67,14 @@ assert.equal(draft.activeOverlaySceneId, 'main-scene');
 assert.deepEqual(draft.ttsSubscriptions, ['streamweaver-main']);
 assert.equal(workspaceDraftSignature(draft), workspaceDraftSignature(createWorkspaceProfileDraft(preferences, slots, profile)));
 
-console.log(JSON.stringify({ status: 'passed', checks: 9 }));
+const proxyHeaders = buildSpmtProxyHeaders(
+  { 'if-match': '"workspace-7"', cookie: 'must-not-forward=1' },
+  'server-session-token',
+  true,
+);
+assert.equal(proxyHeaders['If-Match'], '"workspace-7"');
+assert.equal(proxyHeaders.Authorization, 'Bearer server-session-token');
+assert.equal(proxyHeaders['Content-Type'], 'application/json');
+assert.equal(proxyHeaders.cookie, undefined);
+
+console.log(JSON.stringify({ status: 'passed', checks: 13 }));
