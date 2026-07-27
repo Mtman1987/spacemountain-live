@@ -9,13 +9,15 @@ import {
   SlidersHorizontal,
   Sparkles,
 } from 'lucide-react';
-import { UserPreferences } from '../types';
+import { UserPreferences, type WorkspaceProfileV1 } from '../types';
 
 export interface SettingsPanelProps {
   preferences: UserPreferences;
   onUpdatePreferences: (updated: Partial<UserPreferences>) => void;
   onApplyThemePreset: (preset: 'solar-flare' | 'nebula-purple' | 'oceanic-blue' | 'aurora-green') => void;
   accentColor: string;
+  workspaceProfile?: WorkspaceProfileV1 | null;
+  onUpdateWorkspaceProfile?: (patch: Partial<Pick<WorkspaceProfileV1, 'activeOverlaySceneId' | 'ttsSubscriptions' | 'appThemeMappings'>>) => void;
 }
 
 type ThemeId = 'solar-flare' | 'nebula-purple' | 'oceanic-blue' | 'aurora-green';
@@ -69,11 +71,31 @@ export default function SettingsPanel({
   onUpdatePreferences,
   onApplyThemePreset,
   accentColor,
+  workspaceProfile,
+  onUpdateWorkspaceProfile,
 }: SettingsPanelProps) {
   const currentThemeId = (preferences.theme || 'solar-flare') as ThemeId;
   const animationFactor = Math.max(0.2, (preferences.animationSpeed || 85) / 100);
 
   const activePreset = PRESETS.find((p) => p.id === currentThemeId) ?? PRESETS[0];
+  const activeOverlaySceneId = workspaceProfile?.activeOverlaySceneId || '';
+  const ttsSubscriptions = workspaceProfile?.ttsSubscriptions || [];
+  const appThemeMappings = workspaceProfile?.appThemeMappings || {};
+  const appThemeOptions = ['follow-workspace', 'solar-flare', 'nebula-purple', 'oceanic-blue', 'aurora-green'];
+  const appIds = ['discord-stream-hub', 'streamweaver', 'hearmeout', 'chat-tag'];
+
+  const updateTtsSubscription = (subscription: string, enabled: boolean) => {
+    if (!onUpdateWorkspaceProfile) return;
+    const next = enabled
+      ? Array.from(new Set([...ttsSubscriptions, subscription]))
+      : ttsSubscriptions.filter((item) => item !== subscription);
+    onUpdateWorkspaceProfile({ ttsSubscriptions: next });
+  };
+
+  const updateAppThemeMapping = (appId: string, mapping: string) => {
+    if (!onUpdateWorkspaceProfile) return;
+    onUpdateWorkspaceProfile({ appThemeMappings: { ...appThemeMappings, [appId]: mapping } });
+  };
 
   return (
     <div
@@ -585,6 +607,71 @@ export default function SettingsPanel({
           </div>
         </div>
       </div>
+
+      {workspaceProfile && onUpdateWorkspaceProfile && (
+        <div className="mt-6 rounded-2xl border border-white/5 bg-white/[0.02] p-4">
+          <div className="mb-4">
+            <span className="text-[10px] font-mono tracking-wider font-bold uppercase" style={{ color: accentColor }}>
+              ✦ App Consumers
+            </span>
+            <p className="mt-1 text-xs text-zinc-400">
+              These fields are stored in the SPMT workspace profile and read by connected apps.
+            </p>
+          </div>
+
+          <div className="grid gap-4 lg:grid-cols-3">
+            <label className="flex flex-col gap-1.5 rounded-xl border border-white/5 bg-black/30 p-3">
+              <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-zinc-400">Active overlay scene</span>
+              <input
+                value={activeOverlaySceneId}
+                onChange={(event) => onUpdateWorkspaceProfile({ activeOverlaySceneId: event.target.value.trim() || null })}
+                placeholder="main-scene"
+                className="rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-xs text-white outline-none focus:border-white/25"
+              />
+              <span className="text-[10px] text-zinc-500">Used by overlay renderers to choose the current scene.</span>
+            </label>
+
+            <div className="rounded-xl border border-white/5 bg-black/30 p-3">
+              <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-zinc-400">TTS subscriptions</span>
+              <div className="mt-2 flex flex-col gap-2">
+                {['streamweaver', 'hearmeout', 'discord-stream-hub', 'chat-tag'].map((subscription) => {
+                  const checked = ttsSubscriptions.includes(subscription);
+                  return (
+                    <label key={subscription} className="flex items-center justify-between gap-3 text-xs text-zinc-200">
+                      <span>{subscription}</span>
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={(event) => updateTtsSubscription(subscription, event.target.checked)}
+                        className="h-4 w-4"
+                        style={{ accentColor }}
+                      />
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-white/5 bg-black/30 p-3">
+              <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-zinc-400">App theme mapping</span>
+              <div className="mt-2 flex flex-col gap-2">
+                {appIds.map((appId) => (
+                  <label key={appId} className="grid grid-cols-[1fr_150px] items-center gap-2 text-xs text-zinc-200">
+                    <span>{appId}</span>
+                    <select
+                      value={appThemeMappings[appId] || 'follow-workspace'}
+                      onChange={(event) => updateAppThemeMapping(appId, event.target.value)}
+                      className="rounded-lg border border-white/10 bg-black/40 px-2 py-1.5 text-xs text-white outline-none"
+                    >
+                      {appThemeOptions.map((option) => <option key={option} value={option}>{option}</option>)}
+                    </select>
+                  </label>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Bottom preset cards */}
       <div className="mt-6 pt-5 border-t border-white/5">

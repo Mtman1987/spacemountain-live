@@ -4444,6 +4444,8 @@ export default function App() {
                   onUpdatePreferences={handleUpdatePreferences} 
                   onApplyThemePreset={handleApplyThemePreset}
                   accentColor={currentTheme.glowHex}
+                  workspaceProfile={portableWorkspace.profile}
+                  onUpdateWorkspaceProfile={portableWorkspace.updateProfileFields}
                 />
               </motion.div>
             )}

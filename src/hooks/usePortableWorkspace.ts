@@ -259,6 +259,18 @@ export function usePortableWorkspace(options: PortableWorkspaceOptions) {
     }
   }, [applyProfile, baseUrl, defaultEmbedSlots, identityId, token]);
 
+  const updateProfileFields = useCallback((patch: Partial<Pick<WorkspaceProfileV1, 'activeOverlaySceneId' | 'ttsSubscriptions' | 'appThemeMappings'>>) => {
+    if (!loaded || !identityId || loadedIdentityRef.current !== identityId || !profileRef.current) return;
+    const nextProfile = { ...profileRef.current, ...patch };
+    profileRef.current = nextProfile;
+    setProfile(nextProfile);
+    if (identityId) localStorage.setItem(cacheKey(identityId), JSON.stringify(nextProfile));
+    const draft = createWorkspaceProfileDraft(preferences, embedSlots, nextProfile);
+    const signature = workspaceDraftSignature(draft);
+    setStatus(navigator.onLine ? 'unsaved' : 'offline');
+    queueSave({ draft, signature });
+  }, [embedSlots, identityId, loaded, preferences, queueSave]);
+
   useEffect(() => {
     const handleOnline = () => {
       if (status === 'offline' && retryRef.current) retry();
@@ -267,5 +279,5 @@ export function usePortableWorkspace(options: PortableWorkspaceOptions) {
     return () => window.removeEventListener('online', handleOnline);
   }, [retry, status]);
 
-  return { profile, loaded, status, lastSavedAt, error, retry, reload, reset };
+  return { profile, loaded, status, lastSavedAt, error, retry, reload, reset, updateProfileFields };
 }
