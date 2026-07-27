@@ -16,6 +16,7 @@ const DSH_COMMUNITY_SPOTLIGHT_URL = process.env.DSH_COMMUNITY_SPOTLIGHT_URL || '
 const DSH_COMMUNITY_ONLINE_URL = process.env.DSH_COMMUNITY_ONLINE_URL || 'https://discord-stream-hub-new.fly.dev/api/community-online';
 const SPMT_BASE_URL = 'https://spmt.live';
 const SPMT_SESSION_COOKIE = 'spacemountain_spmt_session';
+const SPMT_REFRESH_COOKIE = 'spacemountain_spmt_refresh';
 const SPMT_API_KEY = String(process.env.SPMT_API_KEY || '').trim();
 
 function readCookie(header: string | undefined, name: string) {
@@ -28,6 +29,40 @@ function readCookie(header: string | undefined, name: string) {
 
 function sessionCookieOptions() {
   return { httpOnly: true, secure: true, sameSite: 'lax' as const, path: '/', maxAge: 30 * 24 * 60 * 60 * 1000 };
+}
+
+function clearSpmtSessionCookies(res: express.Response) {
+  res.clearCookie(SPMT_SESSION_COOKIE, { ...sessionCookieOptions(), maxAge: 0 });
+  res.clearCookie(SPMT_REFRESH_COOKIE, { ...sessionCookieOptions(), maxAge: 0 });
+}
+
+async function refreshSpmtSession(req: express.Request, res: express.Response) {
+  const refreshToken = readCookie(req.headers.cookie, SPMT_REFRESH_COOKIE);
+  const clientSecret = String(process.env.SPACEMOUNTAIN_CLIENT_SECRET || '').trim();
+  if (!refreshToken || !clientSecret) return '';
+
+  try {
+    const response = await fetch(`${SPMT_BASE_URL}/api/oauth/token`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify({
+        grant_type: 'refresh_token',
+        refresh_token: refreshToken,
+        client_id: 'spacemountain-live',
+        client_secret: clientSecret,
+      }),
+    });
+    const data = await response.json() as any;
+    if (!response.ok || !data?.access_token || !data?.refresh_token) {
+      clearSpmtSessionCookies(res);
+      return '';
+    }
+    res.cookie(SPMT_SESSION_COOKIE, data.access_token, sessionCookieOptions());
+    res.cookie(SPMT_REFRESH_COOKIE, data.refresh_token, sessionCookieOptions());
+    return String(data.access_token);
+  } catch {
+    return '';
+  }
 }
 
 type AppStatusType = 'live' | 'warn' | 'pink' | 'default';
@@ -676,6 +711,7 @@ async function startServer() {
       const data = await exchange.json() as any;
       if (!exchange.ok || !data?.access_token) return res.status(401).send('SPMT sign-in exchange failed.');
       res.cookie(SPMT_SESSION_COOKIE, data.access_token, sessionCookieOptions());
+      if (data.refresh_token) res.cookie(SPMT_REFRESH_COOKIE, data.refresh_token, sessionCookieOptions());
       res.clearCookie('spacemountain_oauth_state', { ...sessionCookieOptions(), maxAge: 0 });
       res.redirect('/');
     } catch {
@@ -692,13 +728,18 @@ async function startServer() {
   });
 
   app.get('/api/session', async (req, res) => {
-    const token = readCookie(req.headers.cookie, SPMT_SESSION_COOKIE);
+    let token = readCookie(req.headers.cookie, SPMT_SESSION_COOKIE);
+    if (!token) token = await refreshSpmtSession(req, res);
     if (!token) return res.status(401).json({ error: 'Not authenticated' });
     try {
-      const response = await fetch(`${SPMT_BASE_URL}/api/me`, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' } });
+      let response = await fetch(`${SPMT_BASE_URL}/api/me`, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' } });
+      if (!response.ok) {
+        token = await refreshSpmtSession(req, res);
+        if (token) response = await fetch(`${SPMT_BASE_URL}/api/me`, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' } });
+      }
       const data = await response.json();
       if (!response.ok) {
-        res.clearCookie(SPMT_SESSION_COOKIE, { ...sessionCookieOptions(), maxAge: 0 });
+        clearSpmtSessionCookies(res);
         return res.status(401).json({ error: 'SPMT session expired' });
       }
       res.json(data);
@@ -722,12 +763,13 @@ async function startServer() {
   });
 
   app.post('/api/session/logout', (req, res) => {
-    res.clearCookie(SPMT_SESSION_COOKIE, { ...sessionCookieOptions(), maxAge: 0 });
+    clearSpmtSessionCookies(res);
     res.json({ ok: true });
   });
 
   app.post('/api/embed/launch', async (req, res) => {
-    const token = readCookie(req.headers.cookie, SPMT_SESSION_COOKIE);
+    let token = readCookie(req.headers.cookie, SPMT_SESSION_COOKIE);
+    if (!token) token = await refreshSpmtSession(req, res);
     if (!token) return res.status(401).json({ error: 'Not authenticated' });
     const clientId = String(req.body?.clientId || '').trim();
     const targetOrigin = String(req.body?.targetOrigin || '').trim();
@@ -741,10 +783,10 @@ async function startServer() {
       return res.status(400).json({ error: 'Unsupported embedded app target' });
     }
     try {
-      const response = await fetch(`${SPMT_BASE_URL}/api/embed/launch`, {
+      const launchRequest = (accessToken: string) => fetch(`${SPMT_BASE_URL}/api/embed/launch`, {
         method: 'POST',
         headers: {
-          Authorization: `Bearer ${token}`,
+          Authorization: `Bearer ${accessToken}`,
           Accept: 'application/json',
           'Content-Type': 'application/json',
         },
@@ -754,6 +796,11 @@ async function startServer() {
           scopes: Array.isArray(req.body?.scopes) ? req.body.scopes : undefined,
         }),
       });
+      let response = await launchRequest(token);
+      if (response.status === 401) {
+        token = await refreshSpmtSession(req, res);
+        if (token) response = await launchRequest(token);
+      }
       const body = Buffer.from(await response.arrayBuffer());
       res.status(response.status);
       res.setHeader('Content-Type', response.headers.get('content-type') || 'application/json');
