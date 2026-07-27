@@ -17,7 +17,7 @@ export interface SettingsPanelProps {
   onApplyThemePreset: (preset: 'solar-flare' | 'nebula-purple' | 'oceanic-blue' | 'aurora-green') => void;
   accentColor: string;
   workspaceProfile?: WorkspaceProfileV1 | null;
-  onUpdateWorkspaceProfile?: (patch: Partial<Pick<WorkspaceProfileV1, 'activeOverlaySceneId' | 'ttsSubscriptions' | 'appThemeMappings'>>) => void;
+  onUpdateWorkspaceProfile?: (patch: Partial<Pick<WorkspaceProfileV1, 'ttsSubscriptions' | 'appThemeMappings'>>) => void;
 }
 
 type ThemeId = 'solar-flare' | 'nebula-purple' | 'oceanic-blue' | 'aurora-green';
@@ -78,7 +78,6 @@ export default function SettingsPanel({
   const animationFactor = Math.max(0.2, (preferences.animationSpeed || 85) / 100);
 
   const activePreset = PRESETS.find((p) => p.id === currentThemeId) ?? PRESETS[0];
-  const activeOverlaySceneId = workspaceProfile?.activeOverlaySceneId || '';
   const ttsSubscriptions = workspaceProfile?.ttsSubscriptions || [];
   const appThemeMappings = workspaceProfile?.appThemeMappings || {};
   const appThemeOptions = ['follow-workspace', 'solar-flare', 'nebula-purple', 'oceanic-blue', 'aurora-green'];
@@ -619,18 +618,7 @@ export default function SettingsPanel({
             </p>
           </div>
 
-          <div className="grid gap-4 lg:grid-cols-3">
-            <label className="flex flex-col gap-1.5 rounded-xl border border-white/5 bg-black/30 p-3">
-              <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-zinc-400">Active overlay scene</span>
-              <input
-                value={activeOverlaySceneId}
-                onChange={(event) => onUpdateWorkspaceProfile({ activeOverlaySceneId: event.target.value.trim() || null })}
-                placeholder="main-scene"
-                className="rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-xs text-white outline-none focus:border-white/25"
-              />
-              <span className="text-[10px] text-zinc-500">Used by overlay renderers to choose the current scene.</span>
-            </label>
-
+          <div className="grid gap-4 lg:grid-cols-2">
             <div className="rounded-xl border border-white/5 bg-black/30 p-3">
               <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-zinc-400">TTS subscriptions</span>
               <div className="mt-2 flex flex-col gap-2">
