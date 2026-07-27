@@ -378,6 +378,25 @@ const defaultWorkflowSteps: WorkflowStep[] = [
 
 const embedPresets: EmbeddedAppTarget[] = canonicalEmbedPresets;
 
+const tabPathMap: Record<string, string> = {
+  dashboard: '/',
+  settings: '/settings',
+  shop: '/shop',
+  arena: '/arena',
+  apps: '/apps',
+  inbox: '/inbox',
+  forums: '/forums',
+  rooms: '/rooms',
+  mtnview: '/mtnview',
+  builder: '/builder',
+  crew: '/crew',
+  help: '/help',
+};
+
+const pathTabMap = Object.fromEntries(
+  Object.entries(tabPathMap).map(([tab, path]) => [path, tab]),
+) as Record<string, string>;
+
 function getPlayerName(player: any) {
   return player?.displayName || player?.twitchUsername || player?.username || player?.name || player?.id || 'Player';
 }
@@ -588,10 +607,7 @@ export default function App() {
   // Navigation & Interactive Tabs
   const [activeTab, setActiveTab] = useState<string>(() => {
     if (typeof window !== 'undefined') {
-      const path = window.location.pathname;
-      if (path === '/settings') return 'settings';
-      if (path === '/shop') return 'shop';
-      if (path === '/arena') return 'arena';
+      return pathTabMap[window.location.pathname] || 'dashboard';
     }
     return 'dashboard';
   });
@@ -678,13 +694,7 @@ export default function App() {
   }, [rocketFlying]);
 
   useEffect(() => {
-    const pathMap: Record<string, string> = {
-      'dashboard': '/', 'settings': '/settings', 'shop': '/shop', 'arena': '/arena',
-      'apps': '/apps', 'inbox': '/inbox', 'forums': '/forums',
-      'rooms': '/rooms', 'mtnview': '/mtnview', 'builder': '/builder',
-      'crew': '/crew', 'help': '/help',
-    };
-    const nextPath = pathMap[activeTab] || '/';
+    const nextPath = tabPathMap[activeTab] || '/';
     if (window.location.pathname !== nextPath) {
       window.history.pushState({ activeTab }, '', nextPath);
     }
@@ -716,13 +726,7 @@ export default function App() {
   useEffect(() => {
     const handlePopState = () => {
       const path = window.location.pathname;
-      const routeMap: Record<string, string> = {
-        '/': 'dashboard', '/settings': 'settings', '/shop': 'shop', '/arena': 'arena',
-        '/apps': 'apps', '/inbox': 'inbox', '/forums': 'forums',
-        '/rooms': 'rooms', '/mtnview': 'mtnview', '/builder': 'builder',
-        '/crew': 'crew', '/help': 'help',
-      };
-      setActiveTab(routeMap[path] || 'dashboard');
+      setActiveTab(pathTabMap[path] || 'dashboard');
     };
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
