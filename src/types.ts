@@ -9,6 +9,8 @@ export interface CommunityTool {
   route: string;
   pointsFlow: number;
   appUrl?: string | null;
+  embedUrl?: string | null;
+  popoutUrl?: string | null;
   authUrl?: string | null;
   healthUrl?: string | null;
   lastCheckedAt?: string | null;

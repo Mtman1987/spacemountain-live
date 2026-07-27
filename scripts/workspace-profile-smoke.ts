@@ -9,6 +9,7 @@ import {
 } from '../src/lib/workspace-profile';
 import type { EmbedSlot, UserPreferences, WorkspaceProfileV1 } from '../src/types';
 import { buildSpmtProxyHeaders } from '../src/lib/spmt-proxy';
+import { appSurfaces, normalizeAppSurface } from '../src/lib/app-surfaces';
 
 const preferences: UserPreferences = {
   userId: 'workspace-smoke-user',
@@ -77,4 +78,17 @@ assert.equal(proxyHeaders.Authorization, 'Bearer server-session-token');
 assert.equal(proxyHeaders['Content-Type'], 'application/json');
 assert.equal(proxyHeaders.cookie, undefined);
 
-console.log(JSON.stringify({ status: 'passed', checks: 13 }));
+assert.deepEqual(
+  normalizeAppSurface('StreamWeaver Commands', 'https://streamweaver-new.fly.dev/login?next=%2Fcommands'),
+  { title: 'StreamWeaver Commands', url: appSurfaces.streamweaver.commands },
+);
+assert.deepEqual(
+  normalizeAppSurface('Quackverse Game', 'https://spacemountain.live/chat-tag/quackverse'),
+  { title: 'Quackverse Game', url: appSurfaces.chatTag.quackverse },
+);
+assert.deepEqual(
+  normalizeAppSurface('ChatTag Overlay', 'https://streamweaver-new.fly.dev/tts-player?tenant=94371378'),
+  { title: 'All-Tenant TTS Studio', url: `${appSurfaces.streamweaver.ttsMixer}?streams=94371378` },
+);
+
+console.log(JSON.stringify({ status: 'passed', checks: 16 }));

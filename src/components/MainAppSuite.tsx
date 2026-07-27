@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { Download } from 'lucide-react';
-import { CommunityTool, DashboardStats } from '../types';
+import { CommunityTool, DashboardStats, EmbeddedAppTarget } from '../types';
+import { toolEmbedTarget } from '../lib/app-surfaces';
 import { UserPreferences } from '../types';
 
 interface MainAppSuiteProps {
@@ -10,9 +11,10 @@ interface MainAppSuiteProps {
   accentColor: string; // The selected theme's glow/accent hex color!
   preferences: UserPreferences;
   stats: DashboardStats;
+  onDock: (target: EmbeddedAppTarget) => void;
 }
 
-export default function MainAppSuite({ tools, onTriggerAction, accentColor, preferences, stats }: MainAppSuiteProps) {
+export default function MainAppSuite({ tools, onTriggerAction, accentColor, preferences, stats, onDock }: MainAppSuiteProps) {
   const [clickCount, setClickCount] = useState(0);
   const [cooldownEnd, setCooldownEnd] = useState<number>(0);
   const [cooldownText, setCooldownText] = useState('');
@@ -118,6 +120,7 @@ export default function MainAppSuite({ tools, onTriggerAction, accentColor, pref
           const icon = appIcons[tool.id] || '✦';
           const label = tool.miniLabel || 'Sub Module';
           const appLink = tool.appUrl || tool.authUrl || tool.route;
+          const embedTarget = toolEmbedTarget(tool.id);
           const isExternal = Boolean(tool.appUrl || tool.authUrl);
           const isLive = tool.statusType === 'live';
           const isAvailable = isLive || !tool.healthUrl;
@@ -210,14 +213,28 @@ export default function MainAppSuite({ tools, onTriggerAction, accentColor, pref
                 </div>
               )}
 
-              <button
-                type="button"
-                onClick={(event) => handleInstall(event, appLink, isExternal)}
-                className="mt-2 w-full inline-flex items-center justify-center gap-1 rounded-lg border border-white/10 bg-black/25 px-2 py-1 text-[8px] font-mono font-bold text-zinc-300 hover:text-white hover:bg-white/10"
-                title={isExternal ? `Launch ${tool.name} through SPMT` : 'Install SpaceMountain hub as an app'}
-              >
-                <Download size={10} /> {tool.installed === false ? 'Enable' : 'Launch'}
-              </button>
+              <div className="mt-2 grid w-full grid-cols-2 gap-1">
+                <button
+                  type="button"
+                  onClick={(event) => handleInstall(event, tool.popoutUrl || appLink, isExternal)}
+                  className="inline-flex items-center justify-center gap-1 rounded-lg border border-white/10 bg-black/25 px-2 py-1 text-[8px] font-mono font-bold text-zinc-300 hover:text-white hover:bg-white/10"
+                  title={`Open ${tool.name} in a signed-in popout`}
+                >
+                  <Download size={10} /> Open
+                </button>
+                <button
+                  type="button"
+                  disabled={!embedTarget}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    if (embedTarget) onDock(embedTarget);
+                  }}
+                  className="inline-flex items-center justify-center rounded-lg border border-white/10 bg-black/25 px-2 py-1 text-[8px] font-mono font-bold text-zinc-300 hover:text-white hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-35"
+                  title={embedTarget ? `Dock ${embedTarget.title}` : 'This app opens as a full page'}
+                >
+                  Dock
+                </button>
+              </div>
             </motion.div>
           );
         })}

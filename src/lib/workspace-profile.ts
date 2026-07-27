@@ -5,6 +5,7 @@ import type {
   WorkspaceDockSlotV1,
   WorkspaceProfileV1,
 } from '../types';
+import { normalizeAppSurface } from './app-surfaces';
 
 export type WorkspaceProfileResponse = {
   profile: WorkspaceProfileV1;
@@ -110,8 +111,11 @@ export function workspaceDockSlotsToEmbedSlots(slots: WorkspaceDockSlotV1[], fal
   return ([1, 2, 3] as const).map((id, index) => {
     const slot = slots.find((item) => item.id === id);
     const prior = fallback.find((item) => item.id === id) || fallback[index];
-    const title = slot?.title || prior?.title || `Slot ${id}`;
-    const url = slot?.url || prior?.url || '';
+    const savedTitle = slot?.title || prior?.title || `Slot ${id}`;
+    const savedUrl = slot?.url || prior?.url || '';
+    const normalized = normalizeAppSurface(savedTitle, savedUrl);
+    const title = normalized.title;
+    const url = normalized.url;
     return {
       id,
       title,

@@ -30,6 +30,7 @@ import RightSidebar from './components/RightSidebar';
 import Shop from './components/Shop';
 import Arena from './components/Arena';
 import OverlayWorkspace, { OverlayWidget } from './components/OverlayWorkspace';
+import { appSurfaces, canonicalEmbedPresets, normalizeAppSurface } from './lib/app-surfaces';
 import { usePortableWorkspace } from './hooks/usePortableWorkspace';
 
 const sleekRocketIcon = '/assets/model-rocket.png';
@@ -97,13 +98,13 @@ function getTwitchEmbedUrl(twitchLogin?: string | null) {
   return `https://player.twitch.tv/?${params.toString()}`;
 }
 
-const dshDashboardUrl = 'https://discord-stream-hub-new.fly.dev/dashboard';
-const dshCalendarUrl = 'https://discord-stream-hub-new.fly.dev/calendar';
-const dshLeaderboardUrl = 'https://discord-stream-hub-new.fly.dev/leaderboard';
-const streamweaverCommandsUrl = 'https://streamweaver-new.fly.dev/login?next=%2Fcommands';
-const streamweaverCommunityUrl = 'https://streamweaver-new.fly.dev/login?next=%2Fcommunity';
-const streamweaverIntegrationsUrl = 'https://streamweaver-new.fly.dev/login?next=%2Fintegrations';
-const streamweaverWorkflowsUrl = 'https://streamweaver-new.fly.dev/login?next=%2Factive-commands';
+const dshDashboardUrl = appSurfaces.discordHub.home;
+const dshCalendarUrl = appSurfaces.discordHub.calendar;
+const dshLeaderboardUrl = appSurfaces.discordHub.leaderboard;
+const streamweaverCommandsUrl = appSurfaces.streamweaver.commands;
+const streamweaverCommunityUrl = appSurfaces.streamweaver.community;
+const streamweaverIntegrationsUrl = appSurfaces.streamweaver.integrations;
+const streamweaverWorkflowsUrl = appSurfaces.streamweaver.workflows;
 const spmtBaseUrl = '/api/spmt';
 
 function getStoredSpmtToken() {
@@ -292,8 +293,8 @@ type WorkflowStep = {
 };
 
 const defaultEmbedSlots: EmbedSlot[] = [
-  { id: 1, title: 'ChatTag Overlay', url: 'https://chat-tag-new.fly.dev/overlay', kind: 'overlay', collapsed: true, volume: 1, muted: false },
-  { id: 2, title: 'Quackverse Game', url: 'https://spacemountain.live/chat-tag/quackverse', kind: 'game', collapsed: false, volume: 1, muted: false },
+  { id: 1, title: 'ChatTag Overlay', url: appSurfaces.chatTag.overlay, kind: 'overlay', collapsed: true, volume: 1, muted: false },
+  { id: 2, title: 'All-Tenant TTS Studio', url: appSurfaces.streamweaver.ttsMixer, kind: 'overlay', collapsed: false, volume: 1, muted: false },
   { id: 3, title: 'DSH Dashboard', url: dshDashboardUrl, kind: 'dashboard', collapsed: true, volume: 1, muted: false },
 ];
 
@@ -327,11 +328,11 @@ const defaultUserPreferences: UserPreferences = {
 
 const defaultOverlayWidgets: OverlayWidget[] = [
   {
-    id: 'chat-tag-overlay', title: 'ChatTag Overlay', kind: 'chat', url: 'https://chat-tag-new.fly.dev/overlay',
+    id: 'chat-tag-overlay', title: 'ChatTag Overlay', kind: 'chat', url: appSurfaces.chatTag.overlay,
     visible: false, locked: false, interactive: false, x: 72, y: 66, width: 360, height: 220, opacity: 1,
   },
   {
-    id: 'hearmeout-now-playing', title: 'HearMeOut Now Playing', kind: 'media', url: 'https://hearmeout-main.fly.dev/overlay/spacemountain?media=music',
+    id: 'hearmeout-now-playing', title: 'HearMeOut Now Playing', kind: 'media', url: appSurfaces.hearmeout.nowPlaying,
     visible: false, locked: false, interactive: false, x: 2, y: 12, width: 420, height: 240, opacity: 1,
   },
   {
@@ -339,7 +340,7 @@ const defaultOverlayWidgets: OverlayWidget[] = [
     visible: false, locked: false, interactive: true, x: 75, y: 54, width: 320, height: 320, opacity: 1,
   },
   {
-    id: 'streamweaver-tts-mixer', title: 'StreamWeaver Live TTS', kind: 'audio', url: 'https://streamweaver-new.fly.dev/tts-player',
+    id: 'streamweaver-tts-mixer', title: 'All-Tenant TTS Studio', kind: 'audio', url: appSurfaces.streamweaver.ttsMixer,
     visible: false, locked: false, interactive: true, x: 2, y: 64, width: 520, height: 300, opacity: 1,
   },
 ];
@@ -361,8 +362,8 @@ function normalizeOverlayWidgets(savedWidgets: OverlayWidget[] | null | undefine
       widget.url = addStreamWeaverTenant('https://streamweaver-new.fly.dev/overlay/avatar', tenantId);
     }
     if (widget.id === 'streamweaver-tts-mixer') {
-      widget.title = 'StreamWeaver Live TTS';
-      widget.url = addStreamWeaverTenant('https://streamweaver-new.fly.dev/tts-player', tenantId);
+      widget.title = 'All-Tenant TTS Studio';
+      widget.url = appSurfaces.streamweaver.ttsMixer;
     }
     return widget;
   });
@@ -375,18 +376,7 @@ const defaultWorkflowSteps: WorkflowStep[] = [
   { id: 'chat-tag-overlay', trigger: 'ChatTag event', condition: 'Player tagged', action: 'Show overlay widget', destination: 'ChatTag Overlay', enabled: true },
 ];
 
-const embedPresets: EmbeddedAppTarget[] = [
-  { title: 'Quackverse Game', url: '/chat-tag/quackverse', kind: 'game' },
-  { title: 'ChatTag Overlay', url: 'https://chat-tag-new.fly.dev/overlay', kind: 'overlay' },
-  { title: 'ChatTag Home', url: 'https://chat-tag-new.fly.dev', kind: 'app' },
-  { title: 'StreamWeaver Commands', url: streamweaverCommandsUrl, kind: 'app' },
-  { title: 'StreamWeaver Flows', url: streamweaverCommunityUrl, kind: 'app' },
-  { title: 'StreamWeaver Integrations', url: streamweaverIntegrationsUrl, kind: 'app' },
-  { title: 'DSH Dashboard', url: dshDashboardUrl, kind: 'dashboard' },
-  { title: 'DSH Calendar', url: dshCalendarUrl, kind: 'dashboard' },
-  { title: 'DSH Leaderboard', url: dshLeaderboardUrl, kind: 'dashboard' },
-  { title: 'HearMeOut Rooms', url: 'https://hearmeout-main.fly.dev', kind: 'app' },
-];
+const embedPresets: EmbeddedAppTarget[] = canonicalEmbedPresets;
 
 function getPlayerName(player: any) {
   return player?.displayName || player?.twitchUsername || player?.username || player?.name || player?.id || 'Player';
@@ -1188,11 +1178,12 @@ export default function App() {
     kind: EmbeddedAppTarget['kind'] = 'app',
     slotId = activeEmbedSlot
   ) => {
+    const normalized = normalizeAppSurface(title, url);
     setEmbedSlots((slots) => slots.map((slot) => (
-      slot.id === slotId ? { ...slot, title, url, kind, collapsed: false } : slot
+      slot.id === slotId ? { ...slot, title: normalized.title, url: normalized.url, kind, collapsed: false } : slot
     )));
     setActiveEmbedSlot(slotId);
-    notify('Embed slot updated', `Slot ${slotId}: ${title}`);
+    notify('Embed slot updated', `Slot ${slotId}: ${normalized.title}`);
   };
   const updateEmbedSlot = (slotId: number, patch: Partial<EmbedSlot>) => {
     setEmbedSlots((slots) => slots.map((slot) => slot.id === slotId ? { ...slot, ...patch } : slot));
@@ -1232,7 +1223,7 @@ export default function App() {
     else if (clean.includes('crew') || clean.includes('workspace')) setActiveTab('crew');
     else if (clean.includes('dsh') || clean.includes('discord')) openEmbeddedApp('DSH Dashboard', dshDashboardUrl, 'dashboard');
     else if (clean.includes('streamweaver')) openEmbeddedApp('StreamWeaver Commands', streamweaverCommandsUrl, 'app');
-    else if (clean.includes('quackverse')) openEmbeddedApp('Quackverse Game', '/chat-tag/quackverse', 'game');
+    else if (clean.includes('quackverse')) openEmbeddedApp('Quackverse Game', appSurfaces.chatTag.quackverse, 'game');
     else notify('Command received', command);
   };
   const startVoiceCommander = () => {
@@ -2110,8 +2101,8 @@ export default function App() {
   const commandDockTargets = [
     { title: 'DSH Dashboard', url: dshDashboardUrl, kind: 'dashboard' as const },
     { title: 'StreamWeaver Commands', url: streamweaverCommandsUrl, kind: 'app' as const },
-    { title: 'Quackverse Game', url: '/chat-tag/quackverse', kind: 'game' as const },
-    { title: 'HearMeOut Rooms', url: 'https://hearmeout-main.fly.dev', kind: 'app' as const },
+    { title: 'Quackverse Game', url: appSurfaces.chatTag.quackverse, kind: 'game' as const },
+    { title: 'HearMeOut Rooms', url: appSurfaces.hearmeout.embed, kind: 'app' as const },
   ];
   const bridgeSearchTerm = bridgeSearch.trim().toLowerCase();
   const bridgeSearchResults = [
@@ -3059,7 +3050,7 @@ export default function App() {
                       </div>
                       <div className="mt-3 flex gap-2">
                         <button
-                          onClick={() => openEmbeddedApp('ChatTag Quackverse', '/chat-tag/quackverse', 'game')}
+                          onClick={() => openEmbeddedApp('ChatTag Quackverse', appSurfaces.chatTag.quackverse, 'game')}
                           className="flex-1 rounded-lg bg-emerald-300 px-3 py-2 text-xs font-extrabold text-zinc-950"
                         >
                           Embed
@@ -3172,6 +3163,7 @@ export default function App() {
                   accentColor={currentTheme.glowHex} 
                   preferences={preferences}
                   stats={stats}
+                  onDock={(target) => openEmbeddedApp(target.title, target.url, target.kind)}
                 />
 
                 <div className="dynamic-cosmic-card rounded-3xl p-5 backdrop-blur-xl transition-all duration-300">

@@ -40,6 +40,8 @@ type AppRegistryEntry = {
   miniLabel: string;
   route: string;
   appUrl: string | null;
+  embedUrl?: string | null;
+  popoutUrl?: string | null;
   healthUrl: string | null;
   statusText: string;
   statusType: AppStatusType;
@@ -53,7 +55,9 @@ const APP_REGISTRY: AppRegistryEntry[] = [
     badge: 'SW',
     miniLabel: 'Automation + Overlays',
     route: '/streamweaver',
-    appUrl: 'https://streamweaver-new.fly.dev/login?next=%2Fcommands',
+    appUrl: 'https://streamweaver-new.fly.dev/dashboard',
+    embedUrl: 'https://streamweaver-new.fly.dev/tts-mixer',
+    popoutUrl: 'https://streamweaver-new.fly.dev/dashboard',
     healthUrl: 'https://streamweaver-new.fly.dev/api/health',
     statusText: 'Checking',
     statusType: 'default',
@@ -66,6 +70,8 @@ const APP_REGISTRY: AppRegistryEntry[] = [
     miniLabel: 'Music + Movies',
     route: '/hearmeout',
     appUrl: 'https://hearmeout-main.fly.dev',
+    embedUrl: 'https://hearmeout-main.fly.dev',
+    popoutUrl: 'https://hearmeout-main.fly.dev',
     healthUrl: 'https://hearmeout-main.fly.dev/api/health',
     statusText: 'Checking',
     statusType: 'default',
@@ -78,6 +84,8 @@ const APP_REGISTRY: AppRegistryEntry[] = [
     miniLabel: 'Auth + Shoutout Bot',
     route: '/discord-hub',
     appUrl: 'https://discord-stream-hub-new.fly.dev/dashboard',
+    embedUrl: 'https://discord-stream-hub-new.fly.dev/dashboard',
+    popoutUrl: 'https://discord-stream-hub-new.fly.dev/dashboard',
     healthUrl: 'https://discord-stream-hub-new.fly.dev/api/health',
     statusText: 'Checking',
     statusType: 'default',
@@ -90,6 +98,8 @@ const APP_REGISTRY: AppRegistryEntry[] = [
     miniLabel: 'Game System',
     route: '/chat-tag',
     appUrl: 'https://chat-tag-new.fly.dev',
+    embedUrl: 'https://chat-tag-new.fly.dev/quackverse',
+    popoutUrl: 'https://chat-tag-new.fly.dev',
     healthUrl: 'https://chat-tag-new.fly.dev',
     statusText: 'Checking',
     statusType: 'default',
