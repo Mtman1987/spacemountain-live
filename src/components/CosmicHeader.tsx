@@ -23,8 +23,8 @@ export default function CosmicHeader({ activeTab, setActiveTab, accentColor, ide
   const [isSearchExpanded, setIsSearchExpanded] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
 
-  const currentPoints = identity?.points || 0;
-  const currentLevel = Math.floor(currentPoints / 300) || 1;
+  const currentXp = identity?.xp || 0;
+  const currentLevel = identity?.level || 1;
 
   const logoutFromSpmt = async () => {
     try {
@@ -191,7 +191,7 @@ export default function CosmicHeader({ activeTab, setActiveTab, accentColor, ide
               <div className="flex items-center gap-1.5 mt-0.5 text-[9px] font-mono font-bold text-zinc-400">
                 <span className="text-emerald-400">● SPMT</span>
                 <span className="text-zinc-600">|</span>
-                <span className="text-zinc-400">{currentPoints.toLocaleString()} XP</span>
+                <span className="text-zinc-400">{currentXp.toLocaleString()} XP</span>
               </div>
             </div>
           </button>

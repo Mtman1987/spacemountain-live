@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { 
+import {
   Sparkles, LayoutGrid, Mail, MessageSquare, Headphones, Glasses, Users, 
   Settings, HelpCircle, Rocket, Play, Activity, CheckCircle2, Sliders, 
   Send, Plus, Trash2, ArrowRight, Heart, RefreshCw, Star, Compass, Volume2, Gamepad2, Eye, Layout,
@@ -20,6 +20,7 @@ import {
   EmbeddedAppTarget,
   EmbedSlot,
 } from './types';
+import { parseCanonicalXpBalance } from './lib/canonical-xp';
 
 // Importing high-fidelity sub components
 import RocketDock from './components/RocketDock';
@@ -137,6 +138,8 @@ function mapSpmtUserToProfile(user: any, previous?: UserProfile | null): UserPro
     role: 'Captain',
     status: 'Online',
     points: previous?.points || 0,
+    xp: previous?.xp || 0,
+    level: previous?.level || 1,
     avatarSpeaking: previous?.avatarSpeaking || false,
     createdAt: user.createdAt || user.created_at || new Date().toISOString(),
     discordUsername: user.discordUsername || user.discord_username || null,
@@ -604,6 +607,14 @@ export default function App() {
   // SPMT is the authoritative identity; the browser only receives the profile, never the session token.
   const [identity, setIdentity] = useState<UserProfile | null>(null);
 
+  const refreshCanonicalXp = useCallback(async () => {
+    const response = await fetch('/api/spmt/api/xp', { credentials: 'include' });
+    if (!response.ok) return;
+    const balance = parseCanonicalXpBalance(await response.json());
+    if (!balance) return;
+    setIdentity((previous) => previous ? { ...previous, ...balance } : previous);
+  }, []);
+
   // Navigation & Interactive Tabs
   const [activeTab, setActiveTab] = useState<string>(() => {
     if (typeof window !== 'undefined') {
@@ -700,7 +711,13 @@ export default function App() {
     }
   }, [activeTab]);
 
-  // Fetch points from DSH on every tab change
+  // SPMT is the canonical cross-app XP and level display.
+  useEffect(() => {
+    if (!identity?.id) return;
+    void refreshCanonicalXp().catch(() => {});
+  }, [activeTab, identity?.id, refreshCanonicalXp]);
+
+  // DSH points remain an app-specific spendable balance for the arena shop.
   useEffect(() => {
     const user = identity;
     if (!user?.username) return;
@@ -1729,6 +1746,7 @@ export default function App() {
           ...prev,
           pointsAwarded: prev.pointsAwarded + pointsIncrement
         }));
+        void refreshCanonicalXp().catch(() => {});
 
         fetch('/api/stats')
           .then(res => res.ok ? res.json() : null)
@@ -4414,9 +4432,12 @@ export default function App() {
                 <Arena
                   accentColor={currentTheme.glowHex}
                   points={identity?.points || 0}
+                  xp={identity?.xp || 0}
+                  level={identity?.level || 1}
                   username={identity?.username}
                   displayName={identity?.displayName}
                   onSpendPoints={identity ? handleSpendDshPoints : undefined}
+                  onXpAwarded={() => { void refreshCanonicalXp().catch(() => {}); }}
                 />
               </motion.div>
             )}

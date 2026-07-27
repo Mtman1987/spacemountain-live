@@ -29,9 +29,12 @@ interface Player {
 interface ArenaProps {
   accentColor: string;
   points: number;
+  xp?: number;
+  level?: number;
   username?: string;
   displayName?: string;
   onSpendPoints?: (amount: number) => Promise<boolean>;
+  onXpAwarded?: () => void;
 }
 
 interface Projectile {
@@ -92,7 +95,7 @@ function loadLegacyStats() {
   }
 }
 
-export default function Arena({ accentColor, points, username, displayName, onSpendPoints }: ArenaProps) {
+export default function Arena({ accentColor, points, xp = 0, level = 1, username, displayName, onSpendPoints, onXpAwarded }: ArenaProps) {
   const [players, setPlayers] = useState<Player[]>([]);
   const [myId, setMyId] = useState<string>('local-pilot');
   const [joined, setJoined] = useState(false);
@@ -138,7 +141,7 @@ export default function Arena({ accentColor, points, username, displayName, onSp
 
   const visibleKills = Math.max(localStats.kills, ...players.map((p) => p.kills || 0), 0);
   const visibleDeaths = Math.max(localStats.deaths, ...players.map((p) => p.deaths || 0), 0);
-  const level = Math.max(Number(points) || 0, visibleKills);
+  const canonicalLevel = Math.max(1, Number(level) || 1);
 
   const weaponStatus = useMemo(() => {
     if (selectedWeapon === 'bullet') return `${inventory.bullets} bullets`;
@@ -328,8 +331,10 @@ export default function Arena({ accentColor, points, username, displayName, onSp
       credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ targetLabel: label }),
+    }).then((response) => {
+      if (response.ok) onXpAwarded?.();
     }).catch(() => {});
-    setHitFeedback(`${label} destroyed. +1 level`);
+    setHitFeedback(`${label} destroyed. +1 XP`);
     setTimeout(() => setHitFeedback(''), 1700);
   };
 
@@ -387,7 +392,7 @@ export default function Arena({ accentColor, points, username, displayName, onSp
       if (res.ok) {
         const data = await res.json();
         if (data.killed) setLocalStats((prev) => ({ ...prev, kills: prev.kills + 1 }));
-        setHitFeedback(data.killed ? 'Kill confirmed. +1 level' : `Hit for ${data.damage}`);
+        setHitFeedback(data.killed ? 'Kill confirmed. +1 XP' : `Hit for ${data.damage}`);
         setTimeout(() => setHitFeedback(''), 1500);
       }
     } catch {
@@ -465,14 +470,14 @@ export default function Arena({ accentColor, points, username, displayName, onSp
         <div>
           <h2 className="text-2xl font-display font-extrabold text-white">ROCKET ARENA</h2>
           <p className="text-xs text-zinc-400 max-w-md leading-relaxed mt-2">
-            Practice mode works immediately: fly the same rocket from the main app, buy ammo into inventory, shoot test targets, and earn one level per kill.
+            Practice mode works immediately: fly the same rocket from the main app, buy ammo into inventory, shoot test targets, and earn canonical SPMT XP per kill.
           </p>
         </div>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-[10px] text-zinc-400 font-mono">
           <span className="rounded-xl border border-white/5 bg-white/[0.02] px-3 py-2">Move mouse to fly</span>
           <span className="rounded-xl border border-white/5 bg-white/[0.02] px-3 py-2">Click to shoot</span>
           <span className="rounded-xl border border-white/5 bg-white/[0.02] px-3 py-2">Inventory is visible</span>
-          <span className="rounded-xl border border-white/5 bg-white/[0.02] px-3 py-2">1 kill = 1 level</span>
+          <span className="rounded-xl border border-white/5 bg-white/[0.02] px-3 py-2">1 kill = 1 XP</span>
         </div>
         <button onClick={joinArena} className="px-8 py-3 rounded-xl font-bold text-sm text-black transition-all hover:-translate-y-1" style={{ backgroundColor: accentColor, boxShadow: `0 4px 24px ${accentColor}55` }}>
           {token ? 'ENTER THE ARENA' : 'START PRACTICE MODE'}
@@ -499,10 +504,11 @@ export default function Arena({ accentColor, points, username, displayName, onSp
       <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 rounded-xl bg-black/60 border border-white/10">
         <div className="flex flex-wrap items-center gap-4 text-xs font-mono">
           <span className="flex items-center gap-1 text-red-400"><Heart size={14} /> 100</span>
-          <span className="flex items-center gap-1 text-amber-400">LVL {level}</span>
+          <span className="flex items-center gap-1 text-amber-400">LVL {canonicalLevel}</span>
+          <span className="flex items-center gap-1 text-cyan-300">{xp.toLocaleString()} XP</span>
           <span className="flex items-center gap-1 text-emerald-400"><Crosshair size={14} /> {visibleKills} kills</span>
           <span className="flex items-center gap-1 text-zinc-400"><Skull size={14} /> {visibleDeaths} deaths</span>
-          <span className="flex items-center gap-1" style={{ color: accentColor }}><Coins size={14} /> {balance.toLocaleString()} XP</span>
+          <span className="flex items-center gap-1" style={{ color: accentColor }}><Coins size={14} /> {balance.toLocaleString()} Points</span>
           <span className="flex items-center gap-1 text-cyan-300"><Zap size={14} /> {weaponStatus}</span>
         </div>
         <div className="flex items-center gap-2">
@@ -555,7 +561,7 @@ export default function Arena({ accentColor, points, username, displayName, onSp
                 <span className="text-sm font-bold text-white">Arena Shop</span>
                 <button onClick={() => setShowShop(false)} className="text-zinc-400 hover:text-white"><X size={16} /></button>
               </div>
-              <p className="text-[10px] text-zinc-400 font-mono">Balance: <span style={{ color: accentColor }} className="font-bold">{balance.toLocaleString()} XP</span></p>
+              <p className="text-[10px] text-zinc-400 font-mono">Balance: <span style={{ color: accentColor }} className="font-bold">{balance.toLocaleString()} Points</span></p>
               {[
                 { id: 'bullets' as keyof Inventory, count: 10, name: '10 Bullets', cost: 50, desc: 'Standard ammo' },
                 { id: 'missiles' as keyof Inventory, count: 3, name: '3 Missiles', cost: 150, desc: 'High damage' },
@@ -569,7 +575,7 @@ export default function Arena({ accentColor, points, username, displayName, onSp
                 >
                   <span className="text-xs font-bold text-white">{item.name}</span>
                   <span className="text-[9px] text-zinc-500">{item.desc}</span>
-                  <span className="text-[10px] font-mono font-bold" style={{ color: balance >= item.cost ? accentColor : '#ef4444' }}>{item.cost.toLocaleString()} XP</span>
+                  <span className="text-[10px] font-mono font-bold" style={{ color: balance >= item.cost ? accentColor : '#ef4444' }}>{item.cost.toLocaleString()} Points</span>
                 </button>
               ))}
               <span className="text-[10px] text-zinc-500 leading-relaxed">{spendStatus}</span>
@@ -656,7 +662,7 @@ export default function Arena({ accentColor, points, username, displayName, onSp
       </div>
 
       <p className="text-[9px] text-zinc-500 font-mono text-center">
-        Move mouse to fly • Click targets to shoot • Practice works without another player online • 1 kill = 1 level
+        Move mouse to fly • Click targets to shoot • Practice works without another player online • 1 kill = 1 XP
       </p>
     </motion.div>
   );

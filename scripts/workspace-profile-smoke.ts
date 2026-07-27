@@ -10,6 +10,7 @@ import {
 import type { EmbedSlot, UserPreferences, WorkspaceProfileV1 } from '../src/types';
 import { buildSpmtProxyHeaders } from '../src/lib/spmt-proxy';
 import { appSurfaces, normalizeAppSurface } from '../src/lib/app-surfaces';
+import { parseCanonicalXpBalance } from '../src/lib/canonical-xp';
 
 const preferences: UserPreferences = {
   userId: 'workspace-smoke-user',
@@ -91,4 +92,7 @@ assert.deepEqual(
   { title: 'All-Tenant TTS Studio', url: `${appSurfaces.streamweaver.ttsMixer}?streams=94371378` },
 );
 
-console.log(JSON.stringify({ status: 'passed', checks: 16 }));
+assert.deepEqual(parseCanonicalXpBalance({ xp: 625, level: 3 }), { xp: 625, level: 3 });
+assert.equal(parseCanonicalXpBalance({ xp: 'not-a-number', level: 3 }), null);
+
+console.log(JSON.stringify({ status: 'passed', checks: 18 }));

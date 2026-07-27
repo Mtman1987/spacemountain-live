@@ -146,6 +146,8 @@ export interface UserProfile {
   role: string;
   status: string;
   points: number;
+  xp?: number;
+  level?: number;
   avatarSpeaking: boolean;
   createdAt: string;
   discordUsername?: string | null;

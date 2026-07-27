@@ -33,8 +33,8 @@ export default function RocketDock({
   // Profile dropdown state
   const [isProfileOpen, setIsProfileOpen] = useState(false);
 
-  const currentPoints = identity?.points || 0;
-  const currentLevel = Math.floor(currentPoints / 300) || 1;
+  const currentXp = identity?.xp || 0;
+  const currentLevel = identity?.level || 1;
   const showTopProfilePod = rocketFlying && !isFloating;
   const dockSide = preferences?.sidebarPosition || 'left';
   const sidebarStyle = preferences?.sidebarStyle || 'docked';
@@ -196,7 +196,7 @@ const realAvatar = '/assets/astronaut-avatar.jpg';
                 LVL {currentLevel}
               </span>
               <span className="text-[7.5px] text-zinc-400 tracking-wide">
-                {currentPoints.toLocaleString()} XP
+                {currentXp.toLocaleString()} XP
               </span>
             </div>
           </div>
