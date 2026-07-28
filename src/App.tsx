@@ -2259,6 +2259,22 @@ export default function App() {
   const platformDocSections = Array.isArray(platformDocs?.sections) ? platformDocs.sections : [];
   const platformScopes = Array.isArray(platformDocs?.scopes) ? platformDocs.scopes : [];
   const featuredPlugins = platformPlugins.slice(0, 4);
+  const desktopOverlayMode = new URLSearchParams(window.location.search).get('desktopOverlay') === '1';
+
+  if (desktopOverlayMode && identity) {
+    return (
+      <div className="relative min-h-screen overflow-hidden bg-transparent text-white">
+        <OverlayWorkspace
+          enabled={overlayWorkspaceEnabled}
+          editing={false}
+          widgets={overlayWidgets}
+          accentColor={currentTheme.glowHex}
+          onChange={updateOverlayWidget}
+          onFinishEditing={() => setOverlayEditing(false)}
+        />
+      </div>
+    );
+  }
 
   return (
     <div 
@@ -2396,7 +2412,7 @@ export default function App() {
 
       {/* Main Container Layout */}
       <main
-        className="flex-1 w-full max-w-7xl mx-auto px-6 pb-6 flex z-10 min-h-0 relative transition-all duration-500"
+        className="flex-1 w-full max-w-7xl mx-auto px-6 pb-28 flex z-10 min-h-0 relative transition-all duration-500"
         style={{
           paddingTop: mainSpacing.paddingTop,
           gap: mainSpacing.gap,
@@ -4826,7 +4842,7 @@ export default function App() {
 
       {/* Persistent app embed slots */}
       <footer 
-        className="w-full border-t text-[10px] font-mono relative z-20 bg-black/35 transition-all duration-1000 px-6 py-4"
+        className="fixed inset-x-0 bottom-0 z-[80] max-h-[55vh] w-full overflow-y-auto border-t bg-black/90 px-6 py-3 text-[10px] font-mono shadow-[0_-18px_50px_rgba(0,0,0,0.45)] backdrop-blur-2xl transition-all duration-500"
         style={{ 
           borderColor: `${currentTheme.glowHex}1a`,
           color: `${currentTheme.glowHex}88`
