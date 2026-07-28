@@ -912,6 +912,7 @@ export default function App() {
   const [platformEventsListening, setPlatformEventsListening] = useState(false);
   const [commlinkSearch, setCommlinkSearch] = useState('');
   const [commlinkFilter, setCommlinkFilter] = useState<'all' | 'unread' | 'direct' | 'app'>('all');
+  const [commlinkLane, setCommlinkLane] = useState<'mail' | 'live' | 'notifications' | 'apps'>('mail');
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
   const [activeConversationMessages, setActiveConversationMessages] = useState<any[]>([]);
   const [threadReplyBody, setThreadReplyBody] = useState('');
@@ -3514,15 +3515,108 @@ export default function App() {
                     </h2>
                     <p className="text-xs text-zinc-400 font-sans mt-0.5">Tenant-scoped internal messages between users, apps, and AI bots</p>
                   </div>
-                  <button
-                    onClick={() => setIsComposing(!isComposing)}
-                    className="px-4 py-1.5 rounded-xl bg-gradient-to-r from-red-500 to-orange-500 font-mono text-xs font-bold flex items-center gap-1.5 transition-all"
-                  >
-                    <Plus size={14} /> {isComposing ? 'VIEW INBOX' : 'COMPOSE MESSAGE'}
-                  </button>
+                  {commlinkLane === 'mail' && (
+                    <button
+                      onClick={() => setIsComposing(!isComposing)}
+                      className="px-4 py-1.5 rounded-xl bg-gradient-to-r from-red-500 to-orange-500 font-mono text-xs font-bold flex items-center gap-1.5 transition-all"
+                    >
+                      <Plus size={14} /> {isComposing ? 'VIEW INBOX' : 'COMPOSE MESSAGE'}
+                    </button>
+                  )}
                 </div>
 
-                {isComposing ? (
+                <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
+                  {([
+                    ['mail', 'Mail'],
+                    ['live', 'Live Chat'],
+                    ['notifications', `Notifications (${commlinkNotifications.filter((item) => !item.read_at).length})`],
+                    ['apps', 'App Events'],
+                  ] as const).map(([lane, label]) => (
+                    <button
+                      key={lane}
+                      type="button"
+                      onClick={() => {
+                        setCommlinkLane(lane);
+                        if (lane !== 'mail') setIsComposing(false);
+                      }}
+                      className={`rounded-xl border px-3 py-2 text-[10px] font-black uppercase tracking-wide ${commlinkLane === lane ? 'border-cyan-300/50 bg-cyan-400/10 text-cyan-100' : 'border-white/10 bg-black/20 text-zinc-400 hover:text-white'}`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+
+                {commlinkLane === 'live' ? (
+                  <div className="overflow-hidden rounded-2xl border border-cyan-400/20 bg-black/50">
+                    <div className="flex items-center justify-between gap-3 border-b border-white/10 px-4 py-3">
+                      <div>
+                        <h3 className="text-sm font-bold text-white">Multi-platform live chat</h3>
+                        <p className="text-[10px] text-zinc-500">StreamWeaver owns high-volume chat; Commlink opens it through the signed tenant session.</p>
+                      </div>
+                      <a href={appSurfaces.streamweaver.liveChat} target="_blank" rel="noreferrer" className="rounded-lg border border-cyan-400/20 bg-cyan-400/10 px-3 py-1.5 text-[10px] font-bold text-cyan-200 no-underline">
+                        Pop out
+                      </a>
+                    </div>
+                    <iframe
+                      src={appSurfaces.streamweaver.liveChat}
+                      title="Commlink Live Chat"
+                      data-embed-slot-frame="commlink-live-chat"
+                      onLoad={(event) => void sendEmbeddedAuth(event.currentTarget)}
+                      className="h-[720px] w-full bg-black"
+                      allow="autoplay; clipboard-write"
+                    />
+                  </div>
+                ) : commlinkLane === 'notifications' ? (
+                  <div className="rounded-2xl border border-cyan-400/15 bg-cyan-400/[0.04] p-4">
+                    <div className="mb-3 flex items-center justify-between gap-3">
+                      <div>
+                        <h3 className="text-sm font-bold text-white">Notifications</h3>
+                        <p className="mt-1 text-[10px] text-zinc-500">Account, conversation, and connected-app notices.</p>
+                      </div>
+                      {commlinkNotifications.some((item) => !item.read_at) && (
+                        <button type="button" onClick={() => markAllCommlinkNotificationsRead().catch(() => {})} className="rounded-lg border border-cyan-400/20 bg-cyan-400/10 px-2 py-1 text-[10px] font-bold text-cyan-200">
+                          Clear unread
+                        </button>
+                      )}
+                    </div>
+                    <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+                      {commlinkNotifications.length === 0 && <p className="text-xs text-zinc-400">No notifications yet.</p>}
+                      {commlinkNotifications.map((item) => (
+                        <button key={item.id} type="button" onClick={() => openCommlinkNotification(item).catch(() => {})} className={`rounded-xl border bg-black/25 p-3 text-left ${item.read_at ? 'border-white/5 opacity-60' : 'border-cyan-400/20'}`}>
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="truncate text-xs font-bold text-white">{item.title}</span>
+                            <span className="text-[9px] uppercase text-zinc-500">{item.type}</span>
+                          </div>
+                          <p className="mt-1 line-clamp-2 text-xs text-zinc-400">{item.body}</p>
+                          <p className="mt-2 text-[10px] text-zinc-500">{new Date(item.created_at).toLocaleString()}</p>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ) : commlinkLane === 'apps' ? (
+                  <div className="rounded-2xl border border-fuchsia-400/15 bg-fuchsia-400/[0.035] p-4">
+                    <div className="mb-3 flex items-center justify-between gap-3">
+                      <div>
+                        <h3 className="text-sm font-bold text-white">App events</h3>
+                        <p className="mt-1 text-[10px] text-zinc-500">Operational events from connected SPMT apps. This lane is separate from viewer chat.</p>
+                      </div>
+                      <span className="rounded-full border border-white/10 bg-black/30 px-2 py-1 text-[10px] font-bold text-fuchsia-200">{platformEvents.length} events</span>
+                    </div>
+                    <div className="flex max-h-[620px] flex-col gap-2 overflow-y-auto pr-1">
+                      {platformEvents.length === 0 && <p className="text-xs text-zinc-400">No app events yet.</p>}
+                      {platformEvents.map((event) => (
+                        <div key={event.id} className="rounded-xl border border-white/10 bg-black/25 p-3">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="rounded bg-fuchsia-400/10 px-2 py-0.5 text-[9px] font-black uppercase text-fuchsia-200">{event.sourceApp || 'spmt'}</span>
+                            <span className="text-xs font-bold text-white">{event.type}</span>
+                            <span className="ml-auto text-[9px] text-zinc-500">{new Date(event.timestamp || event.createdAt).toLocaleString()}</span>
+                          </div>
+                          <p className="mt-2 text-xs text-zinc-400">{event.payload?.summary || event.payload?.title || event.payload?.message || 'App event received'}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : isComposing ? (
                   <form onSubmit={handleSendMail} className="flex flex-col gap-4">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>

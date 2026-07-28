@@ -17,6 +17,7 @@ export const appSurfaces = {
     integrations: `${appOrigins.streamweaver}/integrations`,
     workflows: `${appOrigins.streamweaver}/active-commands`,
     ttsMixer: `${appOrigins.streamweaver}/tts-mixer`,
+    liveChat: `${appOrigins.streamweaver}/shared-chat`,
   },
   hearmeout: {
     home: `${appOrigins.hearmeout}/`,
@@ -39,6 +40,7 @@ export const appSurfaces = {
 
 export const canonicalEmbedPresets: EmbeddedAppTarget[] = [
   { title: 'All-Tenant TTS Studio', url: appSurfaces.streamweaver.ttsMixer, kind: 'overlay' },
+  { title: 'Live Chat Dock', url: appSurfaces.streamweaver.liveChat, kind: 'app' },
   { title: 'Quackverse Game', url: appSurfaces.chatTag.quackverse, kind: 'game' },
   { title: 'ChatTag Overlay', url: appSurfaces.chatTag.overlay, kind: 'overlay' },
   { title: 'DSH Dashboard', url: appSurfaces.discordHub.embed, kind: 'dashboard' },
@@ -75,8 +77,8 @@ export function normalizeAppSurface(title: string, value: string): { title: stri
 
 export function toolEmbedTarget(toolId: string): EmbeddedAppTarget | null {
   if (toolId === 'streamweaver') return canonicalEmbedPresets[0];
-  if (toolId === 'chat-tag') return canonicalEmbedPresets[1];
-  if (toolId === 'discord-hub') return canonicalEmbedPresets[3];
-  if (toolId === 'hearmeout') return canonicalEmbedPresets[6];
+  if (toolId === 'chat-tag') return canonicalEmbedPresets[2];
+  if (toolId === 'discord-hub') return canonicalEmbedPresets[4];
+  if (toolId === 'hearmeout') return canonicalEmbedPresets[7];
   return null;
 }
