@@ -26,13 +26,17 @@ import { parseCanonicalXpBalance } from './lib/canonical-xp';
 import RocketDock from './components/RocketDock';
 import CosmicHeader from './components/CosmicHeader';
 import MainAppSuite from './components/MainAppSuite';
-import SettingsPanel from './components/SettingsPanel';
 import RightSidebar from './components/RightSidebar';
 import Shop from './components/Shop';
 import Arena from './components/Arena';
 import OverlayWorkspace, { OverlayWidget } from './components/OverlayWorkspace';
 import { appOrigins, appSurfaces, canonicalEmbedPresets, normalizeAppSurface } from './lib/app-surfaces';
 import { usePortableWorkspace } from './hooks/usePortableWorkspace';
+import type { WorkflowStep } from './features/workspace/BuilderRoute';
+
+const BuilderRoute = React.lazy(() => import('./features/workspace/BuilderRoute'));
+const HelpRoute = React.lazy(() => import('./features/workspace/HelpRoute'));
+const SettingsRoute = React.lazy(() => import('./features/workspace/SettingsRoute'));
 
 const sleekRocketIcon = '/assets/model-rocket.png';
 
@@ -285,15 +289,6 @@ function buildSdkStatusCards(events: PlatformEvent[]): SdkStatusCardData[] {
 
   return Array.from(latestByName.values());
 }
-
-type WorkflowStep = {
-  id: string;
-  trigger: string;
-  condition: string;
-  action: string;
-  destination: string;
-  enabled: boolean;
-};
 
 const defaultEmbedSlots: EmbedSlot[] = [
   { id: 1, title: 'ChatTag Overlay', url: appSurfaces.chatTag.overlay, kind: 'overlay', collapsed: true, volume: 1, muted: false },
@@ -4435,83 +4430,15 @@ export default function App() {
 
             {/* TAB: SECURE WORKFLOW BUILDER */}
             {activeTab === 'builder' && (
-              <motion.div
-                key="builder"
-                initial={{ opacity: 0, y: 15 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -15 }}
-                className="flex flex-col gap-4 dynamic-cosmic-card rounded-3xl p-6 backdrop-blur-xl transition-all duration-300"
-              >
-                <div className="flex items-center justify-between border-b border-white/5 pb-4">
-                  <div>
-                    <h2 className="text-xl font-sans font-bold text-white flex items-center gap-2">
-                      <Rocket className="text-orange-400" size={20} />
-                      Event Flow Builder
-                    </h2>
-                     <p className="text-xs text-zinc-400 mt-0.5">Build shared-chat and app automations as trigger → filter → action → destination flows</p>
-                  </div>
-                </div>
-
-                <div className="rounded-2xl border border-orange-400/15 bg-orange-400/[0.035] p-4">
-                  <div className="grid grid-cols-1 gap-3 lg:grid-cols-4">
-                    {[
-                      ['Trigger', 'trigger', ['Shared chat message', 'App event', 'ChatTag event', 'HearMeOut now playing', 'MountainView command', 'Commlink message']],
-                      ['Filter', 'condition', ['Any connected source', 'Contains keyword', 'Donation or membership', 'Message mentions bot', 'Player tagged', 'Room is live']],
-                      ['Action', 'action', ['Add to bot context', 'Read aloud with TTS', 'Show overlay widget', 'Send message', 'Run bot command', 'Create notification']],
-                      ['Destination', 'destination', ['StreamWeaver memory', 'Shared TTS mixer', 'ChatTag Overlay', 'Discord Stream Hub', 'HearMeOut room', 'MountainView AI']],
-                    ].map(([label, field, options]) => (
-                      <label key={field as string} className="text-[10px] font-black uppercase tracking-wider text-zinc-500">
-                        {label as string}
-                        <select
-                          value={workflowDraft[field as keyof typeof workflowDraft]}
-                          onChange={(event) => setWorkflowDraft((current) => ({ ...current, [field as string]: event.target.value }))}
-                          className="mt-2 w-full rounded-xl border border-white/10 bg-zinc-950 px-3 py-2 text-xs font-bold normal-case tracking-normal text-white outline-none focus:border-orange-400/50"
-                        >
-                          {(options as string[]).map((option) => <option key={option}>{option}</option>)}
-                        </select>
-                      </label>
-                    ))}
-                  </div>
-                  <div className="mt-4 flex flex-wrap gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setWorkflowSteps((steps) => [...steps, { id: `flow-${Date.now()}`, ...workflowDraft, enabled: true }])}
-                      className="rounded-xl bg-orange-400 px-4 py-2 text-xs font-black text-zinc-950"
-                    >
-                      Add flow
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => notify('Test event sent', `${workflowDraft.trigger} → ${workflowDraft.destination}`)}
-                      className="rounded-xl border border-white/10 bg-white/[0.04] px-4 py-2 text-xs font-bold text-zinc-200"
-                    >
-                      Test draft
-                    </button>
-                  </div>
-                </div>
-
-                <div className="flex flex-col gap-3">
-                  {workflowSteps.map((step, index) => (
-                    <div key={step.id} className={`rounded-2xl border p-4 ${step.enabled ? 'border-orange-400/20 bg-black/30' : 'border-white/5 bg-black/15 opacity-55'}`}>
-                      <div className="flex flex-wrap items-center gap-2 text-xs">
-                        <span className="rounded-lg bg-orange-400/10 px-2 py-1 font-black text-orange-200">{index + 1}. {step.trigger}</span>
-                        <ArrowRight size={13} className="text-zinc-600" />
-                        <span className="rounded-lg bg-white/[0.04] px-2 py-1 font-bold text-zinc-300">{step.condition}</span>
-                        <ArrowRight size={13} className="text-zinc-600" />
-                        <span className="rounded-lg bg-cyan-400/10 px-2 py-1 font-bold text-cyan-200">{step.action}</span>
-                        <ArrowRight size={13} className="text-zinc-600" />
-                        <span className="rounded-lg bg-fuchsia-400/10 px-2 py-1 font-bold text-fuchsia-200">{step.destination}</span>
-                        <div className="ml-auto flex gap-3">
-                          <button type="button" onClick={() => notify('Flow tested', `${step.trigger} → ${step.destination}`)} className="text-[10px] font-bold text-cyan-300">Test</button>
-                          <button type="button" onClick={() => setWorkflowSteps((steps) => steps.map((item) => item.id === step.id ? { ...item, enabled: !item.enabled } : item))} className="text-[10px] font-bold text-amber-300">{step.enabled ? 'Disable' : 'Enable'}</button>
-                          <button type="button" onClick={() => setWorkflowSteps((steps) => steps.filter((item) => item.id !== step.id))} className="text-[10px] font-bold text-red-300">Remove</button>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                  {workflowSteps.length === 0 && <p className="rounded-2xl border border-dashed border-white/10 p-6 text-center text-xs text-zinc-500">No flows yet. Build one above.</p>}
-                </div>
-              </motion.div>
+              <React.Suspense fallback={<div className="rounded-3xl border border-white/10 p-8 text-sm text-zinc-400">Loading workflow builder…</div>}>
+                <BuilderRoute
+                  draft={workflowDraft}
+                  setDraft={setWorkflowDraft}
+                  steps={workflowSteps}
+                  setSteps={setWorkflowSteps}
+                  notify={notify}
+                />
+              </React.Suspense>
             )}
 
             {/* TAB: SHOP */}
@@ -4554,114 +4481,27 @@ export default function App() {
 
             {/* TAB: SETTINGS PANEL */}
             {activeTab === 'settings' && (
-              <motion.div
-                key="settings"
-                initial={{ opacity: 0, y: 15 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -15 }}
-                transition={{ duration: 0.3 }}
-              >
-                <div className="mb-4 rounded-2xl border border-cyan-400/20 bg-cyan-400/[0.04] p-4">
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className={`h-2.5 w-2.5 rounded-full ${portableWorkspace.status === 'saved' ? 'bg-emerald-400' : portableWorkspace.status === 'saving' || portableWorkspace.status === 'loading' ? 'bg-amber-300 animate-pulse' : portableWorkspace.status === 'signed-out' ? 'bg-zinc-500' : 'bg-red-400'}`} />
-                        <h3 className="text-sm font-bold text-white">Portable SPMT workspace</h3>
-                      </div>
-                      <p className="mt-1 text-xs text-zinc-400">
-                        {portableWorkspace.status === 'signed-out' && 'Sign in with SPMT to sync themes and all three dock slots across devices.'}
-                        {portableWorkspace.status === 'loading' && 'Loading the account-backed workspace…'}
-                        {portableWorkspace.status === 'saving' && 'Saving this workspace to SPMT…'}
-                        {portableWorkspace.status === 'unsaved' && 'Changes are waiting to save.'}
-                        {portableWorkspace.status === 'saved' && `Saved to SPMT${portableWorkspace.lastSavedAt ? ` at ${new Date(portableWorkspace.lastSavedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}` : ''}.`}
-                        {portableWorkspace.status === 'offline' && 'Offline: changes are cached on this device and need a retry.'}
-                        {portableWorkspace.status === 'conflict' && 'Another device saved a newer revision. Choose retry or reload.'}
-                        {portableWorkspace.status === 'error' && 'The workspace could not be synchronized.'}
-                      </p>
-                      {portableWorkspace.error && <p className="mt-2 text-xs text-red-300">{portableWorkspace.error}</p>}
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      {['offline', 'conflict', 'error'].includes(portableWorkspace.status) && (
-                        <button type="button" onClick={portableWorkspace.retry} className="rounded-xl border border-amber-300/30 bg-amber-300/10 px-3 py-2 text-xs font-bold text-amber-100">Retry save</button>
-                      )}
-                      {portableWorkspace.status === 'conflict' && (
-                        <button type="button" onClick={portableWorkspace.reload} className="rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-xs font-bold text-zinc-200">Use other device version</button>
-                      )}
-                      {identity && portableWorkspace.loaded && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (window.confirm('Reset the account workspace theme and all three dock slots to their defaults?')) void portableWorkspace.reset();
-                          }}
-                          disabled={portableWorkspace.status === 'saving' || portableWorkspace.status === 'loading'}
-                          className="rounded-xl border border-red-400/20 bg-red-400/[0.06] px-3 py-2 text-xs font-bold text-red-200 disabled:opacity-40"
-                        >
-                          Reset workspace
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                </div>
-                <SettingsPanel 
-                  preferences={preferences} 
-                  onUpdatePreferences={handleUpdatePreferences} 
-                  onApplyThemePreset={handleApplyThemePreset}
+              <React.Suspense fallback={<div className="rounded-3xl border border-white/10 p-8 text-sm text-zinc-400">Loading workspace settings…</div>}>
+                <SettingsRoute
+                  identityPresent={Boolean(identity)}
+                  preferences={preferences}
                   accentColor={currentTheme.glowHex}
-                  workspaceProfile={portableWorkspace.profile}
-                  onUpdateWorkspaceProfile={portableWorkspace.updateProfileFields}
+                  portableWorkspace={portableWorkspace}
+                  onUpdatePreferences={handleUpdatePreferences}
+                  onApplyThemePreset={handleApplyThemePreset}
                 />
-              </motion.div>
+              </React.Suspense>
             )}
 
             {/* TAB: SECURE HELP CENTER */}
             {activeTab === 'help' && (
-              <motion.div
-                key="help"
-                initial={{ opacity: 0, y: 15 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -15 }}
-                className="flex flex-col gap-4 dynamic-cosmic-card rounded-3xl p-6 backdrop-blur-xl transition-all duration-300"
-              >
-                <div className="flex items-center justify-between border-b border-white/5 pb-4">
-                  <div>
-                    <h2 className="text-xl font-sans font-bold text-white flex items-center gap-2">
-                      <HelpCircle className="text-zinc-300" size={20} />
-                      SpaceMountain Help & System Status
-                    </h2>
-                    <p className="text-xs text-zinc-400 mt-0.5">Detailed ecosystem documentation</p>
-                  </div>
-                </div>
-
-                <div className="flex flex-col gap-4 mt-2">
-                  <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/5">
-                    <span className="text-xs font-bold text-white block mb-1">What is SPACEMOUNTAIN.LIVE?</span>
-                    <p className="text-xs text-zinc-400 leading-relaxed">
-                      It is a shared account and launch surface for the SpaceMountain app suite, including StreamWeaver, HearMeOut, Discord Stream Hub, ChatTag, MountainView, mail, and forums.
-                    </p>
-                  </div>
-
-                  <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/5">
-                    <span className="text-xs font-bold text-white block mb-1">Where should I start?</span>
-                    <p className="text-xs text-zinc-400 leading-relaxed">
-                      Use Apps for launch links and ChatTag status, Rooms to join HearMeOut, Forums to read website posts forwarded from DSH, and Integration Map to see how the apps pass events between each other.
-                    </p>
-                  </div>
-
-                  <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/5">
-                    <span className="text-xs font-bold text-white block mb-1">Live Hub Status</span>
-                    <div className="grid grid-cols-2 gap-4 mt-2.5">
-                      <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 font-mono text-[10px] flex items-center justify-between">
-                        <span>ONLINE APPS:</span>
-                        <span className="font-extrabold">{stats.onlineApps}/{stats.checkedApps}</span>
-                      </div>
-                      <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 font-mono text-[10px] flex items-center justify-between">
-                        <span>JOINABLE ROOMS:</span>
-                        <span className="font-extrabold">{hearmeoutRooms.length}</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </motion.div>
+              <React.Suspense fallback={<div className="rounded-3xl border border-white/10 p-8 text-sm text-zinc-400">Loading help…</div>}>
+                <HelpRoute
+                  onlineApps={stats.onlineApps}
+                  checkedApps={stats.checkedApps}
+                  joinableRooms={hearmeoutRooms.length}
+                />
+              </React.Suspense>
             )}
 
             {/* TAB: CREW DESK */}
