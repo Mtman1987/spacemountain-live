@@ -10,6 +10,7 @@ import { users, communityTools, userPreferences } from './src/db/schema.js';
 import { eq } from 'drizzle-orm';
 import { mappedXpAwardV1, type XpMappedEventTypeV1 } from '@spmt/sdk';
 import { buildSpmtProxyHeaders } from './src/lib/spmt-proxy.js';
+import { parseCanonicalXpBalance } from './src/lib/canonical-xp.js';
 
 const PORT = Number(process.env.PORT || 3000);
 const DSH_COMMUNITY_SPOTLIGHT_URL = process.env.DSH_COMMUNITY_SPOTLIGHT_URL || 'https://discord-stream-hub-new.fly.dev/api/community-spotlight';
@@ -742,6 +743,17 @@ async function startServer() {
         clearSpmtSessionCookies(res);
         return res.status(401).json({ error: 'SPMT session expired' });
       }
+      try {
+        const xpResponse = await fetch(`${SPMT_BASE_URL}/api/xp`, {
+          headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
+        });
+        if (xpResponse.ok && data?.user) {
+          const balance = parseCanonicalXpBalance(await xpResponse.json());
+          if (balance) data.user = { ...data.user, ...balance };
+        }
+      } catch {
+        // Identity remains usable if the canonical XP service is temporarily unavailable.
+      }
       res.json(data);
     } catch {
       res.status(502).json({ error: 'SPMT session validation unavailable' });
@@ -811,16 +823,22 @@ async function startServer() {
   });
 
   app.use('/api/spmt', async (req, res) => {
-    const token = readCookie(req.headers.cookie, SPMT_SESSION_COOKIE);
+    let token = readCookie(req.headers.cookie, SPMT_SESSION_COOKIE);
+    if (!token) token = await refreshSpmtSession(req, res);
     if (!token) return res.status(401).json({ error: 'Not authenticated' });
     try {
       const target = new URL(req.originalUrl.replace(/^\/api\/spmt/, ''), SPMT_BASE_URL);
       const hasBody = req.method !== 'GET' && req.method !== 'HEAD';
-      const response = await fetch(target, {
+      const proxyRequest = (accessToken: string) => fetch(target, {
         method: req.method,
-        headers: buildSpmtProxyHeaders(req.headers, token, hasBody),
+        headers: buildSpmtProxyHeaders(req.headers, accessToken, hasBody),
         body: hasBody ? JSON.stringify(req.body ?? {}) : undefined,
       });
+      let response = await proxyRequest(token);
+      if (response.status === 401) {
+        token = await refreshSpmtSession(req, res);
+        if (token) response = await proxyRequest(token);
+      }
       const body = Buffer.from(await response.arrayBuffer());
       res.status(response.status);
       const contentType = response.headers.get('content-type');

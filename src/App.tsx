@@ -133,6 +133,8 @@ function clearSpmtSession() {
 }
 
 function mapSpmtUserToProfile(user: any, previous?: UserProfile | null): UserProfile {
+  const canonicalXp = Number(user.xp);
+  const canonicalLevel = Number(user.level);
   return {
     id: user.id,
     displayName: user.displayName || user.display_name || user.username,
@@ -142,8 +144,8 @@ function mapSpmtUserToProfile(user: any, previous?: UserProfile | null): UserPro
     role: 'Captain',
     status: 'Online',
     points: previous?.points || 0,
-    xp: previous?.xp || 0,
-    level: previous?.level || 1,
+    xp: Number.isFinite(canonicalXp) ? Math.max(0, Math.trunc(canonicalXp)) : previous?.xp || 0,
+    level: Number.isFinite(canonicalLevel) ? Math.max(1, Math.trunc(canonicalLevel)) : previous?.level || 1,
     avatarSpeaking: previous?.avatarSpeaking || false,
     createdAt: user.createdAt || user.created_at || new Date().toISOString(),
     discordUsername: user.discordUsername || user.discord_username || null,
