@@ -220,9 +220,13 @@ export default function MainAppSuite({ tools, onTriggerAction, accentColor, pref
                   type="button"
                   onClick={(event) => handleInstall(event, tool.popoutUrl || appLink, isExternal)}
                   className="inline-flex items-center justify-center gap-1 rounded-lg border border-white/10 bg-black/25 px-2 py-1 text-[8px] font-mono font-bold text-zinc-300 hover:text-white hover:bg-white/10"
-                  title={isDesktop ? `Download the signed ${tool.name} installer` : `Open ${tool.name} in a signed-in popout`}
+                  title={isDesktop
+                    ? tool.signed === false
+                      ? `Download the unsigned portable ${tool.name} ZIP`
+                      : `Download the signed ${tool.name} installer`
+                    : `Open ${tool.name} in a signed-in popout`}
                 >
-                  <Download size={10} /> {isDesktop ? 'Download' : 'Open'}
+                  <Download size={10} /> {isDesktop && tool.signed === false ? 'Unsigned ZIP' : isDesktop ? 'Download' : 'Open'}
                 </button>
                 <button
                   type="button"

@@ -23,6 +23,7 @@ export interface CommunityTool {
   updateAvailable?: boolean;
   distribution?: 'web' | 'windows-desktop';
   downloadUrl?: string | null;
+  signed?: boolean;
 }
 
 export interface DashboardStats {

@@ -795,6 +795,7 @@ export default function App() {
         updateAvailable: app.updateAvailable,
         distribution: app.distribution || tool.distribution,
         downloadUrl: app.downloadUrl || tool.downloadUrl,
+        signed: app.signed ?? tool.signed,
         statusText: app.installed === false ? 'Available' : app.enabled === false ? 'Disabled' : tool.statusText,
       };
     });
@@ -823,6 +824,7 @@ export default function App() {
         updateAvailable: app.updateAvailable,
         distribution: app.distribution,
         downloadUrl: app.downloadUrl,
+        signed: app.signed,
       });
     }
 
@@ -3303,7 +3305,7 @@ export default function App() {
                               href={app.downloadUrl || app.url}
                               className="rounded-xl bg-cyan-300 px-3 py-2 text-xs font-black text-zinc-950 no-underline"
                             >
-                              Download for Windows
+                              {app.signed === false ? 'Download unsigned ZIP' : 'Download for Windows'}
                             </a>
                           ) : !app.installed || app.enabled === false ? (
                             <button
