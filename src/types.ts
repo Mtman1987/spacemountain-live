@@ -21,6 +21,8 @@ export interface CommunityTool {
   version?: string;
   latestVersion?: string;
   updateAvailable?: boolean;
+  distribution?: 'web' | 'windows-desktop';
+  downloadUrl?: string | null;
 }
 
 export interface DashboardStats {

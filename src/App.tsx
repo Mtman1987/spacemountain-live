@@ -791,6 +791,8 @@ export default function App() {
         version: app.version,
         latestVersion: app.latestVersion,
         updateAvailable: app.updateAvailable,
+        distribution: app.distribution || tool.distribution,
+        downloadUrl: app.downloadUrl || tool.downloadUrl,
         statusText: app.installed === false ? 'Available' : app.enabled === false ? 'Disabled' : tool.statusText,
       };
     });
@@ -817,6 +819,8 @@ export default function App() {
         version: app.version,
         latestVersion: app.latestVersion,
         updateAvailable: app.updateAvailable,
+        distribution: app.distribution,
+        downloadUrl: app.downloadUrl,
       });
     }
 
@@ -3292,7 +3296,14 @@ export default function App() {
                           </div>
                         </div>
                         <div className="mt-4 flex flex-wrap gap-2">
-                          {!app.installed || app.enabled === false ? (
+                          {app.distribution === 'windows-desktop' ? (
+                            <a
+                              href={app.downloadUrl || app.url}
+                              className="rounded-xl bg-cyan-300 px-3 py-2 text-xs font-black text-zinc-950 no-underline"
+                            >
+                              Download for Windows
+                            </a>
+                          ) : !app.installed || app.enabled === false ? (
                             <button
                               type="button"
                               onClick={() => updateSpmtAppInstall(app.id, 'install')}
@@ -3309,9 +3320,11 @@ export default function App() {
                               Disable
                             </button>
                           )}
-                          <a href={app.url || app.authUrl} target="_blank" rel="noreferrer" className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-bold text-zinc-300 no-underline hover:text-white">
-                            Launch
-                          </a>
+                          {app.distribution !== 'windows-desktop' && (
+                            <a href={app.url || app.authUrl} target="_blank" rel="noreferrer" className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-bold text-zinc-300 no-underline hover:text-white">
+                              Launch
+                            </a>
+                          )}
                         </div>
                       </div>
                     ))}

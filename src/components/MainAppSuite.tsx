@@ -73,6 +73,7 @@ export default function MainAppSuite({ tools, onTriggerAction, accentColor, pref
     'mail': '✉',
     'forums': '☷',
     'builder': '⌗',
+    'companion': '▣',
   };
 
   const realLogos: Record<string, string> = {
@@ -119,9 +120,10 @@ export default function MainAppSuite({ tools, onTriggerAction, accentColor, pref
         {tools.map((tool) => {
           const icon = appIcons[tool.id] || '✦';
           const label = tool.miniLabel || 'Sub Module';
-          const appLink = tool.appUrl || tool.authUrl || tool.route;
+          const isDesktop = tool.distribution === 'windows-desktop';
+          const appLink = (isDesktop ? tool.downloadUrl : null) || tool.appUrl || tool.authUrl || tool.route;
           const embedTarget = toolEmbedTarget(tool.id);
-          const isExternal = Boolean(tool.appUrl || tool.authUrl);
+          const isExternal = isDesktop || Boolean(tool.appUrl || tool.authUrl);
           const isLive = tool.statusType === 'live';
           const isAvailable = isLive || !tool.healthUrl;
 
@@ -218,19 +220,19 @@ export default function MainAppSuite({ tools, onTriggerAction, accentColor, pref
                   type="button"
                   onClick={(event) => handleInstall(event, tool.popoutUrl || appLink, isExternal)}
                   className="inline-flex items-center justify-center gap-1 rounded-lg border border-white/10 bg-black/25 px-2 py-1 text-[8px] font-mono font-bold text-zinc-300 hover:text-white hover:bg-white/10"
-                  title={`Open ${tool.name} in a signed-in popout`}
+                  title={isDesktop ? `Download the signed ${tool.name} installer` : `Open ${tool.name} in a signed-in popout`}
                 >
-                  <Download size={10} /> Open
+                  <Download size={10} /> {isDesktop ? 'Download' : 'Open'}
                 </button>
                 <button
                   type="button"
-                  disabled={!embedTarget}
+                  disabled={isDesktop || !embedTarget}
                   onClick={(event) => {
                     event.stopPropagation();
                     if (embedTarget) onDock(embedTarget);
                   }}
                   className="inline-flex items-center justify-center rounded-lg border border-white/10 bg-black/25 px-2 py-1 text-[8px] font-mono font-bold text-zinc-300 hover:text-white hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-35"
-                  title={embedTarget ? `Dock ${embedTarget.title}` : 'This app opens as a full page'}
+                  title={isDesktop ? 'Desktop apps cannot be docked' : embedTarget ? `Dock ${embedTarget.title}` : 'This app opens as a full page'}
                 >
                   Dock
                 </button>
