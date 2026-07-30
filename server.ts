@@ -37,6 +37,19 @@ function clearSpmtSessionCookies(res: express.Response) {
   res.clearCookie(SPMT_REFRESH_COOKIE, { ...sessionCookieOptions(), maxAge: 0 });
 }
 
+function safeLocalReturnPath(value: unknown) {
+  const raw = String(value || '').trim();
+  if (!raw.startsWith('/') || raw.startsWith('//')) return '/';
+  try {
+    const parsed = new URL(raw, 'https://spacemountain.live');
+    return parsed.origin === 'https://spacemountain.live'
+      ? `${parsed.pathname}${parsed.search}${parsed.hash}`
+      : '/';
+  } catch {
+    return '/';
+  }
+}
+
 async function refreshSpmtSession(req: express.Request, res: express.Response) {
   const refreshToken = readCookie(req.headers.cookie, SPMT_REFRESH_COOKIE);
   const clientSecret = String(process.env.SPACEMOUNTAIN_CLIENT_SECRET || '').trim();
@@ -713,8 +726,10 @@ async function startServer() {
       if (!exchange.ok || !data?.access_token) return res.status(401).send('SPMT sign-in exchange failed.');
       res.cookie(SPMT_SESSION_COOKIE, data.access_token, sessionCookieOptions());
       if (data.refresh_token) res.cookie(SPMT_REFRESH_COOKIE, data.refresh_token, sessionCookieOptions());
+      const returnPath = safeLocalReturnPath(readCookie(req.headers.cookie, 'spacemountain_oauth_return'));
       res.clearCookie('spacemountain_oauth_state', { ...sessionCookieOptions(), maxAge: 0 });
-      res.redirect('/');
+      res.clearCookie('spacemountain_oauth_return', { ...sessionCookieOptions(), maxAge: 0 });
+      res.redirect(returnPath);
     } catch {
       res.status(502).send('SPMT sign-in is temporarily unavailable.');
     }
@@ -724,6 +739,7 @@ async function startServer() {
   app.get('/auth/login', (req, res) => {
     const state = crypto.randomBytes(24).toString('base64url');
     res.cookie('spacemountain_oauth_state', state, { ...sessionCookieOptions(), maxAge: 10 * 60 * 1000 });
+    res.cookie('spacemountain_oauth_return', safeLocalReturnPath(req.query.return), { ...sessionCookieOptions(), maxAge: 10 * 60 * 1000 });
     const returnUrl = `/api/oauth/authorize?client_id=spacemountain-live&redirect_uri=${encodeURIComponent('https://spacemountain.live/auth/callback')}&state=${encodeURIComponent(state)}`;
     res.redirect(`https://spmt.live/?return=${encodeURIComponent(returnUrl)}`);
   });
