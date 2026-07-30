@@ -344,6 +344,10 @@ const defaultOverlayWidgets: OverlayWidget[] = [
     id: 'streamweaver-tts-mixer', title: 'All-Tenant TTS Studio', kind: 'audio', url: appSurfaces.streamweaver.ttsMixer,
     visible: false, locked: false, interactive: true, x: 2, y: 64, width: 520, height: 300, opacity: 1,
   },
+  {
+    id: 'commlink-live-chat', title: 'Commlink Live Chat', kind: 'chat', url: appSurfaces.streamweaver.liveChat,
+    visible: false, locked: false, interactive: true, x: 2, y: 30, width: 520, height: 420, opacity: 1,
+  },
 ];
 
 function addStreamWeaverTenant(url: string, tenantId?: string | null) {
@@ -365,6 +369,10 @@ function normalizeOverlayWidgets(savedWidgets: OverlayWidget[] | null | undefine
     if (widget.id === 'streamweaver-tts-mixer') {
       widget.title = 'All-Tenant TTS Studio';
       widget.url = appSurfaces.streamweaver.ttsMixer;
+    }
+    if (widget.id === 'commlink-live-chat') {
+      widget.title = 'Commlink Live Chat';
+      widget.url = appSurfaces.streamweaver.liveChat;
     }
     return widget;
   });
@@ -2285,7 +2293,10 @@ export default function App() {
         widgets={overlayWidgets}
         slots={embedSlots}
         accentColor={currentTheme.glowHex}
+        dockSurfaceOpacity={preferences.glassOpacity / 100}
+        dockBlurStrength={preferences.blurStrength}
         onWidgetChange={updateOverlayWidget}
+        onSlotChange={updateEmbedSlot}
         onFrameLoad={sendEmbeddedAuth}
       />
     );
@@ -2394,6 +2405,7 @@ export default function App() {
         accentColor={currentTheme.glowHex}
         onChange={updateOverlayWidget}
         onFinishEditing={() => setOverlayEditing(false)}
+        onFrameLoad={sendEmbeddedAuth}
       />
 
       {/* Floating Interactive Points Indicators (+XP) */}

@@ -22,6 +22,7 @@ type OverlayWorkspaceProps = {
   accentColor: string;
   onChange: (widgetId: string, patch: Partial<OverlayWidget>) => void;
   onFinishEditing: () => void;
+  onFrameLoad?: (frame: HTMLIFrameElement | null) => void | Promise<void>;
 };
 
 type PointerOperation = {
@@ -32,7 +33,7 @@ type PointerOperation = {
   initial: OverlayWidget;
 };
 
-export default function OverlayWorkspace({ enabled, editing, widgets, accentColor, onChange, onFinishEditing }: OverlayWorkspaceProps) {
+export default function OverlayWorkspace({ enabled, editing, widgets, accentColor, onChange, onFinishEditing, onFrameLoad }: OverlayWorkspaceProps) {
   const operation = useRef<PointerOperation | null>(null);
 
   useEffect(() => {
@@ -106,6 +107,8 @@ export default function OverlayWorkspace({ enabled, editing, widgets, accentColo
             key={`${widget.id}:${widget.url}`}
             src={widget.url}
             title={widget.title}
+            data-embed-slot-frame={`personal-overlay-${widget.id}`}
+            onLoad={(event) => void onFrameLoad?.(event.currentTarget)}
             className={`h-full w-full border-0 bg-transparent ${editing ? 'pointer-events-none pt-7' : ''}`}
             allow="autoplay; microphone; camera; fullscreen; clipboard-write"
           />
