@@ -23,6 +23,22 @@ Apps are specialized modules connected through SPMT.
 - Docked apps
 - Creator workspace
 
+## Companion overlay surface
+
+`/?desktopOverlay=1` is the transparent renderer used by SpaceMountain
+Companion. It deliberately paints no page background. Only enabled personal
+widgets and the three saved dock-slot shells are rendered.
+
+- Personal-widget visibility and opacity come from the saved SpaceMountain
+  overlay layout.
+- Dock Show/Hide state comes from the portable workspace profile.
+- Dock glass opacity and blur follow the shared SpaceMountain appearance.
+- Commlink Live Chat is available as a dock preset and as a personal-overlay
+  widget, using the authenticated StreamWeaver embed bridge.
+- Companion interaction mode adds a visible focus frame, dock Show/Hide
+  controls, and a **Done** button; outside that mode the native window returns
+  to click-through.
+
 ## Documentation
 
 Start with `docs/DOCS_HOME.md`.

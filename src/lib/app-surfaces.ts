@@ -40,7 +40,7 @@ export const appSurfaces = {
 
 export const canonicalEmbedPresets: EmbeddedAppTarget[] = [
   { title: 'All-Tenant TTS Studio', url: appSurfaces.streamweaver.ttsMixer, kind: 'overlay' },
-  { title: 'Live Chat Dock', url: appSurfaces.streamweaver.liveChat, kind: 'app' },
+  { title: 'Commlink Live Chat', url: appSurfaces.streamweaver.liveChat, kind: 'app' },
   { title: 'Quackverse Game', url: appSurfaces.chatTag.quackverse, kind: 'game' },
   { title: 'ChatTag Overlay', url: appSurfaces.chatTag.overlay, kind: 'overlay' },
   { title: 'DSH Dashboard', url: appSurfaces.discordHub.embed, kind: 'dashboard' },

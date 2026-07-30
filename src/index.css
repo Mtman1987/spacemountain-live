@@ -18,6 +18,13 @@ body {
   scrollbar-color: var(--theme-glow-color-alpha, rgba(168, 85, 247, 0.3)) rgba(5, 5, 5, 0.5);
 }
 
+html[data-companion-overlay="true"],
+html[data-companion-overlay="true"] body,
+html[data-companion-overlay="true"] #root {
+  background: transparent !important;
+  background-color: transparent !important;
+}
+
 /* Custom scrollbars */
 ::-webkit-scrollbar {
   width: 6px;
