@@ -30,6 +30,7 @@ import RightSidebar from './components/RightSidebar';
 import Shop from './components/Shop';
 import Arena from './components/Arena';
 import OverlayWorkspace, { OverlayWidget } from './components/OverlayWorkspace';
+import { CompanionOverlaySurface, CompanionWorkspaceSurface } from './components/CompanionSurfaces';
 import { appOrigins, appSurfaces, canonicalEmbedPresets, normalizeAppSurface } from './lib/app-surfaces';
 import { usePortableWorkspace } from './hooks/usePortableWorkspace';
 import type { WorkflowStep } from './features/workspace/BuilderRoute';
@@ -2262,20 +2263,31 @@ export default function App() {
   const platformDocSections = Array.isArray(platformDocs?.sections) ? platformDocs.sections : [];
   const platformScopes = Array.isArray(platformDocs?.scopes) ? platformDocs.scopes : [];
   const featuredPlugins = platformPlugins.slice(0, 4);
-  const desktopOverlayMode = new URLSearchParams(window.location.search).get('desktopOverlay') === '1';
+  const surfaceParams = new URLSearchParams(window.location.search);
+  const desktopOverlayMode = surfaceParams.get('desktopOverlay') === '1';
+  const companionWorkspaceMode = surfaceParams.get('companionWorkspace') === 'streamweaver';
 
-  if (desktopOverlayMode && identity) {
+  if (companionWorkspaceMode) {
     return (
-      <div className="relative min-h-screen overflow-hidden bg-transparent text-white">
-        <OverlayWorkspace
-          enabled={overlayWorkspaceEnabled}
-          editing={false}
-          widgets={overlayWidgets}
-          accentColor={currentTheme.glowHex}
-          onChange={updateOverlayWidget}
-          onFinishEditing={() => setOverlayEditing(false)}
-        />
-      </div>
+      <CompanionWorkspaceSurface
+        identityPresent={Boolean(identity)}
+        streamWeaverUrl={`${appSurfaces.streamweaver.home}?companion=1`}
+        onFrameLoad={sendEmbeddedAuth}
+      />
+    );
+  }
+
+  if (desktopOverlayMode) {
+    return (
+      <CompanionOverlaySurface
+        identityPresent={Boolean(identity)}
+        overlayEnabled={overlayWorkspaceEnabled}
+        widgets={overlayWidgets}
+        slots={embedSlots}
+        accentColor={currentTheme.glowHex}
+        onWidgetChange={updateOverlayWidget}
+        onFrameLoad={sendEmbeddedAuth}
+      />
     );
   }
 
