@@ -76,7 +76,11 @@ const gateway = http.createServer(async (request, response) => {
   const identity = await resolveIdentity(request);
   if (!identity) {
     if (pathname.startsWith('/api/')) return sendJson(response, 401, { error: 'SPMT session required' });
-    response.writeHead(302, { location: `https://spmt.live/api/oauth/authorize?client_id=spacemountain-live&redirect_uri=${encodeURIComponent('https://spacemountain.live/auth/callback')}`, 'cache-control': 'no-store' });
+    const returnPath = `${pathname}${url.search}`;
+    response.writeHead(302, {
+      location: `/auth/login?return=${encodeURIComponent(returnPath)}`,
+      'cache-control': 'no-store',
+    });
     return response.end();
   }
 
