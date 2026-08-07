@@ -5,6 +5,8 @@ const PUBLIC_PORT = Number(process.env.PORT || 3000);
 const INTERNAL_PORT = Number(process.env.SPACEMOUNTAIN_INTERNAL_PORT || PUBLIC_PORT + 1);
 const SPMT_BASE_URL = String(process.env.SPMT_BASE_URL || 'https://spmt.live').replace(/\/$/, '');
 const SPMT_COOKIE = 'spacemountain_spmt_session';
+const SPMT_REFRESH_COOKIE = 'spacemountain_spmt_refresh';
+const SPMT_CLIENT_ID = 'spacemountain-live';
 
 const PUBLIC_PREFIXES = [
   '/auth/', '/api/auth/', '/api/health', '/health', '/downloads/', '/docs/', '/assets/',
@@ -28,10 +30,17 @@ function identityIsAdmin(identity: any) {
   return role === 'admin' || role === 'owner' || roles.includes('admin') || roles.includes('owner');
 }
 
-async function resolveIdentity(request: http.IncomingMessage) {
-  const bearer = String(request.headers.authorization || '').replace(/^Bearer\s+/i, '').trim();
-  const token = cookieValue(request.headers.cookie, SPMT_COOKIE) || bearer;
-  if (!token) return null;
+function appendSetCookie(response: http.ServerResponse, value: string) {
+  const current = response.getHeader('set-cookie');
+  const cookies = Array.isArray(current) ? current.map(String) : current ? [String(current)] : [];
+  response.setHeader('set-cookie', [...cookies, value]);
+}
+
+function setSessionCookie(response: http.ServerResponse, name: string, value: string, maxAge: number) {
+  appendSetCookie(response, `${name}=${encodeURIComponent(value)}; Max-Age=${Math.max(0, Math.floor(maxAge))}; Path=/; HttpOnly; Secure; SameSite=Lax`);
+}
+
+async function fetchIdentity(token: string) {
   const response = await fetch(`${SPMT_BASE_URL}/api/oauth/userinfo`, {
     headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
     signal: AbortSignal.timeout(8_000),
@@ -40,6 +49,39 @@ async function resolveIdentity(request: http.IncomingMessage) {
   const payload = await response.json().catch(() => null);
   const identity = payload?.user || payload?.profile || payload;
   return identity?.id ? identity : null;
+}
+
+async function refreshSession(request: http.IncomingMessage, response: http.ServerResponse) {
+  const refreshToken = cookieValue(request.headers.cookie, SPMT_REFRESH_COOKIE);
+  const clientSecret = String(process.env.SPACEMOUNTAIN_CLIENT_SECRET || '').trim();
+  if (!refreshToken || !clientSecret) return '';
+  const refreshResponse = await fetch(`${SPMT_BASE_URL}/api/oauth/token`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', accept: 'application/json' },
+    body: JSON.stringify({
+      grant_type: 'refresh_token',
+      refresh_token: refreshToken,
+      client_id: SPMT_CLIENT_ID,
+      client_secret: clientSecret,
+    }),
+    signal: AbortSignal.timeout(8_000),
+  }).catch(() => null);
+  if (!refreshResponse?.ok) return '';
+  const payload = await refreshResponse.json().catch(() => null);
+  if (!payload?.access_token || !payload?.refresh_token) return '';
+  setSessionCookie(response, SPMT_COOKIE, String(payload.access_token), Number(payload.expires_in || 604800));
+  setSessionCookie(response, SPMT_REFRESH_COOKIE, String(payload.refresh_token), Number(payload.refresh_expires_in || 2592000));
+  return String(payload.access_token);
+}
+
+async function resolveIdentity(request: http.IncomingMessage, response: http.ServerResponse) {
+  const bearer = String(request.headers.authorization || '').replace(/^Bearer\s+/i, '').trim();
+  let token = cookieValue(request.headers.cookie, SPMT_COOKIE) || bearer;
+  let identity = token ? await fetchIdentity(token) : null;
+  if (identity || bearer) return identity;
+  token = await refreshSession(request, response);
+  if (!token) return null;
+  return fetchIdentity(token);
 }
 
 function isStatic(pathname: string) {
@@ -73,7 +115,7 @@ const gateway = http.createServer(async (request, response) => {
     return forward(request, response, null);
   }
 
-  const identity = await resolveIdentity(request);
+  const identity = await resolveIdentity(request, response);
   if (!identity) {
     if (pathname.startsWith('/api/')) return sendJson(response, 401, { error: 'SPMT session required' });
     const returnPath = `${pathname}${url.search}`;
