@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { EmbedSlot } from '../types';
+import { buildAppSurfaceUrl } from '../lib/app-surfaces';
 import OverlayWorkspace, { type OverlayWidget } from './OverlayWorkspace';
 
 type AuthFrameHandler = (frame: HTMLIFrameElement | null) => void | Promise<void>;
@@ -63,25 +64,55 @@ export function CompanionOverlaySurface({
   overlayEnabled,
   widgets,
   slots,
+  tenantId,
   accentColor,
-  dockSurfaceOpacity,
-  dockBlurStrength,
   onWidgetChange,
   onSlotChange,
+  onOverlayEnabledChange,
   onFrameLoad,
 }: {
   identityPresent: boolean;
   overlayEnabled: boolean;
   widgets: OverlayWidget[];
   slots: EmbedSlot[];
+  tenantId?: string | null;
   accentColor: string;
-  dockSurfaceOpacity: number;
-  dockBlurStrength: number;
   onWidgetChange: (widgetId: string, patch: Partial<OverlayWidget>) => void;
   onSlotChange: (slotId: number, patch: Partial<EmbedSlot>) => void;
+  onOverlayEnabledChange: (enabled: boolean) => void;
   onFrameLoad: AuthFrameHandler;
 }) {
   const [interaction, setInteraction] = useState({ active: false, hotkey: 'CommandOrControl+Shift+O' });
+  const unifiedWidgets = useMemo(() => widgets.map((widget) => {
+    const match = /^dock-slot-([123])$/.exec(widget.id);
+    if (!match) return widget;
+    const slot = slots.find((item) => item.id === Number(match[1]));
+    if (!slot) return widget;
+    const surface = buildAppSurfaceUrl(slot.url, slot.title, {
+      tenantId,
+      embed: true,
+      scopes: ['identity:read', 'overlay:control', 'workspace:read'],
+    });
+    return { ...widget, title: slot.title, url: surface.valid ? surface.url : 'about:blank' };
+  }), [slots, tenantId, widgets]);
+
+  const handleWidgetChange = (widgetId: string, patch: Partial<OverlayWidget>) => {
+    onWidgetChange(widgetId, patch);
+    const match = /^dock-slot-([123])$/.exec(widgetId);
+    if (!match) return;
+    const slotId = Number(match[1]);
+    onSlotChange(slotId, {
+      ...(typeof patch.title === 'string' ? { title: patch.title } : {}),
+      ...(typeof patch.url === 'string' ? { url: patch.url } : {}),
+      ...(typeof patch.visible === 'boolean' ? { collapsed: !patch.visible } : {}),
+    });
+  };
+
+  const finishInteraction = () => {
+    const request = window.companionOverlay?.finishInteraction();
+    if (request) void request.catch(() => setInteraction((state) => ({ ...state, active: false })));
+    else setInteraction((state) => ({ ...state, active: false }));
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -111,52 +142,15 @@ export function CompanionOverlaySurface({
         <>
           <OverlayWorkspace
             enabled={overlayEnabled}
-            editing={false}
-            widgets={widgets}
+            editing={interaction.active}
+            widgets={unifiedWidgets}
             accentColor={accentColor}
-            onChange={onWidgetChange}
-            onFinishEditing={() => {}}
+            onChange={handleWidgetChange}
+            onFinishEditing={finishInteraction}
+            onSetEditing={(active) => active ? setInteraction((state) => ({ ...state, active: true })) : finishInteraction()}
+            onSetEnabled={onOverlayEnabledChange}
             onFrameLoad={onFrameLoad}
           />
-
-          <section className="pointer-events-none absolute inset-x-3 bottom-3 z-[60] grid grid-cols-1 items-end gap-3 lg:grid-cols-3" aria-label="Companion dock slots">
-            {slots.map((slot) => (
-              <article
-                key={slot.id}
-                className="pointer-events-auto overflow-hidden rounded-2xl border border-white/10 shadow-2xl"
-                style={{
-                  backgroundColor: `rgba(4, 8, 18, ${Math.max(0.05, Math.min(1, dockSurfaceOpacity))})`,
-                  backdropFilter: `blur(${Math.max(0, dockBlurStrength)}px)`,
-                }}
-              >
-                <header className="flex h-9 items-center justify-between border-b border-white/10 px-3">
-                  <span className="truncate text-[10px] font-black text-white">Dock {slot.id}: {slot.title}</span>
-                  <div className="flex items-center gap-2">
-                    <span className="text-[8px] font-bold uppercase tracking-wider text-zinc-500">{slot.kind}</span>
-                    {interaction.active && (
-                      <button
-                        type="button"
-                        onClick={() => onSlotChange(slot.id, { collapsed: !slot.collapsed })}
-                        className="rounded-full border border-cyan-300/25 bg-cyan-300/10 px-2 py-0.5 text-[8px] font-black text-cyan-100"
-                      >
-                        {slot.collapsed ? 'Show' : 'Hide'}
-                      </button>
-                    )}
-                  </div>
-                </header>
-                {!slot.collapsed && (
-                  <iframe
-                    src={slot.url}
-                    title={slot.title}
-                    data-embed-slot-frame={`companion-dock-${slot.id}`}
-                    onLoad={(event) => void onFrameLoad(event.currentTarget)}
-                    className="h-[280px] w-full border-0 bg-transparent"
-                    allow="autoplay; microphone; camera; fullscreen; clipboard-write"
-                  />
-                )}
-              </article>
-            ))}
-          </section>
         </>
       )}
 
@@ -165,7 +159,7 @@ export function CompanionOverlaySurface({
           Overlay interaction active · {interaction.hotkey}
           <button
             type="button"
-            onClick={() => void window.companionOverlay?.finishInteraction()}
+            onClick={finishInteraction}
             className="rounded-full bg-cyan-300 px-3 py-1 text-zinc-950"
           >
             Done

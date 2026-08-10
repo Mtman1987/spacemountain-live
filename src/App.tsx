@@ -31,7 +31,7 @@ import Shop from './components/Shop';
 import Arena from './components/Arena';
 import OverlayWorkspace, { OverlayWidget } from './components/OverlayWorkspace';
 import { CompanionOverlaySurface, CompanionWorkspaceSurface } from './components/CompanionSurfaces';
-import { appOrigins, appSurfaces, canonicalEmbedPresets, normalizeAppSurface } from './lib/app-surfaces';
+import { appOrigins, appSurfaces, buildAppSurfaceUrl, canonicalEmbedPresets, normalizeAppSurface } from './lib/app-surfaces';
 import { usePortableWorkspace } from './hooks/usePortableWorkspace';
 import type { WorkflowStep } from './features/workspace/BuilderRoute';
 
@@ -348,7 +348,28 @@ const defaultOverlayWidgets: OverlayWidget[] = [
     id: 'commlink-live-chat', title: 'Commlink Live Chat', kind: 'chat', url: appSurfaces.streamweaver.liveChat,
     visible: false, locked: false, interactive: true, x: 2, y: 30, width: 520, height: 420, opacity: 1,
   },
+  {
+    id: 'dock-slot-1', title: defaultEmbedSlots[0].title, kind: 'embed', url: defaultEmbedSlots[0].url,
+    visible: !defaultEmbedSlots[0].collapsed, locked: false, interactive: true, x: 1, y: 67, width: 420, height: 280, opacity: 0.92,
+  },
+  {
+    id: 'dock-slot-2', title: defaultEmbedSlots[1].title, kind: 'embed', url: defaultEmbedSlots[1].url,
+    visible: !defaultEmbedSlots[1].collapsed, locked: false, interactive: true, x: 34, y: 67, width: 520, height: 280, opacity: 0.92,
+  },
+  {
+    id: 'dock-slot-3', title: defaultEmbedSlots[2].title, kind: 'embed', url: defaultEmbedSlots[2].url,
+    visible: !defaultEmbedSlots[2].collapsed, locked: false, interactive: true, x: 67, y: 67, width: 420, height: 280, opacity: 0.92,
+  },
 ];
+
+function dockOverlayWidgetId(slotId: number) {
+  return `dock-slot-${slotId}`;
+}
+
+function dockSlotIdFromWidget(widgetId: string) {
+  const match = /^dock-slot-([123])$/.exec(widgetId);
+  return match ? Number(match[1]) : null;
+}
 
 function addStreamWeaverTenant(url: string, tenantId?: string | null) {
   if (!tenantId || !url.startsWith('https://streamweaver-new.fly.dev/')) return url;
@@ -357,11 +378,36 @@ function addStreamWeaverTenant(url: string, tenantId?: string | null) {
   return nextUrl.toString();
 }
 
+function embeddedSurfaceUrl(title: string, url: string, tenantId?: string | null) {
+  const surface = buildAppSurfaceUrl(url, title, {
+    tenantId: tenantId || 'spmt',
+    embed: true,
+    scopes: ['identity:read', 'overlay:control', 'workspace:read'],
+  });
+  return surface.valid ? surface.url : 'about:blank';
+}
+
 function normalizeOverlayWidgets(savedWidgets: OverlayWidget[] | null | undefined, tenantId?: string | null) {
   const savedById = new Map((savedWidgets || []).map((widget) => [widget.id, widget]));
-  const normalizedDefaults = defaultOverlayWidgets.map((defaultWidget) => {
+  const normalizeWidget = (defaultWidget: OverlayWidget, saved: OverlayWidget | undefined, index: number) => {
+    const legacyInteractive = saved?.interactive ?? defaultWidget.interactive;
+    const interactionMode = saved?.interactionMode || defaultWidget.interactionMode || (legacyInteractive ? 'interactive' : 'click-through');
+    return {
+      ...defaultWidget,
+      ...saved,
+      interactive: interactionMode !== 'click-through',
+      interactionMode,
+      hoverReveal: saved?.hoverReveal ?? defaultWidget.hoverReveal ?? false,
+      rotation: Number.isFinite(saved?.rotation) ? Number(saved?.rotation) : (defaultWidget.rotation ?? 0),
+      zIndex: Number.isFinite(saved?.zIndex) ? Number(saved?.zIndex) : (defaultWidget.zIndex ?? index + 1),
+      parallaxEnabled: saved?.parallaxEnabled ?? defaultWidget.parallaxEnabled ?? false,
+      parallaxDepth: Number.isFinite(saved?.parallaxDepth) ? Number(saved?.parallaxDepth) : (defaultWidget.parallaxDepth ?? 8),
+      groupId: saved?.groupId ?? defaultWidget.groupId ?? null,
+    } satisfies OverlayWidget;
+  };
+  const normalizedDefaults = defaultOverlayWidgets.map((defaultWidget, index) => {
     const saved = savedById.get(defaultWidget.id);
-    const widget = { ...defaultWidget, ...saved };
+    const widget = normalizeWidget(defaultWidget, saved, index);
     if (widget.id === 'streamweaver-avatar') {
       widget.title = 'StreamWeaver Bot Avatar';
       widget.url = addStreamWeaverTenant('https://streamweaver-new.fly.dev/overlay/avatar', tenantId);
@@ -374,9 +420,17 @@ function normalizeOverlayWidgets(savedWidgets: OverlayWidget[] | null | undefine
       widget.title = 'Commlink Live Chat';
       widget.url = appSurfaces.streamweaver.liveChat;
     }
+    const scopedSurface = buildAppSurfaceUrl(widget.url, widget.title, {
+      tenantId,
+      embed: true,
+      scopes: ['identity:read', 'overlay:control', 'workspace:read'],
+    });
+    if (scopedSurface.valid) widget.url = scopedSurface.url;
     return widget;
   });
-  const customWidgets = (savedWidgets || []).filter((widget) => !defaultOverlayWidgets.some((item) => item.id === widget.id));
+  const customWidgets = (savedWidgets || [])
+    .filter((widget) => !defaultOverlayWidgets.some((item) => item.id === widget.id))
+    .map((widget, index) => normalizeWidget(widget, widget, normalizedDefaults.length + index));
   return [...normalizedDefaults, ...customWidgets];
 }
 
@@ -1169,7 +1223,7 @@ export default function App() {
   const [activeEmbedSlot, setActiveEmbedSlot] = useState(2);
   const [overlayWorkspaceEnabled, setOverlayWorkspaceEnabled] = useState(true);
   const [overlayEditing, setOverlayEditing] = useState(false);
-  const [overlayWidgets, setOverlayWidgets] = useState<OverlayWidget[]>(defaultOverlayWidgets);
+  const [overlayWidgets, setOverlayWidgets] = useState<OverlayWidget[]>(() => normalizeOverlayWidgets(defaultOverlayWidgets));
   const [workflowSteps, setWorkflowSteps] = useState<WorkflowStep[]>(defaultWorkflowSteps);
   const [workflowDraft, setWorkflowDraft] = useState<Omit<WorkflowStep, 'id' | 'enabled'>>({
     trigger: 'Shared chat message', condition: 'Any connected source', action: 'Add to bot context', destination: 'StreamWeaver memory',
@@ -1186,6 +1240,16 @@ export default function App() {
     setPreferences,
     setEmbedSlots,
   });
+  useEffect(() => {
+    if (!portableWorkspace.loaded) return;
+    setOverlayWidgets((widgets) => widgets.map((widget) => {
+      const slotId = dockSlotIdFromWidget(widget.id);
+      const slot = slotId ? embedSlots.find((item) => item.id === slotId) : null;
+      if (!slot) return widget;
+      if (widget.title === slot.title && widget.url === slot.url && widget.visible === !slot.collapsed) return widget;
+      return { ...widget, title: slot.title, url: slot.url, visible: !slot.collapsed };
+    }));
+  }, [embedSlots, portableWorkspace.loaded]);
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [bridgeSearch, setBridgeSearch] = useState('');
   const [voiceTranscript, setVoiceTranscript] = useState('');
@@ -1221,9 +1285,27 @@ export default function App() {
   };
   const updateEmbedSlot = (slotId: number, patch: Partial<EmbedSlot>) => {
     setEmbedSlots((slots) => slots.map((slot) => slot.id === slotId ? { ...slot, ...patch } : slot));
+    setOverlayWidgets((widgets) => widgets.map((widget) => {
+      if (widget.id !== dockOverlayWidgetId(slotId)) return widget;
+      return {
+        ...widget,
+        ...(typeof patch.title === 'string' ? { title: patch.title } : {}),
+        ...(typeof patch.url === 'string' ? { url: patch.url } : {}),
+        ...(typeof patch.collapsed === 'boolean' ? { visible: !patch.collapsed } : {}),
+      };
+    }));
   };
   const updateOverlayWidget = useCallback((widgetId: string, patch: Partial<OverlayWidget>) => {
     setOverlayWidgets((widgets) => widgets.map((widget) => widget.id === widgetId ? { ...widget, ...patch } : widget));
+    const slotId = dockSlotIdFromWidget(widgetId);
+    if (slotId) {
+      setEmbedSlots((slots) => slots.map((slot) => slot.id === slotId ? {
+        ...slot,
+        ...(typeof patch.title === 'string' ? { title: patch.title } : {}),
+        ...(typeof patch.url === 'string' ? { url: patch.url } : {}),
+        ...(typeof patch.visible === 'boolean' ? { collapsed: !patch.visible } : {}),
+      } : slot));
+    }
   }, []);
   const addOverlayWidget = (preset?: Partial<OverlayWidget>) => {
     const id = `custom-${Date.now()}`;
@@ -1240,6 +1322,13 @@ export default function App() {
       width: 360,
       height: 220,
       opacity: 1,
+      interactionMode: 'click-through',
+      hoverReveal: false,
+      rotation: 0,
+      zIndex: widgets.length + 1,
+      parallaxEnabled: false,
+      parallaxDepth: 8,
+      groupId: null,
       ...preset,
     }]);
   };
@@ -1398,7 +1487,7 @@ export default function App() {
       const cached = JSON.parse(localStorage.getItem(cacheKey) || 'null');
       if (cached) {
         if (typeof cached.enabled === 'boolean') setOverlayWorkspaceEnabled(cached.enabled);
-        setOverlayWidgets(normalizeOverlayWidgets(cached.widgets, identity.twitchId));
+        setOverlayWidgets(normalizeOverlayWidgets(cached.widgets, (identity as any).tenantId || identity.twitchId || 'spmt'));
         if (Array.isArray(cached.workflows)) setWorkflowSteps(cached.workflows);
       }
     } catch {}
@@ -1415,7 +1504,7 @@ export default function App() {
         const layout = data?.layout;
         if (typeof layout?.enabled === 'boolean') setOverlayWorkspaceEnabled(layout.enabled);
         if (Array.isArray(layout?.widgets)) {
-          setOverlayWidgets(normalizeOverlayWidgets(layout.widgets, identity.twitchId));
+          setOverlayWidgets(normalizeOverlayWidgets(layout.widgets, (identity as any).tenantId || identity.twitchId || 'spmt'));
         }
         if (Array.isArray(layout?.workflows)) setWorkflowSteps(layout.workflows);
       })
@@ -1429,7 +1518,7 @@ export default function App() {
     if (!token) return;
     const layout = {
       enabled: overlayWorkspaceEnabled,
-      widgets: normalizeOverlayWidgets(overlayWidgets, identity.twitchId),
+      widgets: normalizeOverlayWidgets(overlayWidgets, (identity as any).tenantId || identity.twitchId || 'spmt'),
       workflows: workflowSteps,
     };
     localStorage.setItem(`spacemountain:overlay-workspace:${identity.id}`, JSON.stringify(layout));
@@ -2292,11 +2381,11 @@ export default function App() {
         overlayEnabled={overlayWorkspaceEnabled}
         widgets={overlayWidgets}
         slots={embedSlots}
+        tenantId={(identity as any)?.tenantId || identity?.twitchId || 'spmt'}
         accentColor={currentTheme.glowHex}
-        dockSurfaceOpacity={preferences.glassOpacity / 100}
-        dockBlurStrength={preferences.blurStrength}
         onWidgetChange={updateOverlayWidget}
         onSlotChange={updateEmbedSlot}
+        onOverlayEnabledChange={setOverlayWorkspaceEnabled}
         onFrameLoad={sendEmbeddedAuth}
       />
     );
@@ -2401,10 +2490,15 @@ export default function App() {
       <OverlayWorkspace
         enabled={overlayWorkspaceEnabled}
         editing={overlayEditing}
-        widgets={overlayWidgets}
+        widgets={overlayWidgets.filter((widget) => overlayEditing || !dockSlotIdFromWidget(widget.id))}
         accentColor={currentTheme.glowHex}
         onChange={updateOverlayWidget}
         onFinishEditing={() => setOverlayEditing(false)}
+        onSetEditing={(editing) => {
+          if (editing) setOverlayWorkspaceEnabled(true);
+          setOverlayEditing(editing);
+        }}
+        onSetEnabled={setOverlayWorkspaceEnabled}
         onFrameLoad={sendEmbeddedAuth}
       />
 
@@ -4569,7 +4663,8 @@ export default function App() {
                     <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/5 pb-3">
                       <div>
                         <h3 className="text-sm font-bold text-white">Personal overlay canvas</h3>
-                        <p className="mt-1 text-xs text-zinc-500">A transparent full-screen layer for movable app widgets. Layout is saved to your SPMT account.</p>
+                        <p className="mt-1 text-xs text-zinc-500">One account-saved canvas for widgets and all three embeds. Mobile drag handles are enlarged; numeric controls below provide exact placement.</p>
+                        <p className="mt-1 text-[9px] font-mono text-zinc-600">Alt+Shift+O canvas · Alt+Shift+E edit · Alt+Shift+L layers · Alt+Shift+H emergency hide/restore</p>
                       </div>
                       <div className="flex flex-wrap gap-2">
                         <button
@@ -4613,7 +4708,7 @@ export default function App() {
                                 {widget.locked ? 'Locked' : 'Unlocked'}
                               </button>
                               {widget.kind === 'custom' && (
-                                <button type="button" onClick={() => setOverlayWidgets((items) => items.filter((item) => item.id !== widget.id))} className="text-[10px] font-bold text-red-300">Remove</button>
+                                <button type="button" aria-label={`Delete ${widget.title}`} title="Delete widget" onClick={() => setOverlayWidgets((items) => items.filter((item) => item.id !== widget.id))} className="rounded-lg border border-red-400/20 p-1 text-red-300"><Trash2 size={13} /></button>
                               )}
                             </div>
                           </div>
@@ -4623,11 +4718,30 @@ export default function App() {
                             className="mt-2 w-full rounded-lg border border-white/10 bg-black/40 px-2 py-1.5 text-[10px] text-zinc-300 outline-none focus:border-cyan-400/50"
                             aria-label={`${widget.title} URL`}
                           />
+                          {!buildAppSurfaceUrl(widget.url, widget.title).valid && (
+                            <p className="mt-1 text-[9px] font-bold text-red-300">{buildAppSurfaceUrl(widget.url, widget.title).error}</p>
+                          )}
                           <div className="mt-3 grid grid-cols-2 gap-3 text-[10px] text-zinc-500 sm:grid-cols-4">
+                            <label>X %<input type="number" min="0" max="100" step="0.1" value={Number(widget.x.toFixed(1))} onChange={(event) => updateOverlayWidget(widget.id, { x: Math.max(0, Math.min(100, Number(event.target.value) || 0)) })} className="mt-1 w-full rounded bg-black/40 px-2 py-1 text-zinc-200" /></label>
+                            <label>Y %<input type="number" min="0" max="100" step="0.1" value={Number(widget.y.toFixed(1))} onChange={(event) => updateOverlayWidget(widget.id, { y: Math.max(0, Math.min(100, Number(event.target.value) || 0)) })} className="mt-1 w-full rounded bg-black/40 px-2 py-1 text-zinc-200" /></label>
                             <label>Width<input type="number" min="120" value={Math.round(widget.width)} onChange={(event) => updateOverlayWidget(widget.id, { width: Number(event.target.value) || 120 })} className="mt-1 w-full rounded bg-black/40 px-2 py-1 text-zinc-200" /></label>
                             <label>Height<input type="number" min="72" value={Math.round(widget.height)} onChange={(event) => updateOverlayWidget(widget.id, { height: Number(event.target.value) || 72 })} className="mt-1 w-full rounded bg-black/40 px-2 py-1 text-zinc-200" /></label>
-                            <label>Opacity<input type="range" min="10" max="100" value={Math.round(widget.opacity * 100)} onChange={(event) => updateOverlayWidget(widget.id, { opacity: Number(event.target.value) / 100 })} className="mt-2 w-full" /></label>
-                            <label className="flex items-center gap-2 pt-4"><input type="checkbox" checked={widget.interactive} onChange={(event) => updateOverlayWidget(widget.id, { interactive: event.target.checked })} /> Interactive</label>
+                            <label>Rotation<input type="number" min="-180" max="180" value={Math.round(widget.rotation ?? 0)} onChange={(event) => updateOverlayWidget(widget.id, { rotation: Math.max(-180, Math.min(180, Number(event.target.value) || 0)) })} className="mt-1 w-full rounded bg-black/40 px-2 py-1 text-zinc-200" /></label>
+                            <label>Layer<input type="number" min="1" value={Math.round(widget.zIndex ?? 1)} onChange={(event) => updateOverlayWidget(widget.id, { zIndex: Math.max(1, Number(event.target.value) || 1) })} className="mt-1 w-full rounded bg-black/40 px-2 py-1 text-zinc-200" /></label>
+                            <label>Opacity {Math.round(widget.opacity * 100)}%<input type="range" min="0" max="100" value={Math.round(widget.opacity * 100)} onChange={(event) => updateOverlayWidget(widget.id, { opacity: Number(event.target.value) / 100 })} className="mt-2 w-full" /></label>
+                            <label>Interaction
+                              <select value={widget.interactionMode || (widget.interactive ? 'interactive' : 'click-through')} onChange={(event) => {
+                                const mode = event.target.value as NonNullable<OverlayWidget['interactionMode']>;
+                                updateOverlayWidget(widget.id, { interactionMode: mode, interactive: mode !== 'click-through' });
+                              }} className="mt-1 w-full rounded bg-black/40 px-2 py-1 text-zinc-200">
+                                <option value="click-through">Click-through</option>
+                                <option value="interactive">Interactive</option>
+                                <option value="hybrid">Hybrid</option>
+                              </select>
+                            </label>
+                            <label className="flex items-center gap-2 pt-4"><input type="checkbox" checked={Boolean(widget.hoverReveal)} onChange={(event) => updateOverlayWidget(widget.id, { hoverReveal: event.target.checked })} /> Reveal on hover</label>
+                            <label className="flex items-center gap-2 pt-4"><input type="checkbox" checked={Boolean(widget.parallaxEnabled)} onChange={(event) => updateOverlayWidget(widget.id, { parallaxEnabled: event.target.checked })} /> Widget parallax</label>
+                            <label>Parallax depth<input type="range" min="0" max="40" value={widget.parallaxDepth ?? 8} disabled={!widget.parallaxEnabled} onChange={(event) => updateOverlayWidget(widget.id, { parallaxDepth: Number(event.target.value) })} className="mt-2 w-full disabled:opacity-30" /></label>
                           </div>
                         </div>
                       ))}
@@ -4638,7 +4752,7 @@ export default function App() {
                     <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/5 pb-3">
                       <div>
                         <h3 className="text-sm font-bold text-white">Embed control dashboard</h3>
-                        <p className="text-xs text-zinc-500 mt-1">Choose what lives in each persistent footer slot.</p>
+                        <p className="text-xs text-zinc-500 mt-1">Choose each embed URL here; its independent overlay position, visibility, opacity, interaction, and layer are controlled above.</p>
                       </div>
                       <div className="flex gap-2">
                         {embedSlots.map((slot) => (
@@ -4722,7 +4836,7 @@ export default function App() {
       </main>
 
       {/* Persistent app embed slots */}
-      <footer 
+      {!overlayEditing && <footer
         className="fixed inset-x-0 bottom-0 z-[80] max-h-[55vh] w-full overflow-y-auto border-t bg-black/90 px-6 py-3 text-[10px] font-mono shadow-[0_-18px_50px_rgba(0,0,0,0.45)] backdrop-blur-2xl transition-all duration-500"
         style={{ 
           borderColor: `${currentTheme.glowHex}1a`,
@@ -4763,7 +4877,7 @@ export default function App() {
                     <span className="block truncate text-[8px] uppercase tracking-wider text-zinc-500">{slot.kind}</span>
                   </button>
                   <div className="flex shrink-0 items-center gap-2">
-                    <a href={slot.url} target="_blank" rel="noreferrer" className="text-[9px] font-bold text-cyan-300 no-underline">Pop out</a>
+                    <a href={embeddedSurfaceUrl(slot.title, slot.url, (identity as any)?.tenantId || identity?.twitchId)} target="_blank" rel="noreferrer" className="text-[9px] font-bold text-cyan-300 no-underline">Pop out</a>
                     <button
                       type="button"
                       onClick={() => updateEmbedSlot(slot.id, { collapsed: !slot.collapsed })}
@@ -4776,7 +4890,7 @@ export default function App() {
                 {!slot.collapsed && (
                   <iframe
                     key={`${slot.id}:${slot.url}`}
-                    src={slot.url}
+                    src={embeddedSurfaceUrl(slot.title, slot.url, (identity as any)?.tenantId || identity?.twitchId)}
                     title={slot.title}
                     data-embed-slot-frame={slot.id}
                     onLoad={(event) => void sendEmbeddedAuth(event.currentTarget)}
@@ -4788,7 +4902,7 @@ export default function App() {
             ))}
           </div>
         </div>
-      </footer>
+      </footer>}
 
       {/* Easter Egg Flying Rocket Particles Trail */}
       <AnimatePresence>

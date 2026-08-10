@@ -49,7 +49,54 @@ export const canonicalEmbedPresets: EmbeddedAppTarget[] = [
   { title: 'HearMeOut Rooms', url: appSurfaces.hearmeout.embed, kind: 'app' },
 ];
 
-export function normalizeAppSurface(title: string, value: string): { title: string; url: string } {
+export type AppSurfaceContext = {
+  tenantId?: string | null;
+  scopes?: string[];
+  embed?: boolean;
+};
+
+export type NormalizedAppSurface = {
+  title: string;
+  url: string;
+  valid: boolean;
+  error: string | null;
+};
+
+const localHosts = new Set(['0.0.0.0', '127.0.0.1', 'localhost', '[::1]']);
+
+function deployedOriginFor(title: string, pathname: string) {
+  const hint = `${title} ${pathname}`.toLowerCase();
+  if (hint.includes('streamweaver') || hint.includes('tts') || hint.includes('shared-chat') || hint.includes('commlink')) return appOrigins.streamweaver;
+  if (hint.includes('chat-tag') || hint.includes('chattag') || hint.includes('quackverse')) return appOrigins.chatTag;
+  if (hint.includes('discord') || hint.includes('dsh')) return appOrigins.discordHub;
+  if (hint.includes('hearmeout') || hint.includes('now-playing') || hint.includes('music')) return appOrigins.hearmeout;
+  return null;
+}
+
+export function buildAppSurfaceUrl(value: string, title = '', context: AppSurfaceContext = {}): NormalizedAppSurface {
+  const input = String(value || '').trim();
+  if (!input || input === 'about:blank') return { title, url: input || 'about:blank', valid: true, error: null };
+  try {
+    let parsed = new URL(input, 'https://spacemountain.live');
+    if (localHosts.has(parsed.hostname)) {
+      const deployedOrigin = deployedOriginFor(title, parsed.pathname);
+      if (!deployedOrigin) {
+        return { title, url: input, valid: false, error: 'Localhost and 0.0.0.0 URLs cannot be used by deployed overlays.' };
+      }
+      parsed = new URL(`${deployedOrigin}${parsed.pathname}${parsed.search}${parsed.hash}`);
+    }
+
+    const knownOrigin = Object.values(appOrigins).includes(parsed.origin as (typeof appOrigins)[keyof typeof appOrigins]);
+    if (knownOrigin && context.embed) parsed.searchParams.set('embed', '1');
+    if (knownOrigin && context.tenantId) parsed.searchParams.set('tenant', context.tenantId);
+    if (knownOrigin && context.scopes?.length) parsed.searchParams.set('scopes', [...new Set(context.scopes)].sort().join(','));
+    return { title, url: parsed.toString(), valid: true, error: null };
+  } catch {
+    return { title, url: input, valid: false, error: 'Enter a complete https:// URL.' };
+  }
+}
+
+export function normalizeAppSurface(title: string, value: string): NormalizedAppSurface {
   let url = String(value || '').trim();
   let nextTitle = String(title || '').trim();
 
@@ -72,7 +119,7 @@ export function normalizeAppSurface(title: string, value: string): { title: stri
 
   if (url === '/chat-tag/quackverse') url = appSurfaces.chatTag.quackverse;
   if (url === appSurfaces.streamweaver.ttsMixer) nextTitle = 'All-Tenant TTS Studio';
-  return { title: nextTitle, url };
+  return buildAppSurfaceUrl(url, nextTitle);
 }
 
 export function toolEmbedTarget(toolId: string): EmbeddedAppTarget | null {
