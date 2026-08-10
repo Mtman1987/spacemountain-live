@@ -6,6 +6,12 @@ import {defineConfig} from 'vite';
 export default defineConfig(() => {
   return {
     plugins: [react(), tailwindcss()],
+    build: {
+      // The production Express server serves the compiled app from
+      // dist/frontend. Keep the browser bundle isolated from server.cjs and
+      // make the Docker runtime path match the server's static-file root.
+      outDir: 'dist/frontend',
+    },
     resolve: {
       alias: {
         '@': path.resolve(__dirname, '.'),
