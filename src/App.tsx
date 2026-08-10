@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
-  Sparkles, LayoutGrid, Mail, MessageSquare, Headphones, Glasses, Users, 
-  Settings, HelpCircle, Rocket, Play, Activity, CheckCircle2, Sliders, 
+  Sparkles, LayoutGrid, Mail, MessageSquare, Headphones, Users,
+  Settings, HelpCircle, Rocket, Play, Activity, CheckCircle2, Sliders,
   Send, Plus, Trash2, ArrowRight, Heart, RefreshCw, Star, Compass, Volume2, Gamepad2, Eye, Layout,
   Search, Mic, Bot
 } from 'lucide-react';
@@ -26,15 +26,18 @@ import { parseCanonicalXpBalance } from './lib/canonical-xp';
 import RocketDock from './components/RocketDock';
 import CosmicHeader from './components/CosmicHeader';
 import MainAppSuite from './components/MainAppSuite';
-import RightSidebar from './components/RightSidebar';
 import Shop from './components/Shop';
 import Arena from './components/Arena';
 import OverlayWorkspace, { OverlayWidget } from './components/OverlayWorkspace';
+import WorkspaceTray from './components/WorkspaceTray';
 import { CompanionOverlaySurface, CompanionWorkspaceSurface } from './components/CompanionSurfaces';
 import { appOrigins, appSurfaces, buildAppSurfaceUrl, canonicalEmbedPresets, normalizeAppSurface } from './lib/app-surfaces';
+import { resolveThemePreset } from './lib/theme-presets';
+import { createThemeMessage } from './lib/theme-bridge';
 import { usePortableWorkspace } from './hooks/usePortableWorkspace';
 import type { WorkflowStep } from './features/workspace/BuilderRoute';
 
+const HomeRoute = React.lazy(() => import('./features/home/HomeRoute'));
 const BuilderRoute = React.lazy(() => import('./features/workspace/BuilderRoute'));
 const HelpRoute = React.lazy(() => import('./features/workspace/HelpRoute'));
 const SettingsRoute = React.lazy(() => import('./features/workspace/SettingsRoute'));
@@ -302,6 +305,8 @@ const defaultEmbedSlots: EmbedSlot[] = [
 const defaultUserPreferences: UserPreferences = {
   userId: 'u_novastar',
   theme: 'solar-flare',
+  accentColor: null,
+  accentSaturation: 100,
   glowIntensity: 80,
   starDensity: 70,
   shootingStars: true,
@@ -312,6 +317,8 @@ const defaultUserPreferences: UserPreferences = {
   parallaxDepth: 65,
   uiDensity: 'comfortable',
   borderStrength: 60,
+  borderGlow: true,
+  hoverGlow: true,
   cornerRadius: 'md',
   sidebarStyle: 'docked',
   sidebarPosition: 'left',
@@ -325,6 +332,14 @@ const defaultUserPreferences: UserPreferences = {
   smoothTransitions: true,
   animationSpeed: 85,
   pushToTalk: true,
+  pushToTalkKey: 'V',
+  micButtonStyle: 'filled',
+  voiceWaveStyle: 'wave',
+  highContrast: false,
+  colorVisionMode: 'default',
+  textScale: 'md',
+  reduceMotion: false,
+  focusHighlight: true,
 };
 
 const defaultOverlayWidgets: OverlayWidget[] = [
@@ -443,6 +458,7 @@ const embedPresets: EmbeddedAppTarget[] = canonicalEmbedPresets;
 
 const tabPathMap: Record<string, string> = {
   dashboard: '/',
+  bridge: '/bridge',
   settings: '/settings',
   shop: '/shop',
   arena: '/arena',
@@ -450,15 +466,16 @@ const tabPathMap: Record<string, string> = {
   inbox: '/inbox',
   forums: '/forums',
   rooms: '/rooms',
-  mtnview: '/mtnview',
   builder: '/builder',
   crew: '/crew',
   help: '/help',
 };
 
-const pathTabMap = Object.fromEntries(
-  Object.entries(tabPathMap).map(([tab, path]) => [path, tab]),
-) as Record<string, string>;
+const pathTabMap = {
+  ...Object.fromEntries(Object.entries(tabPathMap).map(([tab, path]) => [path, tab])),
+  // MountainView is an app, not a SpaceMountain workspace destination.
+  '/mtnview': 'apps',
+} as Record<string, string>;
 
 function getPlayerName(player: any) {
   return player?.displayName || player?.twitchUsername || player?.username || player?.name || player?.id || 'Player';
@@ -1221,6 +1238,7 @@ export default function App() {
   const [chatTagLoading, setChatTagLoading] = useState(false);
   const [embedSlots, setEmbedSlots] = useState<EmbedSlot[]>(() => defaultEmbedSlots.map((slot) => ({ ...slot })));
   const [activeEmbedSlot, setActiveEmbedSlot] = useState(2);
+  const [workspaceTrayOpen, setWorkspaceTrayOpen] = useState(false);
   const [overlayWorkspaceEnabled, setOverlayWorkspaceEnabled] = useState(true);
   const [overlayEditing, setOverlayEditing] = useState(false);
   const [overlayWidgets, setOverlayWidgets] = useState<OverlayWidget[]>(() => normalizeOverlayWidgets(defaultOverlayWidgets));
@@ -1281,6 +1299,7 @@ export default function App() {
       slot.id === slotId ? { ...slot, title: normalized.title, url: normalized.url, kind, collapsed: false } : slot
     )));
     setActiveEmbedSlot(slotId);
+    setWorkspaceTrayOpen(true);
     notify('Embed slot updated', `Slot ${slotId}: ${normalized.title}`);
   };
   const updateEmbedSlot = (slotId: number, patch: Partial<EmbedSlot>) => {
@@ -1563,9 +1582,6 @@ export default function App() {
   const [quackverseState, setQuackverseState] = useState<QuackverseSummary | null>(null);
   const [quackverseLoading, setQuackverseLoading] = useState(false);
 
-  // MountainView QR HUD Seed state
-  const [qrHUDSeed, setQrHUDSeed] = useState('https://spacemountain.live/invite/novastar');
-
   // Interactive points animations list (floating points indicator!)
   const [pointPopups, setPointPopups] = useState<{ id: number; text: string; x: number; y: number }[]>([]);
 
@@ -1781,6 +1797,8 @@ export default function App() {
 
     handleUpdatePreferences({
       theme: preset,
+      accentColor: null,
+      accentSaturation: 100,
       glowIntensity: presetGlow,
       starDensity: presetStars,
       blurStrength: presetBlur,
@@ -2140,59 +2158,25 @@ export default function App() {
       .catch(() => {});
   };
 
-  // Define visual styling maps according to active theme preset
-  const themeStyles = {
-    'solar-flare': {
-      name: 'Solar Flare',
-      glow: 'from-orange-500/10 via-red-500/5 to-transparent',
-      glowHex: '#F97316',
-      ambientBg: 'bg-radial-gradient(circle_at_center,_rgba(249,115,22,0.15)_0%,_rgba(0,0,0,0)_70%)',
-      cardBorder: 'border-orange-500/20 hover:border-orange-500/40',
-      activeBorder: 'border-orange-500',
-      textAccent: 'text-amber-400',
-      titleGrad: 'from-orange-400 via-amber-300 to-red-400',
-      glowingBorder: 'rgba(249, 115, 22, 0.45)',
-      orbAccent: '🌅'
-    },
-    'nebula-purple': {
-      name: 'Nebula Purple',
-      glow: 'from-fuchsia-500/10 via-purple-500/5 to-transparent',
-      glowHex: '#A855F7',
-      ambientBg: 'bg-radial-gradient(circle_at_center,_rgba(168,85,247,0.15)_0%,_rgba(0,0,0,0)_70%)',
-      cardBorder: 'border-purple-500/20 hover:border-purple-500/40',
-      activeBorder: 'border-purple-500',
-      textAccent: 'text-fuchsia-400',
-      titleGrad: 'from-fuchsia-400 via-purple-300 to-indigo-400',
-      glowingBorder: 'rgba(168, 85, 247, 0.45)',
-      orbAccent: '🌌'
-    },
-    'oceanic-blue': {
-      name: 'Oceanic Blue',
-      glow: 'from-blue-500/10 via-cyan-500/5 to-transparent',
-      glowHex: '#3B82F6',
-      ambientBg: 'bg-radial-gradient(circle_at_center,_rgba(59,130,246,0.15)_0%,_rgba(0,0,0,0)_70%)',
-      cardBorder: 'border-blue-500/20 hover:border-blue-500/40',
-      activeBorder: 'border-blue-500',
-      textAccent: 'text-cyan-400',
-      titleGrad: 'from-blue-400 via-cyan-300 to-teal-400',
-      glowingBorder: 'rgba(59, 130, 246, 0.45)',
-      orbAccent: '🌊'
-    },
-    'aurora-green': {
-      name: 'Aurora Green',
-      glow: 'from-emerald-400/10 via-teal-500/5 to-transparent',
-      glowHex: '#10B981',
-      ambientBg: 'bg-radial-gradient(circle_at_center,_rgba(16,185,129,0.15)_0%,_rgba(0,0,0,0)_70%)',
-      cardBorder: 'border-emerald-500/20 hover:border-emerald-500/40',
-      activeBorder: 'border-emerald-500',
-      textAccent: 'text-emerald-400',
-      titleGrad: 'from-emerald-400 via-teal-300 to-green-400',
-      glowingBorder: 'rgba(16, 185, 129, 0.45)',
-      orbAccent: '🟢'
-    }
-  };
+  const currentTheme = resolveThemePreset(preferences.theme, preferences.accentColor, preferences.accentSaturation);
+  const sendEmbeddedTheme = useCallback((frame: HTMLIFrameElement | null) => {
+    if (!frame?.contentWindow) return;
+    let targetOrigin = '*';
+    try {
+      targetOrigin = new URL(frame.getAttribute('src') || window.location.href, window.location.origin).origin;
+    } catch {}
+    frame.contentWindow.postMessage(createThemeMessage(currentTheme, preferences), targetOrigin);
+  }, [currentTheme, preferences]);
+  const sendEmbeddedFrameContext = useCallback(async (frame: HTMLIFrameElement | null) => {
+    await sendEmbeddedAuth(frame);
+    sendEmbeddedTheme(frame);
+  }, [sendEmbeddedAuth, sendEmbeddedTheme]);
 
-  const currentTheme = themeStyles[preferences.theme as keyof typeof themeStyles] || themeStyles['solar-flare'];
+  useEffect(() => {
+    document.querySelectorAll<HTMLIFrameElement>('[data-embed-slot-frame]')
+      .forEach((frame) => sendEmbeddedTheme(frame));
+  }, [sendEmbeddedTheme]);
+
   const glowScale = Math.max(0.1, preferences.glowIntensity / 100);
   const glassAlpha = Math.max(0.08, Math.min(0.78, preferences.glassOpacity / 100));
   const borderAlpha = Math.max(0.02, Math.min(0.55, preferences.borderStrength / 100 * 0.36));
@@ -2363,13 +2347,53 @@ export default function App() {
   const surfaceParams = new URLSearchParams(window.location.search);
   const desktopOverlayMode = surfaceParams.get('desktopOverlay') === '1';
   const companionWorkspaceMode = surfaceParams.get('companionWorkspace') === 'streamweaver';
+  const settingsEmbedMode = surfaceParams.get('embed') === '1' && activeTab === 'settings';
+
+  if (settingsEmbedMode) {
+    return (
+      <div
+        data-theme={currentTheme.id}
+        data-contrast={preferences.highContrast ? 'high' : 'standard'}
+        data-focus={preferences.focusHighlight ? 'strong' : 'standard'}
+        data-color-vision={preferences.colorVisionMode}
+        className={`min-h-screen bg-[#050505] p-3 text-white font-sans md:p-5 ${preferences.uiAnimations && !preferences.reduceMotion ? '' : 'reduce-ui-motion'}`}
+        style={{
+          ['--theme-glow-color' as any]: currentTheme.glowHex,
+          ['--theme-secondary-color' as any]: currentTheme.secondaryHex,
+          ['--theme-surface-bg' as any]: preferences.highContrast ? 'rgba(0, 0, 0, 0.96)' : `rgba(6, 8, 22, ${glassAlpha})`,
+          ['--theme-surface-border' as any]: rgbaFromHex(currentTheme.glowHex, borderAlpha),
+          ['--theme-surface-shadow' as any]: preferences.borderGlow ? `0 10px 40px -12px ${rgbaFromHex(currentTheme.glowHex, 0.35 * glowScale)}` : 'none',
+          ['--theme-blur' as any]: `${preferences.blurStrength}px`,
+          ['--theme-radius' as any]: radiusMap[preferences.cornerRadius],
+          ['--theme-text-scale' as any]: preferences.textScale === 'sm' ? '0.92' : preferences.textScale === 'lg' ? '1.08' : '1',
+          backgroundImage: `linear-gradient(180deg, rgba(2, 6, 18, 0.28), rgba(2, 6, 18, 0.72)), url("${currentTheme.backgroundImage}")`,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          backgroundAttachment: 'fixed',
+        }}
+      >
+        <main className="mx-auto max-w-[1500px]">
+          <React.Suspense fallback={<div className="rounded-3xl border border-white/10 p-8 text-sm text-zinc-400">Loading universal settings…</div>}>
+            <SettingsRoute
+              identityPresent={Boolean(identity)}
+              preferences={preferences}
+              accentColor={currentTheme.glowHex}
+              portableWorkspace={portableWorkspace}
+              onUpdatePreferences={handleUpdatePreferences}
+              onApplyThemePreset={handleApplyThemePreset}
+            />
+          </React.Suspense>
+        </main>
+      </div>
+    );
+  }
 
   if (companionWorkspaceMode) {
     return (
       <CompanionWorkspaceSurface
         identityPresent={Boolean(identity)}
         streamWeaverUrl={`${appSurfaces.streamweaver.home}?companion=1`}
-        onFrameLoad={sendEmbeddedAuth}
+        onFrameLoad={sendEmbeddedFrameContext}
       />
     );
   }
@@ -2386,24 +2410,31 @@ export default function App() {
         onWidgetChange={updateOverlayWidget}
         onSlotChange={updateEmbedSlot}
         onOverlayEnabledChange={setOverlayWorkspaceEnabled}
-        onFrameLoad={sendEmbeddedAuth}
+        onFrameLoad={sendEmbeddedFrameContext}
       />
     );
   }
 
   return (
     <div 
-      className={`min-h-screen bg-[#050505] text-white flex flex-col relative overflow-hidden select-none font-sans ${preferences.uiAnimations ? '' : 'reduce-ui-motion'} ${preferences.smoothTransitions ? '' : 'no-smooth-transitions'}`}
+      data-theme={currentTheme.id}
+      data-contrast={preferences.highContrast ? 'high' : 'standard'}
+      data-focus={preferences.focusHighlight ? 'strong' : 'standard'}
+      data-hover-glow={preferences.hoverGlow ? 'on' : 'off'}
+      data-color-vision={preferences.colorVisionMode}
+      className={`min-h-screen bg-[#050505] text-white flex flex-col relative overflow-hidden select-none font-sans ${preferences.uiAnimations && !preferences.reduceMotion ? '' : 'reduce-ui-motion'} ${preferences.smoothTransitions && !preferences.reduceMotion ? '' : 'no-smooth-transitions'}`}
       style={{
         ['--theme-glow-color' as any]: currentTheme.glowHex,
+        ['--theme-secondary-color' as any]: currentTheme.secondaryHex,
         ['--theme-glow-color-alpha' as any]: rgbaFromHex(currentTheme.glowHex, 0.24 * glowScale),
         ['--theme-glow-color-half' as any]: rgbaFromHex(currentTheme.glowHex, 0.5 * glowScale),
         ['--theme-glow-color-quarter' as any]: rgbaFromHex(currentTheme.glowHex, 0.18 * glowScale),
-        ['--theme-surface-bg' as any]: `rgba(6, 8, 22, ${glassAlpha})`,
+        ['--theme-surface-bg' as any]: preferences.highContrast ? 'rgba(0, 0, 0, 0.96)' : `rgba(6, 8, 22, ${glassAlpha})`,
         ['--theme-surface-border' as any]: rgbaFromHex(currentTheme.glowHex, borderAlpha),
-        ['--theme-surface-shadow' as any]: `0 10px ${Math.round(20 + preferences.glowIntensity * 0.35)}px -10px ${rgbaFromHex(currentTheme.glowHex, 0.35 * glowScale)}`,
+        ['--theme-surface-shadow' as any]: preferences.borderGlow ? `0 10px ${Math.round(20 + preferences.glowIntensity * 0.35)}px -10px ${rgbaFromHex(currentTheme.glowHex, 0.35 * glowScale)}` : '0 10px 28px -14px rgba(0, 0, 0, 0.65)',
         ['--theme-blur' as any]: `${preferences.blurStrength}px`,
         ['--theme-radius' as any]: radiusMap[preferences.cornerRadius],
+        ['--theme-text-scale' as any]: preferences.textScale === 'sm' ? '0.92' : preferences.textScale === 'lg' ? '1.08' : '1',
         ['--chat-surface-bg' as any]: `rgba(6, 8, 22, ${Math.max(0.05, Math.min(0.9, preferences.chatTransparency / 100))})`,
       }}
     >
@@ -2415,8 +2446,8 @@ export default function App() {
         <div 
           className="absolute inset-[-7vh_-5vw] bg-cover bg-left-bottom opacity-90 transition-transform duration-300"
           style={{ 
-            backgroundImage: `linear-gradient(180deg, rgba(2, 6, 18, 0.08), rgba(2, 6, 18, 0.23)), url("/assets/space-background.png")`,
-            filter: 'saturate(1.12) contrast(1.04) brightness(0.9)',
+            backgroundImage: `linear-gradient(180deg, rgba(2, 6, 18, 0.16), rgba(2, 6, 18, 0.42)), url("${currentTheme.backgroundImage}")`,
+            filter: 'saturate(1.06) contrast(1.04) brightness(0.82)',
             transform: `translate3d(${(mousePos.x / window.innerWidth - 0.5) * preferences.parallaxDepth * -0.10}px, ${(mousePos.y / window.innerHeight - 0.5) * preferences.parallaxDepth * -0.06}px, 0) scale(1.06)`,
           }}
         />
@@ -2499,7 +2530,7 @@ export default function App() {
           setOverlayEditing(editing);
         }}
         onSetEnabled={setOverlayWorkspaceEnabled}
-        onFrameLoad={sendEmbeddedAuth}
+        onFrameLoad={sendEmbeddedFrameContext}
       />
 
       {/* Floating Interactive Points Indicators (+XP) */}
@@ -2547,8 +2578,31 @@ export default function App() {
           
           <AnimatePresence mode="wait">
             {activeTab === 'dashboard' && (
+              <React.Suspense fallback={<div className="rounded-3xl border border-white/10 p-8 text-sm text-zinc-400">Loading your launchpad…</div>}>
+                <HomeRoute
+                  identity={identity}
+                  tools={tools}
+                  stats={stats}
+                  unreadCount={commlinkNotifications.filter((item) => !item.read_at).length}
+                  activeEmbedCount={embedSlots.filter((slot) => !slot.collapsed).length}
+                  theme={currentTheme}
+                  onNavigate={setActiveTab}
+                  onLaunchTool={(tool) => {
+                    if (tool.embedUrl) {
+                      openEmbeddedApp(tool.name, tool.embedUrl, 'app');
+                    } else if (tool.appUrl || tool.authUrl) {
+                      window.open(tool.appUrl || tool.authUrl || '', '_blank', 'noopener,noreferrer');
+                    } else {
+                      setActiveTab(pathTabMap[tool.route] || 'apps');
+                    }
+                  }}
+                />
+              </React.Suspense>
+            )}
+
+            {activeTab === 'bridge' && (
               <motion.div
-                key="dashboard"
+                key="bridge"
                 initial={{ opacity: 0, y: 15 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -15 }}
@@ -3707,7 +3761,7 @@ export default function App() {
                       src={appSurfaces.streamweaver.liveChat}
                       title="Commlink Live Chat"
                       data-embed-slot-frame="commlink-live-chat"
-                      onLoad={(event) => void sendEmbeddedAuth(event.currentTarget)}
+                      onLoad={(event) => void sendEmbeddedFrameContext(event.currentTarget)}
                       className="h-[720px] w-full bg-black"
                       allow="autoplay; clipboard-write"
                     />
@@ -4473,96 +4527,6 @@ export default function App() {
               </motion.div>
             )}
 
-            {/* TAB: MOUNTAINVIEW PAIRING HUD */}
-            {activeTab === 'mtnview' && (
-              <motion.div
-                key="mtnview"
-                initial={{ opacity: 0, y: 15 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -15 }}
-                className="flex flex-col gap-4 dynamic-cosmic-card rounded-3xl p-6 backdrop-blur-xl transition-all duration-300"
-              >
-                <div className="flex items-center justify-between border-b border-white/5 pb-4">
-                  <div>
-                    <h2 className="text-xl font-sans font-bold text-white flex items-center gap-2">
-                      <Glasses className="text-cyan-400" size={20} />
-                      MountainView AI Mobile Bridge
-                    </h2>
-                    <p className="text-xs text-zinc-400 mt-0.5">Phone-camera vision, Bluetooth-headset voice, StreamWeaver commands, and ecosystem event routing</p>
-                  </div>
-                  <span className="rounded-full border border-emerald-400/25 bg-emerald-400/10 px-3 py-1 text-[10px] font-black uppercase tracking-wider text-emerald-300">Active development + testing</span>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-2">
-                  
-                  {/* Dynamic simulated camera frame overlay */}
-                  <div className="rounded-2xl border border-cyan-500/20 bg-black/80 p-5 flex flex-col items-center justify-center text-center relative overflow-hidden min-h-[220px] shadow-[0_0_20px_rgba(6,182,212,0.1)]">
-                    {/* Simulated camera corners */}
-                    <div className="absolute top-4 left-4 w-4 h-4 border-t-2 border-l-2 border-cyan-400" />
-                    <div className="absolute top-4 right-4 w-4 h-4 border-t-2 border-r-2 border-cyan-400" />
-                    <div className="absolute bottom-4 left-4 w-4 h-4 border-b-2 border-l-2 border-cyan-400" />
-                    <div className="absolute bottom-4 right-4 w-4 h-4 border-b-2 border-r-2 border-cyan-400" />
-
-                    <span className="text-[9px] font-mono font-bold text-cyan-400 tracking-[0.2em] block mb-4">PAIRING TARGET</span>
-                    
-                    {/* Holographic glowing display representation */}
-                    <div className="w-20 h-20 rounded-full border border-dashed border-cyan-500/30 flex items-center justify-center mb-4">
-                      <span className="text-3xl text-cyan-400 animate-bounce">📱</span>
-                    </div>
-
-                    <span className="text-xs font-bold text-white">Target Anchor: SpaceMountain account</span>
-                    <span className="text-[10px] text-zinc-500 mt-1 font-mono">Use the seed below for pairing links</span>
-                  </div>
-
-                  {/* Pairing utilities */}
-                  <div className="rounded-2xl border border-white/5 bg-white/[0.01] p-5 flex flex-col justify-between">
-                    <div>
-                      <span className="text-[10px] font-mono font-bold text-zinc-500 block mb-3">CUSTOM QR MACRO SEED</span>
-                      <p className="text-xs text-zinc-400 leading-relaxed mb-4">
-                        Generate a pairing seed for the MountainView phone bridge. The phone handles camera and headset access, then calls StreamWeaver without exposing service credentials in this page.
-                      </p>
-
-                      <div className="flex flex-col gap-3">
-                        <div>
-                          <label className="text-[9px] font-mono font-bold text-zinc-500 block mb-1">PAIRING SEED VALUE</label>
-                          <input 
-                            type="text" 
-                            value={qrHUDSeed} 
-                            onChange={(e) => setQrHUDSeed(e.target.value)}
-                            className="w-full bg-white/5 border border-white/10 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-cyan-400"
-                          />
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="mt-5 pt-4 border-t border-white/5 flex items-center justify-between">
-                      <span className="text-xs font-mono text-cyan-400 font-bold">PAIRING SEED READY</span>
-                      <button 
-                        onClick={() => navigator.clipboard?.writeText(qrHUDSeed)}
-                        className="px-4 py-1.5 rounded-xl bg-cyan-500 text-xs font-bold text-black font-sans hover:bg-cyan-400 transition-all"
-                      >
-                        COPY SEED
-                      </button>
-                    </div>
-                  </div>
-
-                </div>
-                <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-                  {[
-                    ['Voice command bridge', '/api/mountainview/voice-commander', 'Dictation, translation, bot commands, AI replies, Discord delivery, and TTS routing.'],
-                    ['Image relay', '/api/mountainview/image-relay', 'Phone camera frames are forwarded to StreamWeaver for analysis; this hub does not perform face recognition.'],
-                    ['Shared event context', '/api/integrations/social-stream', 'Normalized combined-chat events can feed the same StreamWeaver memory used by MountainView and the bots.'],
-                  ].map(([title, endpoint, description]) => (
-                    <div key={endpoint} className="rounded-2xl border border-cyan-400/15 bg-cyan-400/[0.035] p-4">
-                      <span className="text-xs font-black text-white">{title}</span>
-                      <code className="mt-2 block text-[10px] text-cyan-300">StreamWeaver {endpoint}</code>
-                      <p className="mt-2 text-xs leading-relaxed text-zinc-400">{description}</p>
-                    </div>
-                  ))}
-                </div>
-              </motion.div>
-            )}
-
             {/* TAB: SECURE WORKFLOW BUILDER */}
             {activeTab === 'builder' && (
               <React.Suspense fallback={<div className="rounded-3xl border border-white/10 p-8 text-sm text-zinc-400">Loading workflow builder…</div>}>
@@ -4835,74 +4799,19 @@ export default function App() {
 
       </main>
 
-      {/* Persistent app embed slots */}
-      {!overlayEditing && <footer
-        className="fixed inset-x-0 bottom-0 z-[80] max-h-[55vh] w-full overflow-y-auto border-t bg-black/90 px-6 py-3 text-[10px] font-mono shadow-[0_-18px_50px_rgba(0,0,0,0.45)] backdrop-blur-2xl transition-all duration-500"
-        style={{ 
-          borderColor: `${currentTheme.glowHex}1a`,
-          color: `${currentTheme.glowHex}88`
-        }}
-      >
-        <div className="mx-auto flex max-w-7xl flex-col gap-3">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <span className="inline-flex items-center justify-center gap-2">
-              <img
-                src="/assets/astronaut-avatar.jpg"
-                alt="SpaceMountain account"
-                className="w-5 h-5 rounded-full object-cover border border-white/10"
-                referrerPolicy="no-referrer"
-              />
-              <span>One login for the SpaceMountain app hub • persistent app slots</span>
-            </span>
-            <div className="flex flex-wrap gap-2">
-              {notifications.slice(0, 3).map((item) => (
-                <span key={item.id} className="rounded-full border border-white/10 bg-white/[0.04] px-2 py-1 text-[9px] text-zinc-300">
-                  {item.title}: {item.body}
-                </span>
-              ))}
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
-            {embedSlots.map((slot) => (
-              <div key={slot.id} className={`overflow-hidden rounded-2xl border bg-black/45 ${activeEmbedSlot === slot.id ? 'border-cyan-400/45' : 'border-white/10'}`}>
-                <div className="flex items-center justify-between gap-2 border-b border-white/10 px-3 py-2">
-                  <button
-                    type="button"
-                    onClick={() => setActiveEmbedSlot(slot.id)}
-                    className="min-w-0 text-left"
-                    title={`Use slot ${slot.id} for new embeds`}
-                  >
-                    <span className="block truncate text-[10px] font-black text-white">Slot {slot.id}: {slot.title}</span>
-                    <span className="block truncate text-[8px] uppercase tracking-wider text-zinc-500">{slot.kind}</span>
-                  </button>
-                  <div className="flex shrink-0 items-center gap-2">
-                    <a href={embeddedSurfaceUrl(slot.title, slot.url, (identity as any)?.tenantId || identity?.twitchId)} target="_blank" rel="noreferrer" className="text-[9px] font-bold text-cyan-300 no-underline">Pop out</a>
-                    <button
-                      type="button"
-                      onClick={() => updateEmbedSlot(slot.id, { collapsed: !slot.collapsed })}
-                      className="text-[9px] font-bold text-zinc-400 hover:text-white"
-                    >
-                      {slot.collapsed ? 'Show' : 'Hide'}
-                    </button>
-                  </div>
-                </div>
-                {!slot.collapsed && (
-                  <iframe
-                    key={`${slot.id}:${slot.url}`}
-                    src={embeddedSurfaceUrl(slot.title, slot.url, (identity as any)?.tenantId || identity?.twitchId)}
-                    title={slot.title}
-                    data-embed-slot-frame={slot.id}
-                    onLoad={(event) => void sendEmbeddedAuth(event.currentTarget)}
-                    className="h-[360px] w-full bg-black"
-                    allow="autoplay; microphone; camera; fullscreen; clipboard-write"
-                  />
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-      </footer>}
+      {!overlayEditing && (
+        <WorkspaceTray
+          open={workspaceTrayOpen}
+          activeSlotId={activeEmbedSlot}
+          slots={embedSlots}
+          accentColor={currentTheme.glowHex}
+          resolveUrl={(slot) => embeddedSurfaceUrl(slot.title, slot.url, (identity as any)?.tenantId || identity?.twitchId)}
+          onOpenChange={setWorkspaceTrayOpen}
+          onSelectSlot={setActiveEmbedSlot}
+          onSlotChange={updateEmbedSlot}
+          onFrameLoad={sendEmbeddedFrameContext}
+        />
+      )}
 
       {/* Easter Egg Flying Rocket Particles Trail */}
       <AnimatePresence>

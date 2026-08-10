@@ -414,6 +414,35 @@ html[data-companion-overlay="true"] #root {
   box-shadow: var(--theme-surface-shadow, 0 10px 40px -10px rgba(0, 0, 0, 0.4)), inset 0 1px 1px rgba(255, 255, 255, 0.03) !important;
 }
 
+[data-theme] {
+  font-size: calc(16px * var(--theme-text-scale, 1));
+}
+
+[data-contrast='high'] .dynamic-cosmic-card {
+  border-color: color-mix(in srgb, var(--theme-glow-color, #f97316) 72%, white) !important;
+}
+
+[data-hover-glow='off'] * {
+  --tw-shadow-colored: 0 0 #0000;
+}
+
+[data-focus='strong'] :focus-visible {
+  outline: 3px solid var(--theme-secondary-color, #fbbf24) !important;
+  outline-offset: 3px !important;
+}
+
+[data-color-vision='deuteranopia'] {
+  filter: saturate(0.82) hue-rotate(-8deg);
+}
+
+[data-color-vision='protanopia'] {
+  filter: saturate(0.78) hue-rotate(12deg);
+}
+
+[data-color-vision='tritanopia'] {
+  filter: saturate(0.8) hue-rotate(22deg);
+}
+
 .shooting-star {
   position: absolute;
   width: 92px;

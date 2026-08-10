@@ -11,10 +11,14 @@ import type { EmbedSlot, UserPreferences, WorkspaceProfileV1 } from '../src/type
 import { buildSpmtProxyHeaders } from '../src/lib/spmt-proxy';
 import { appSurfaces, buildAppSurfaceUrl, normalizeAppSurface } from '../src/lib/app-surfaces';
 import { parseCanonicalXpBalance } from '../src/lib/canonical-xp';
+import { createThemeMessage } from '../src/lib/theme-bridge';
+import { getThemePreset } from '../src/lib/theme-presets';
 
 const preferences: UserPreferences = {
   userId: 'workspace-smoke-user',
   theme: 'nebula-purple',
+  accentColor: '#8B5CF6',
+  accentSaturation: 88,
   glowIntensity: 73,
   starDensity: 84,
   shootingStars: false,
@@ -25,6 +29,8 @@ const preferences: UserPreferences = {
   parallaxDepth: 44,
   uiDensity: 'compact',
   borderStrength: 37,
+  borderGlow: true,
+  hoverGlow: false,
   cornerRadius: 'lg',
   sidebarStyle: 'floating',
   sidebarPosition: 'right',
@@ -38,6 +44,14 @@ const preferences: UserPreferences = {
   smoothTransitions: false,
   animationSpeed: 120,
   pushToTalk: false,
+  pushToTalkKey: 'V',
+  micButtonStyle: 'outline',
+  voiceWaveStyle: 'bars',
+  highContrast: true,
+  colorVisionMode: 'deuteranopia',
+  textScale: 'lg',
+  reduceMotion: true,
+  focusHighlight: true,
 };
 const slots: EmbedSlot[] = [
   { id: 1, title: 'Overlay', url: 'https://example.com/overlay', kind: 'overlay', collapsed: false, volume: 0.5, muted: true },
@@ -62,12 +76,26 @@ const profile: WorkspaceProfileV1 = {
   activeOverlaySceneId: 'main-scene',
   ttsSubscriptions: ['streamweaver-main'],
   appThemeMappings: { streamweaver: 'follow-workspace' },
+  savedThemes: [{
+    id: 'theme-nebula-readable',
+    name: 'Nebula Readable',
+    appearance,
+    createdAt: '2026-07-13T00:00:00.000Z',
+    updatedAt: '2026-07-13T00:00:00.000Z',
+  }],
   updatedAt: '2026-07-13T00:00:00.000Z',
 };
 const draft = createWorkspaceProfileDraft(preferences, slots, profile);
 assert.equal(draft.activeOverlaySceneId, 'main-scene');
 assert.deepEqual(draft.ttsSubscriptions, ['streamweaver-main']);
+assert.equal(draft.savedThemes?.[0]?.name, 'Nebula Readable');
 assert.equal(workspaceDraftSignature(draft), workspaceDraftSignature(createWorkspaceProfileDraft(preferences, slots, profile)));
+
+const themeMessage = createThemeMessage(getThemePreset(preferences.theme), preferences);
+assert.equal(themeMessage.version, 2);
+assert.equal(themeMessage.appearance.accentSaturation, 88);
+assert.equal(themeMessage.appearance.highContrast, true);
+assert.equal(themeMessage.theme.motion, false);
 
 const proxyHeaders = buildSpmtProxyHeaders(
   { 'if-match': '"workspace-7"', cookie: 'must-not-forward=1' },
@@ -106,4 +134,4 @@ assert.equal(buildAppSurfaceUrl('http://localhost:9999/unknown', 'Unknown').vali
 assert.deepEqual(parseCanonicalXpBalance({ xp: 625, level: 3 }), { xp: 625, level: 3 });
 assert.equal(parseCanonicalXpBalance({ xp: 'not-a-number', level: 3 }), null);
 
-console.log(JSON.stringify({ status: 'passed', checks: 23 }));
+console.log(JSON.stringify({ status: 'passed', checks: 28 }));

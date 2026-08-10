@@ -259,7 +259,7 @@ export function usePortableWorkspace(options: PortableWorkspaceOptions) {
     }
   }, [applyProfile, baseUrl, defaultEmbedSlots, identityId, token]);
 
-  const updateProfileFields = useCallback((patch: Partial<Pick<WorkspaceProfileV1, 'activeOverlaySceneId' | 'ttsSubscriptions' | 'appThemeMappings'>>) => {
+  const updateProfileFields = useCallback((patch: Partial<Pick<WorkspaceProfileV1, 'activeOverlaySceneId' | 'ttsSubscriptions' | 'appThemeMappings' | 'savedThemes'>>) => {
     if (!loaded || !identityId || loadedIdentityRef.current !== identityId || !profileRef.current) return;
     const nextProfile = { ...profileRef.current, ...patch };
     profileRef.current = nextProfile;

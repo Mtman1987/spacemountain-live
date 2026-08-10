@@ -16,12 +16,14 @@ export type WorkspaceProfileResponse = {
 
 export type WorkspaceProfileDraft = Pick<
   WorkspaceProfileV1,
-  'appearance' | 'dockSlots' | 'activeOverlaySceneId' | 'ttsSubscriptions' | 'appThemeMappings'
+  'appearance' | 'dockSlots' | 'activeOverlaySceneId' | 'ttsSubscriptions' | 'appThemeMappings' | 'savedThemes'
 >;
 
 export function preferencesToWorkspaceAppearance(preferences: UserPreferences): WorkspaceAppearanceV1 {
   return {
     themeId: preferences.theme,
+    accentColor: preferences.accentColor,
+    accentSaturation: preferences.accentSaturation,
     glowIntensity: preferences.glowIntensity,
     starDensity: preferences.starDensity,
     glassOpacity: preferences.glassOpacity,
@@ -29,6 +31,8 @@ export function preferencesToWorkspaceAppearance(preferences: UserPreferences): 
     nebulaIntensity: preferences.nebulaIntensity,
     parallaxDepth: preferences.parallaxDepth,
     borderStrength: preferences.borderStrength,
+    borderGlow: preferences.borderGlow,
+    hoverGlow: preferences.hoverGlow,
     cornerRadius: preferences.cornerRadius,
     density: preferences.uiDensity,
     sidebarCollapsed: preferences.sidebarCollapsed,
@@ -41,6 +45,16 @@ export function preferencesToWorkspaceAppearance(preferences: UserPreferences): 
     showAvatars: preferences.showAvatars,
     smoothTransitions: preferences.smoothTransitions,
     pushToTalk: preferences.pushToTalk,
+    pushToTalkKey: preferences.pushToTalkKey,
+    micButtonStyle: preferences.micButtonStyle,
+    voiceWaveStyle: preferences.voiceWaveStyle,
+    accessibility: {
+      highContrast: preferences.highContrast,
+      colorVisionMode: preferences.colorVisionMode,
+      textScale: preferences.textScale,
+      reduceMotion: preferences.reduceMotion,
+      focusHighlight: preferences.focusHighlight,
+    },
     animation: {
       enabled: preferences.uiAnimations,
       speed: preferences.animationSpeed,
@@ -59,6 +73,8 @@ export function workspaceAppearanceToPreferences(
     ...fallback,
     userId,
     theme: appearance.themeId,
+    accentColor: appearance.accentColor ?? fallback.accentColor,
+    accentSaturation: appearance.accentSaturation ?? fallback.accentSaturation,
     glowIntensity: appearance.glowIntensity,
     starDensity: appearance.starDensity,
     glassOpacity: appearance.glassOpacity,
@@ -67,6 +83,8 @@ export function workspaceAppearanceToPreferences(
     parallaxDepth: appearance.parallaxDepth,
     uiDensity: appearance.density,
     borderStrength: appearance.borderStrength,
+    borderGlow: appearance.borderGlow ?? fallback.borderGlow,
+    hoverGlow: appearance.hoverGlow ?? fallback.hoverGlow,
     cornerRadius: appearance.cornerRadius,
     sidebarCollapsed: appearance.sidebarCollapsed,
     sidebarStyle: appearance.sidebarStyle,
@@ -78,6 +96,14 @@ export function workspaceAppearanceToPreferences(
     showAvatars: appearance.showAvatars,
     smoothTransitions: appearance.smoothTransitions,
     pushToTalk: appearance.pushToTalk,
+    pushToTalkKey: appearance.pushToTalkKey ?? fallback.pushToTalkKey,
+    micButtonStyle: appearance.micButtonStyle ?? fallback.micButtonStyle,
+    voiceWaveStyle: appearance.voiceWaveStyle ?? fallback.voiceWaveStyle,
+    highContrast: appearance.accessibility?.highContrast ?? fallback.highContrast,
+    colorVisionMode: appearance.accessibility?.colorVisionMode ?? fallback.colorVisionMode,
+    textScale: appearance.accessibility?.textScale ?? fallback.textScale,
+    reduceMotion: appearance.accessibility?.reduceMotion ?? fallback.reduceMotion,
+    focusHighlight: appearance.accessibility?.focusHighlight ?? fallback.focusHighlight,
     uiAnimations: appearance.animation.enabled,
     animationSpeed: appearance.animation.speed,
     particleEffects: appearance.animation.particles,
@@ -139,6 +165,7 @@ export function createWorkspaceProfileDraft(
     activeOverlaySceneId: current?.activeOverlaySceneId ?? null,
     ttsSubscriptions: current?.ttsSubscriptions ?? [],
     appThemeMappings: current?.appThemeMappings ?? {},
+    savedThemes: current?.savedThemes ?? [],
   };
 }
 

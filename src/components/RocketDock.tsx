@@ -4,6 +4,7 @@ import {
   Home, Mail, MessageSquare, Settings, HelpCircle, ChevronDown, ChevronUp, Users, Workflow, Compass, Award, ChevronRight, Check, ShoppingCart
 } from 'lucide-react';
 import { UserProfile, UserPreferences } from '../types';
+import { THEME_PRESET_LIST } from '../lib/theme-presets';
 
 interface RocketDockProps {
   activeTab: string;
@@ -238,21 +239,16 @@ const realAvatar = '/assets/astronaut-avatar.jpg';
                 <span className="text-[7px] font-mono tracking-widest text-zinc-500 font-bold block uppercase leading-none mb-1">
                   LAUNCH TO
                 </span>
-                {[
-                  { name: 'SOLAR', preset: 'solar-flare', color: '#f59e0b' },
-                  { name: 'NEBULA', preset: 'nebula-purple', color: '#a855f7' },
-                  { name: 'DEEP', preset: 'oceanic-blue', color: '#0ea5e9' },
-                  { name: 'AURORA', preset: 'aurora-green', color: '#10b981' }
-                ].map((loc) => (
+                {THEME_PRESET_LIST.map((preset) => (
                   <button
-                    key={loc.preset}
+                    key={preset.id}
                     onClick={() => {
-                      if (onApplyThemePreset) onApplyThemePreset(loc.preset as any);
+                      if (onApplyThemePreset) onApplyThemePreset(preset.id);
                     }}
                     className="w-full py-1 px-1.5 rounded bg-white/[0.03] hover:bg-white/[0.08] border border-white/5 hover:border-white/10 flex items-center gap-1 text-zinc-300 hover:text-white transition-all text-left cursor-pointer"
                   >
-                    <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: loc.color }} />
-                    <span className="text-[7.5px] font-mono font-black tracking-tight leading-none">{loc.name}</span>
+                    <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: preset.glowHex }} />
+                    <span className="text-[7.5px] font-mono font-black tracking-tight leading-none">{preset.shortName.toUpperCase()}</span>
                   </button>
                 ))}
               </div>

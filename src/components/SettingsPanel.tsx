@@ -1,69 +1,146 @@
-import React from 'react';
+import React, { useRef, useState } from 'react';
 import { motion } from 'motion/react';
 import {
+  Accessibility,
+  Check,
+  Download,
   Flame,
   Layout,
   MessageSquare,
+  Mic2,
+  MonitorCog,
+  Palette,
   RotateCcw,
+  Save,
   Sliders,
-  SlidersHorizontal,
   Sparkles,
+  Trash2,
+  Upload,
+  WandSparkles,
 } from 'lucide-react';
-import { UserPreferences, type WorkspaceProfileV1 } from '../types';
+import type { LucideIcon } from 'lucide-react';
+import type { SavedWorkspaceTheme, UserPreferences, WorkspaceProfileV1 } from '../types';
+import { THEME_PRESET_LIST, type ThemeId } from '../lib/theme-presets';
+import { preferencesToWorkspaceAppearance, workspaceAppearanceToPreferences } from '../lib/workspace-profile';
 
 export interface SettingsPanelProps {
   preferences: UserPreferences;
   onUpdatePreferences: (updated: Partial<UserPreferences>) => void;
-  onApplyThemePreset: (preset: 'solar-flare' | 'nebula-purple' | 'oceanic-blue' | 'aurora-green') => void;
+  onApplyThemePreset: (preset: ThemeId) => void;
   accentColor: string;
   workspaceProfile?: WorkspaceProfileV1 | null;
-  onUpdateWorkspaceProfile?: (patch: Partial<Pick<WorkspaceProfileV1, 'ttsSubscriptions' | 'appThemeMappings'>>) => void;
+  onUpdateWorkspaceProfile?: (patch: Partial<Pick<WorkspaceProfileV1, 'ttsSubscriptions' | 'appThemeMappings' | 'savedThemes'>>) => void;
 }
 
-type ThemeId = 'solar-flare' | 'nebula-purple' | 'oceanic-blue' | 'aurora-green';
+type SectionId = 'appearance' | 'cosmos' | 'layout' | 'chat' | 'motion' | 'voice' | 'accessibility' | 'themes';
 
-type ThemePreset = {
-  id: ThemeId;
-  name: string;
-  desc: string;
-  color: string;
-  accent: string;
-};
-
-const PRESETS: ThemePreset[] = [
-  {
-    id: 'solar-flare',
-    name: 'Solar Flare',
-    desc: 'Warm • Energetic',
-    color: 'from-orange-500 to-amber-500',
-    accent: '#f97316',
-  },
-  {
-    id: 'nebula-purple',
-    name: 'Nebula Purple',
-    desc: 'Cosmic • Dreamy',
-    color: 'from-fuchsia-500 to-indigo-600',
-    accent: '#a855f7',
-  },
-  {
-    id: 'oceanic-blue',
-    name: 'Oceanic Blue',
-    desc: 'Calm • Deep',
-    color: 'from-blue-500 to-cyan-500',
-    accent: '#3b82f6',
-  },
-  {
-    id: 'aurora-green',
-    name: 'Aurora Green',
-    desc: 'Vibrant • Natural',
-    color: 'from-emerald-400 to-teal-500',
-    accent: '#10b981',
-  },
+const SECTIONS: Array<{ id: SectionId; label: string; icon: LucideIcon }> = [
+  { id: 'appearance', label: 'Appearance', icon: Palette },
+  { id: 'cosmos', label: 'Background & Cosmos', icon: Sparkles },
+  { id: 'layout', label: 'Layout & Density', icon: Layout },
+  { id: 'chat', label: 'Chat & Tabs', icon: MessageSquare },
+  { id: 'motion', label: 'Motion & Effects', icon: WandSparkles },
+  { id: 'voice', label: 'Voice UI', icon: Mic2 },
+  { id: 'accessibility', label: 'Accessibility', icon: Accessibility },
+  { id: 'themes', label: 'Save / Load Theme', icon: Save },
 ];
 
-function parseIntSafe(value: string): number {
-  const n = Number.parseInt(value, 10);
-  return Number.isFinite(n) ? n : 0;
+const ACCENT_COLORS = ['#F97316', '#EF4444', '#A855F7', '#3B82F6', '#22D3EE', '#10B981', '#A3E635', '#FBBF24', '#F8FAFC'];
+
+function RangeSetting({ label, value, min, max, suffix = '%', accentColor, onChange }: {
+  label: string;
+  value: number;
+  min: number;
+  max: number;
+  suffix?: string;
+  accentColor: string;
+  onChange: (value: number) => void;
+}) {
+  return (
+    <label className="block">
+      <span className="mb-2 flex items-center justify-between gap-3 text-xs text-zinc-300">
+        <span>{label}</span>
+        <span className="font-mono text-[11px] text-white">{value}{suffix}</span>
+      </span>
+      <input
+        type="range"
+        min={min}
+        max={max}
+        value={value}
+        onChange={(event) => onChange(Number.parseInt(event.target.value, 10))}
+        className="h-1 w-full cursor-pointer rounded-full bg-zinc-800"
+        style={{ accentColor }}
+      />
+    </label>
+  );
+}
+
+function ToggleSetting({ label, description, checked, accentColor, onChange }: {
+  label: string;
+  description?: string;
+  checked: boolean;
+  accentColor: string;
+  onChange: (checked: boolean) => void;
+}) {
+  return (
+    <button type="button" onClick={() => onChange(!checked)} className="flex w-full items-center justify-between gap-4 border-t border-white/5 py-3 text-left first:border-t-0 first:pt-0 last:pb-0">
+      <span>
+        <span className="block text-xs font-bold text-zinc-200">{label}</span>
+        {description && <span className="mt-0.5 block text-[10px] leading-4 text-zinc-500">{description}</span>}
+      </span>
+      <span className="relative h-5 w-9 shrink-0 rounded-full p-0.5 transition-colors" style={{ backgroundColor: checked ? accentColor : '#27272a' }}>
+        <span className={`block h-4 w-4 rounded-full bg-white shadow transition-transform ${checked ? 'translate-x-4' : 'translate-x-0'}`} />
+      </span>
+    </button>
+  );
+}
+
+function Segmented<T extends string>({ label, value, options, accentColor, onChange }: {
+  label: string;
+  value: T;
+  options: readonly T[];
+  accentColor: string;
+  onChange: (value: T) => void;
+}) {
+  return (
+    <div>
+      <span className="mb-2 block text-xs text-zinc-300">{label}</span>
+      <div className="grid gap-1 rounded-xl border border-white/5 bg-black/35 p-1" style={{ gridTemplateColumns: `repeat(${options.length}, minmax(0, 1fr))` }}>
+        {options.map((option) => {
+          const active = option === value;
+          return (
+            <button
+              key={option}
+              type="button"
+              onClick={() => onChange(option)}
+              className="truncate rounded-lg px-2 py-2 text-[10px] font-bold capitalize text-zinc-400 transition"
+              style={active ? { color: '#fff', border: `1px solid ${accentColor}55`, backgroundColor: `${accentColor}20` } : undefined}
+            >
+              {option}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function SettingCard({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <section className="rounded-2xl border border-white/8 bg-white/[0.025] p-4">
+      <h3 className="mb-4 text-[10px] font-black uppercase tracking-[0.18em] text-zinc-400">{title}</h3>
+      <div className="space-y-5">{children}</div>
+    </section>
+  );
+}
+
+function downloadJson(filename: string, value: unknown) {
+  const url = URL.createObjectURL(new Blob([JSON.stringify(value, null, 2)], { type: 'application/json' }));
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = filename;
+  anchor.click();
+  URL.revokeObjectURL(url);
 }
 
 export default function SettingsPanel({
@@ -74,14 +151,102 @@ export default function SettingsPanel({
   workspaceProfile,
   onUpdateWorkspaceProfile,
 }: SettingsPanelProps) {
-  const currentThemeId = (preferences.theme || 'solar-flare') as ThemeId;
-  const animationFactor = Math.max(0.2, (preferences.animationSpeed || 85) / 100);
-
-  const activePreset = PRESETS.find((p) => p.id === currentThemeId) ?? PRESETS[0];
+  const [activeSection, setActiveSection] = useState<SectionId>('appearance');
+  const [themeName, setThemeName] = useState('My SpaceMountain Theme');
+  const [libraryMessage, setLibraryMessage] = useState('');
+  const importInputRef = useRef<HTMLInputElement>(null);
+  const savedThemes = workspaceProfile?.savedThemes || [];
   const ttsSubscriptions = workspaceProfile?.ttsSubscriptions || [];
   const appThemeMappings = workspaceProfile?.appThemeMappings || {};
-  const appThemeOptions = ['follow-workspace', 'solar-flare', 'nebula-purple', 'oceanic-blue', 'aurora-green'];
-  const appIds = ['discord-stream-hub', 'streamweaver', 'hearmeout', 'chat-tag'];
+
+  const resetDefaults = () => onUpdatePreferences({
+    accentColor: null,
+    accentSaturation: 100,
+    glowIntensity: 80,
+    starDensity: 70,
+    shootingStars: true,
+    sidebarCollapsed: false,
+    glassOpacity: 65,
+    blurStrength: 22,
+    nebulaIntensity: 80,
+    parallaxDepth: 65,
+    uiDensity: 'comfortable',
+    borderStrength: 60,
+    borderGlow: true,
+    hoverGlow: true,
+    cornerRadius: 'md',
+    sidebarStyle: 'docked',
+    sidebarPosition: 'left',
+    topbarStyle: 'transparent',
+    tabStyle: 'pills',
+    tabPosition: 'top',
+    chatTransparency: 65,
+    showAvatars: true,
+    uiAnimations: true,
+    particleEffects: true,
+    smoothTransitions: true,
+    animationSpeed: 85,
+    pushToTalk: true,
+    pushToTalkKey: 'V',
+    micButtonStyle: 'filled',
+    voiceWaveStyle: 'wave',
+    highContrast: false,
+    colorVisionMode: 'default',
+    textScale: 'md',
+    reduceMotion: false,
+    focusHighlight: true,
+  });
+
+  const saveTheme = () => {
+    if (!onUpdateWorkspaceProfile) {
+      setLibraryMessage('Sign in to save themes to your SPMT account.');
+      return;
+    }
+    const now = new Date().toISOString();
+    const saved: SavedWorkspaceTheme = {
+      id: `theme-${Date.now()}`,
+      name: themeName.trim() || 'Custom Theme',
+      appearance: preferencesToWorkspaceAppearance(preferences),
+      createdAt: now,
+      updatedAt: now,
+    };
+    onUpdateWorkspaceProfile({ savedThemes: [...savedThemes, saved] });
+    setLibraryMessage(`${saved.name} saved to your workspace.`);
+  };
+
+  const applySavedTheme = (saved: SavedWorkspaceTheme) => {
+    const next = workspaceAppearanceToPreferences(saved.appearance, preferences.userId, preferences);
+    const { userId: _userId, ...patch } = next;
+    onUpdatePreferences(patch);
+    setLibraryMessage(`${saved.name} applied.`);
+  };
+
+  const deleteSavedTheme = (themeId: string) => {
+    onUpdateWorkspaceProfile?.({ savedThemes: savedThemes.filter((saved) => saved.id !== themeId) });
+  };
+
+  const importTheme = async (file: File | null) => {
+    if (!file) return;
+    try {
+      const parsed = JSON.parse(await file.text()) as Partial<SavedWorkspaceTheme> & { appearance?: SavedWorkspaceTheme['appearance'] };
+      if (!parsed.appearance?.themeId) throw new Error('Missing appearance');
+      const now = new Date().toISOString();
+      const imported: SavedWorkspaceTheme = {
+        id: `theme-${Date.now()}`,
+        name: parsed.name || file.name.replace(/\.json$/i, '') || 'Imported Theme',
+        appearance: parsed.appearance,
+        createdAt: now,
+        updatedAt: now,
+      };
+      applySavedTheme(imported);
+      if (onUpdateWorkspaceProfile) onUpdateWorkspaceProfile({ savedThemes: [...savedThemes, imported] });
+      setLibraryMessage(`${imported.name} imported and applied.`);
+    } catch {
+      setLibraryMessage('That file is not a valid SpaceMountain theme.');
+    } finally {
+      if (importInputRef.current) importInputRef.current.value = '';
+    }
+  };
 
   const updateTtsSubscription = (subscription: string, enabled: boolean) => {
     if (!onUpdateWorkspaceProfile) return;
@@ -92,624 +257,245 @@ export default function SettingsPanel({
   };
 
   const updateAppThemeMapping = (appId: string, mapping: string) => {
-    if (!onUpdateWorkspaceProfile) return;
-    onUpdateWorkspaceProfile({ appThemeMappings: { ...appThemeMappings, [appId]: mapping } });
+    onUpdateWorkspaceProfile?.({ appThemeMappings: { ...appThemeMappings, [appId]: mapping } });
+  };
+
+  const renderSection = () => {
+    if (activeSection === 'appearance') return (
+      <div className="grid gap-4 xl:grid-cols-2">
+        <SettingCard title="Accent color">
+          <div className="flex flex-wrap gap-2">
+            <button type="button" onClick={() => onUpdatePreferences({ accentColor: null })} className="flex h-9 items-center gap-2 rounded-xl border border-white/10 bg-black/30 px-3 text-[10px] font-bold text-zinc-300">
+              <Flame size={13} /> Preset
+            </button>
+            {ACCENT_COLORS.map((color) => (
+              <button key={color} type="button" onClick={() => onUpdatePreferences({ accentColor: color })} aria-label={`Use ${color} accent`} className="grid h-9 w-9 place-items-center rounded-full border border-white/15" style={{ backgroundColor: color, boxShadow: preferences.accentColor === color ? `0 0 0 2px #050505, 0 0 0 4px ${color}` : undefined }}>
+                {preferences.accentColor === color && <Check size={14} className="text-black" />}
+              </button>
+            ))}
+          </div>
+          <RangeSetting label="Accent saturation" value={preferences.accentSaturation} min={20} max={150} accentColor={accentColor} onChange={(value) => onUpdatePreferences({ accentSaturation: value })} />
+          <RangeSetting label="Glow intensity" value={preferences.glowIntensity} min={0} max={100} accentColor={accentColor} onChange={(value) => onUpdatePreferences({ glowIntensity: value })} />
+        </SettingCard>
+        <SettingCard title="Glass surfaces">
+          <RangeSetting label="Glass opacity" value={preferences.glassOpacity} min={20} max={95} accentColor={accentColor} onChange={(value) => onUpdatePreferences({ glassOpacity: value })} />
+          <RangeSetting label="Blur strength" value={preferences.blurStrength} min={0} max={40} suffix="px" accentColor={accentColor} onChange={(value) => onUpdatePreferences({ blurStrength: value })} />
+          <ToggleSetting label="Border glow" checked={preferences.borderGlow} accentColor={accentColor} onChange={(borderGlow) => onUpdatePreferences({ borderGlow })} />
+          <ToggleSetting label="Hover glow" checked={preferences.hoverGlow} accentColor={accentColor} onChange={(hoverGlow) => onUpdatePreferences({ hoverGlow })} />
+        </SettingCard>
+      </div>
+    );
+
+    if (activeSection === 'cosmos') return (
+      <div className="grid gap-4 xl:grid-cols-2">
+        <SettingCard title="Background & cosmos">
+          <RangeSetting label="Star density" value={preferences.starDensity} min={0} max={100} accentColor={accentColor} onChange={(value) => onUpdatePreferences({ starDensity: value })} />
+          <RangeSetting label="Nebula intensity" value={preferences.nebulaIntensity} min={0} max={100} accentColor={accentColor} onChange={(value) => onUpdatePreferences({ nebulaIntensity: value })} />
+          <RangeSetting label="Parallax depth" value={preferences.parallaxDepth} min={0} max={100} accentColor={accentColor} onChange={(value) => onUpdatePreferences({ parallaxDepth: value })} />
+          <ToggleSetting label="Shooting stars" checked={preferences.shootingStars} accentColor={accentColor} onChange={(shootingStars) => onUpdatePreferences({ shootingStars })} />
+        </SettingCard>
+        <SettingCard title="Theme presets">
+          <div className="grid gap-2 sm:grid-cols-2">
+            {THEME_PRESET_LIST.map((preset) => (
+              <button key={preset.id} type="button" onClick={() => onApplyThemePreset(preset.id)} className="overflow-hidden rounded-xl border p-3 text-left" style={{ borderColor: preferences.theme === preset.id ? accentColor : 'rgba(255,255,255,.08)', backgroundImage: `linear-gradient(110deg, ${preset.glowHex}22, rgba(0,0,0,.42)), url(${preset.backgroundImage})`, backgroundSize: 'cover' }}>
+                <span className="block text-xs font-black text-white">{preset.name}</span>
+                <span className="mt-1 block text-[10px] text-zinc-300">{preset.shortName} workspace</span>
+              </button>
+            ))}
+          </div>
+        </SettingCard>
+      </div>
+    );
+
+    if (activeSection === 'layout') return (
+      <div className="grid gap-4 xl:grid-cols-2">
+        <SettingCard title="Surface & density">
+          <Segmented label="UI density" value={preferences.uiDensity} options={['compact', 'comfortable', 'spacious'] as const} accentColor={accentColor} onChange={(uiDensity) => onUpdatePreferences({ uiDensity })} />
+          <RangeSetting label="Border strength" value={preferences.borderStrength} min={0} max={100} accentColor={accentColor} onChange={(value) => onUpdatePreferences({ borderStrength: value })} />
+          <Segmented label="Corner radius" value={preferences.cornerRadius} options={['sm', 'md', 'lg', 'full'] as const} accentColor={accentColor} onChange={(cornerRadius) => onUpdatePreferences({ cornerRadius })} />
+        </SettingCard>
+        <SettingCard title="Application shell">
+          <Segmented label="Sidebar style" value={preferences.sidebarStyle} options={['docked', 'floating', 'hidden'] as const} accentColor={accentColor} onChange={(sidebarStyle) => onUpdatePreferences({ sidebarStyle })} />
+          <Segmented label="Sidebar position" value={preferences.sidebarPosition} options={['left', 'right'] as const} accentColor={accentColor} onChange={(sidebarPosition) => onUpdatePreferences({ sidebarPosition })} />
+          <ToggleSetting label="Icon-only sidebar" description="Keeps the shell narrow while preserving navigation." checked={preferences.sidebarCollapsed} accentColor={accentColor} onChange={(sidebarCollapsed) => onUpdatePreferences({ sidebarCollapsed })} />
+          <Segmented label="Topbar style" value={preferences.topbarStyle} options={['transparent', 'glass'] as const} accentColor={accentColor} onChange={(topbarStyle) => onUpdatePreferences({ topbarStyle })} />
+        </SettingCard>
+      </div>
+    );
+
+    if (activeSection === 'chat') return (
+      <div className="grid gap-4 xl:grid-cols-2">
+        <SettingCard title="Chat surfaces">
+          <RangeSetting label="Chat transparency" value={preferences.chatTransparency} min={10} max={95} accentColor={accentColor} onChange={(value) => onUpdatePreferences({ chatTransparency: value })} />
+          <ToggleSetting label="Show avatars in chat" checked={preferences.showAvatars} accentColor={accentColor} onChange={(showAvatars) => onUpdatePreferences({ showAvatars })} />
+        </SettingCard>
+        <SettingCard title="Tabs">
+          <Segmented label="Tab style" value={preferences.tabStyle} options={['pills', 'underline', 'cards'] as const} accentColor={accentColor} onChange={(tabStyle) => onUpdatePreferences({ tabStyle })} />
+          <Segmented label="Tab position" value={preferences.tabPosition} options={['top', 'bottom', 'left', 'right'] as const} accentColor={accentColor} onChange={(tabPosition) => onUpdatePreferences({ tabPosition })} />
+          <p className="rounded-xl border border-cyan-300/10 bg-cyan-300/[0.04] p-3 text-[10px] leading-4 text-zinc-400">These controls are stored everywhere and take effect in apps that provide chat or tab surfaces.</p>
+        </SettingCard>
+      </div>
+    );
+
+    if (activeSection === 'motion') return (
+      <div className="grid gap-4 xl:grid-cols-2">
+        <SettingCard title="Motion">
+          <ToggleSetting label="UI animations" checked={preferences.uiAnimations} accentColor={accentColor} onChange={(uiAnimations) => onUpdatePreferences({ uiAnimations })} />
+          <ToggleSetting label="Smooth transitions" checked={preferences.smoothTransitions} accentColor={accentColor} onChange={(smoothTransitions) => onUpdatePreferences({ smoothTransitions })} />
+          <RangeSetting label="Animation speed" value={preferences.animationSpeed} min={20} max={200} suffix="%" accentColor={accentColor} onChange={(value) => onUpdatePreferences({ animationSpeed: value })} />
+        </SettingCard>
+        <SettingCard title="Effects">
+          <ToggleSetting label="Particle effects" checked={preferences.particleEffects} accentColor={accentColor} onChange={(particleEffects) => onUpdatePreferences({ particleEffects })} />
+          <ToggleSetting label="Shooting stars" checked={preferences.shootingStars} accentColor={accentColor} onChange={(shootingStars) => onUpdatePreferences({ shootingStars })} />
+          <ToggleSetting label="Hover glow" checked={preferences.hoverGlow} accentColor={accentColor} onChange={(hoverGlow) => onUpdatePreferences({ hoverGlow })} />
+        </SettingCard>
+      </div>
+    );
+
+    if (activeSection === 'voice') return (
+      <div className="grid gap-4 xl:grid-cols-2">
+        <SettingCard title="Voice controls">
+          <ToggleSetting label="Push to talk" description="Used by HearMeOut and other voice-enabled apps." checked={preferences.pushToTalk} accentColor={accentColor} onChange={(pushToTalk) => onUpdatePreferences({ pushToTalk })} />
+          <label className="block text-xs text-zinc-300">Push-to-talk key
+            <input value={preferences.pushToTalkKey} maxLength={12} onChange={(event) => onUpdatePreferences({ pushToTalkKey: event.target.value.toUpperCase() })} className="mt-2 w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-sm font-black text-white outline-none" />
+          </label>
+        </SettingCard>
+        <SettingCard title="Voice presentation">
+          <Segmented label="Microphone button" value={preferences.micButtonStyle} options={['filled', 'outline', 'minimal'] as const} accentColor={accentColor} onChange={(micButtonStyle) => onUpdatePreferences({ micButtonStyle })} />
+          <Segmented label="Waveform style" value={preferences.voiceWaveStyle} options={['bars', 'wave', 'pulse'] as const} accentColor={accentColor} onChange={(voiceWaveStyle) => onUpdatePreferences({ voiceWaveStyle })} />
+          <div className="flex h-20 items-center justify-center gap-1 rounded-xl border border-white/5 bg-black/35" style={{ color: accentColor }}>
+            {[18, 34, 48, 28, 42, 20, 36].map((height, index) => <span key={index} className={`w-1 ${preferences.voiceWaveStyle === 'pulse' ? 'rounded-full' : 'rounded-sm'}`} style={{ height: preferences.voiceWaveStyle === 'wave' ? `${Math.max(8, height - Math.abs(index - 3) * 5)}px` : `${height}px`, backgroundColor: 'currentColor' }} />)}
+          </div>
+        </SettingCard>
+      </div>
+    );
+
+    if (activeSection === 'accessibility') return (
+      <div className="grid gap-4 xl:grid-cols-2">
+        <SettingCard title="Readability">
+          <ToggleSetting label="High contrast" checked={preferences.highContrast} accentColor={accentColor} onChange={(highContrast) => onUpdatePreferences({ highContrast })} />
+          <Segmented label="Text scale" value={preferences.textScale} options={['sm', 'md', 'lg'] as const} accentColor={accentColor} onChange={(textScale) => onUpdatePreferences({ textScale })} />
+          <ToggleSetting label="Strong focus highlight" description="Makes keyboard focus rings easier to see." checked={preferences.focusHighlight} accentColor={accentColor} onChange={(focusHighlight) => onUpdatePreferences({ focusHighlight })} />
+        </SettingCard>
+        <SettingCard title="Motion & color">
+          <Segmented label="Color vision mode" value={preferences.colorVisionMode} options={['default', 'deuteranopia', 'protanopia', 'tritanopia'] as const} accentColor={accentColor} onChange={(colorVisionMode) => onUpdatePreferences({ colorVisionMode })} />
+          <ToggleSetting label="Reduce motion" description="Overrides animations and smooth transitions in every connected app." checked={preferences.reduceMotion} accentColor={accentColor} onChange={(reduceMotion) => onUpdatePreferences({ reduceMotion })} />
+        </SettingCard>
+      </div>
+    );
+
+    return (
+      <div className="space-y-4">
+        <div className="grid gap-4 xl:grid-cols-2">
+          <SettingCard title="Save current theme">
+            <label className="block text-xs text-zinc-300">Theme name
+              <input value={themeName} onChange={(event) => setThemeName(event.target.value)} className="mt-2 w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-sm text-white outline-none" />
+            </label>
+            <button type="button" onClick={saveTheme} className="inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-black text-zinc-950" style={{ backgroundColor: accentColor }}><Save size={14} /> Save theme</button>
+            {libraryMessage && <p className="text-[10px] leading-4 text-zinc-400">{libraryMessage}</p>}
+          </SettingCard>
+          <SettingCard title="Import / export">
+            <div className="flex flex-wrap gap-2">
+              <button type="button" onClick={() => downloadJson(`${themeName.trim().replace(/\s+/g, '-').toLowerCase() || 'spmt-theme'}.json`, { name: themeName, appearance: preferencesToWorkspaceAppearance(preferences) })} className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-bold text-zinc-200"><Download size={14} /> Export current</button>
+              <button type="button" onClick={() => importInputRef.current?.click()} className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-bold text-zinc-200"><Upload size={14} /> Import theme</button>
+              <input ref={importInputRef} type="file" accept="application/json,.json" className="hidden" onChange={(event) => void importTheme(event.target.files?.[0] || null)} />
+            </div>
+            <p className="text-[10px] leading-4 text-zinc-500">Theme files contain appearance settings only—never identity, messages, or account credentials.</p>
+          </SettingCard>
+        </div>
+
+        <SettingCard title="Saved themes">
+          <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+            {savedThemes.map((saved) => (
+              <div key={saved.id} className="rounded-xl border border-white/10 bg-black/30 p-3">
+                <span className="block truncate text-xs font-black text-white">{saved.name}</span>
+                <span className="mt-1 block text-[9px] uppercase tracking-wide text-zinc-500">{saved.appearance.themeId}</span>
+                <div className="mt-3 flex gap-2">
+                  <button type="button" onClick={() => applySavedTheme(saved)} className="flex-1 rounded-lg border border-white/10 px-2 py-1.5 text-[10px] font-bold text-zinc-200">Apply</button>
+                  <button type="button" onClick={() => downloadJson(`${saved.name.replace(/\s+/g, '-').toLowerCase()}.json`, saved)} aria-label={`Export ${saved.name}`} className="rounded-lg border border-white/10 p-1.5 text-zinc-400"><Download size={13} /></button>
+                  <button type="button" onClick={() => deleteSavedTheme(saved.id)} aria-label={`Delete ${saved.name}`} className="rounded-lg border border-red-400/15 p-1.5 text-red-300"><Trash2 size={13} /></button>
+                </div>
+              </div>
+            ))}
+            {savedThemes.length === 0 && <p className="col-span-full rounded-xl border border-dashed border-white/10 p-5 text-center text-xs text-zinc-500">Save your first custom theme to make it available across connected apps.</p>}
+          </div>
+        </SettingCard>
+
+        {workspaceProfile && onUpdateWorkspaceProfile && (
+          <div className="grid gap-4 xl:grid-cols-2">
+            <SettingCard title="Feature consumers">
+              {['streamweaver', 'hearmeout', 'discord-stream-hub', 'chat-tag'].map((subscription) => (
+                <label key={subscription} className="flex items-center justify-between gap-3 border-t border-white/5 py-2 text-xs text-zinc-200 first:border-0 first:pt-0">
+                  <span>{subscription}</span>
+                  <input type="checkbox" checked={ttsSubscriptions.includes(subscription)} onChange={(event) => updateTtsSubscription(subscription, event.target.checked)} style={{ accentColor }} />
+                </label>
+              ))}
+            </SettingCard>
+            <SettingCard title="Per-app theme mapping">
+              {['discord-stream-hub', 'streamweaver', 'hearmeout', 'chat-tag'].map((appId) => (
+                <label key={appId} className="grid grid-cols-[1fr_150px] items-center gap-2 border-t border-white/5 py-2 text-xs text-zinc-200 first:border-0 first:pt-0">
+                  <span>{appId}</span>
+                  <select value={appThemeMappings[appId] || 'follow-workspace'} onChange={(event) => updateAppThemeMapping(appId, event.target.value)} className="rounded-lg border border-white/10 bg-black/40 px-2 py-1.5 text-xs text-white outline-none">
+                    {['follow-workspace', ...THEME_PRESET_LIST.map((preset) => preset.id)].map((option) => <option key={option} value={option}>{option}</option>)}
+                  </select>
+                </label>
+              ))}
+            </SettingCard>
+          </div>
+        )}
+      </div>
+    );
   };
 
   return (
-    <div
-      className="w-full bg-black/40 border rounded-3xl p-6 backdrop-blur-xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] transition-all duration-500"
-      style={{ borderColor: `${accentColor}20` }}
-    >
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 pb-5 border-b border-white/5">
+    <div className="w-full rounded-3xl border bg-black/45 p-4 shadow-[0_20px_50px_rgba(0,0,0,0.5)] backdrop-blur-xl md:p-6" style={{ borderColor: `${accentColor}30` }}>
+      <div className="mb-5 flex flex-col justify-between gap-4 border-b border-white/5 pb-5 md:flex-row md:items-center">
         <div>
-          <h2 className="text-xl font-sans font-bold text-white tracking-tight flex items-center gap-2">
-            <Sliders style={{ color: accentColor }} size={22} />
-            Settings
-          </h2>
-          <p className="text-xs text-zinc-400 font-sans mt-1">
-            Customize your experience. Changes sync across all your SpaceMountain apps.
-          </p>
+          <h2 className="flex items-center gap-2 text-xl font-black text-white"><Sliders size={21} style={{ color: accentColor }} /> Universal UI Settings</h2>
+          <p className="mt-1 text-xs text-zinc-400">One appearance profile for SpaceMountain and every connected app.</p>
         </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => {
-              onUpdatePreferences({
-                glowIntensity: 80,
-                starDensity: 70,
-                glassOpacity: 65,
-                blurStrength: 22,
-                nebulaIntensity: 80,
-                parallaxDepth: 65,
-                uiDensity: 'comfortable',
-                borderStrength: 60,
-                cornerRadius: 'md',
-                sidebarStyle: 'docked',
-                sidebarPosition: 'left',
-                topbarStyle: 'transparent',
-                tabStyle: 'pills',
-                tabPosition: 'top',
-                chatTransparency: 65,
-                showAvatars: true,
-                uiAnimations: true,
-                particleEffects: true,
-                smoothTransitions: true,
-                animationSpeed: 85,
-                pushToTalk: true,
-              });
-            }}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-[11px] font-mono font-bold text-zinc-300 hover:text-white transition-all"
-          >
-            <RotateCcw size={12} />
-            RESET DEFAULTS
-          </button>
-        </div>
+        <button type="button" onClick={resetDefaults} className="inline-flex items-center gap-2 self-start rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-[10px] font-black uppercase tracking-wide text-zinc-300"><RotateCcw size={13} /> Reset appearance</button>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Left menu */}
-        <div className="lg:col-span-3 flex flex-col gap-1 border-r border-white/5 pr-4">
-          <button
-            className="flex items-center gap-2.5 px-3.5 py-3 rounded-2xl text-white text-xs font-semibold text-left transition-all"
-            style={{
-              border: `1px solid ${accentColor}30`,
-              background: `linear-gradient(90deg, ${accentColor}1a, ${accentColor}05, transparent)`,
-            }}
-          >
-            <Sparkles size={14} style={{ color: accentColor }} />
-            Appearance
-          </button>
-          <button className="flex items-center gap-2.5 px-3.5 py-3 rounded-2xl text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.03] text-xs font-semibold text-left transition-all">
-            <Flame size={14} />
-            Theme Presets
-          </button>
-          <button className="flex items-center gap-2.5 px-3.5 py-3 rounded-2xl text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.03] text-xs font-semibold text-left transition-all">
-            <Layout size={14} />
-            Layout & Density
-          </button>
-          <button className="flex items-center gap-2.5 px-3.5 py-3 rounded-2xl text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.03] text-xs font-semibold text-left transition-all">
-            <MessageSquare size={14} />
-            Chat & Tabs
-          </button>
-          <button className="flex items-center gap-2.5 px-3.5 py-3 rounded-2xl text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.03] text-xs font-semibold text-left transition-all">
-            <SlidersHorizontal size={14} />
-            Voice UI & Audio
-          </button>
-        </div>
-
-        {/* Center settings */}
-        <div className="lg:col-span-6 grid grid-cols-1 md:grid-cols-2 gap-5">
-          {/* Accent Color & Glass */}
-          <div className="flex flex-col gap-4 bg-white/[0.02] border border-white/5 rounded-2xl p-4">
-            <span
-              className="text-[10px] font-mono tracking-wider font-bold uppercase"
-              style={{ color: accentColor }}
-            >
-              ✦ Accent Color & Glass
-            </span>
-
-            <div className="flex items-center gap-2.5 mt-1">
-              {PRESETS.map((p) => {
-                const active = currentThemeId === p.id;
-                return (
-                  <button
-                    key={p.id}
-                    onClick={() => onApplyThemePreset(p.id)}
-                    className={`w-6 h-6 rounded-full bg-gradient-to-br ${p.color} border transition-all duration-200 relative`}
-                    style={{
-                      borderColor: active ? '#ffffff' : 'rgba(255,255,255,0.1)',
-                      boxShadow: active ? `0 0 12px ${p.accent}` : 'none',
-                    }}
-                    title={p.name}
-                  >
-                    {active && (
-                      <span className="absolute inset-0 flex items-center justify-center text-white text-[10px] font-extrabold">
-                        ✓
-                      </span>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-
-            <div className="mt-2.5">
-              <div className="flex justify-between text-[11px] font-sans text-zinc-400 mb-1">
-                <span>Glass Opacity</span>
-                <span className="text-white font-mono">{preferences.glassOpacity}%</span>
-              </div>
-              <input
-                type="range"
-                min={20}
-                max={95}
-                value={preferences.glassOpacity}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                  onUpdatePreferences({ glassOpacity: parseIntSafe(e.target.value) })
-                }
-                className="w-full bg-zinc-800 rounded-lg h-1"
-                style={{ accentColor }}
-              />
-            </div>
-
-            <div>
-              <div className="flex justify-between text-[11px] font-sans text-zinc-400 mb-1">
-                <span>Blur Strength</span>
-                <span className="text-white font-mono">{preferences.blurStrength}px</span>
-              </div>
-              <input
-                type="range"
-                min={0}
-                max={40}
-                value={preferences.blurStrength}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                  onUpdatePreferences({ blurStrength: parseIntSafe(e.target.value) })
-                }
-                className="w-full bg-zinc-800 rounded-lg h-1"
-                style={{ accentColor }}
-              />
-            </div>
-
-            <div>
-              <div className="flex justify-between text-[11px] font-sans text-zinc-400 mb-1">
-                <span>Glow Intensity</span>
-                <span className="text-white font-mono">{preferences.glowIntensity}%</span>
-              </div>
-              <input
-                type="range"
-                min={10}
-                max={100}
-                value={preferences.glowIntensity}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                  onUpdatePreferences({ glowIntensity: parseIntSafe(e.target.value) })
-                }
-                className="w-full bg-zinc-800 rounded-lg h-1"
-                style={{ accentColor }}
-              />
-            </div>
-          </div>
-
-          {/* Cosmic Background */}
-          <div className="flex flex-col gap-4 bg-white/[0.02] border border-white/5 rounded-2xl p-4">
-            <span
-              className="text-[10px] font-mono tracking-wider font-bold uppercase"
-              style={{ color: accentColor }}
-            >
-              ✦ Cosmic Background
-            </span>
-
-            <div className="mt-1">
-              <div className="flex justify-between text-[11px] font-sans text-zinc-400 mb-1">
-                <span>Star Density</span>
-                <span className="text-white font-mono">{preferences.starDensity}%</span>
-              </div>
-              <input
-                type="range"
-                min={10}
-                max={100}
-                value={preferences.starDensity}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                  onUpdatePreferences({ starDensity: parseIntSafe(e.target.value) })
-                }
-                className="w-full bg-zinc-800 rounded-lg h-1"
-                style={{ accentColor }}
-              />
-            </div>
-
-            <div>
-              <div className="flex justify-between text-[11px] font-sans text-zinc-400 mb-1">
-                <span>Nebula Intensity</span>
-                <span className="text-white font-mono">{preferences.nebulaIntensity}%</span>
-              </div>
-              <input
-                type="range"
-                min={10}
-                max={100}
-                value={preferences.nebulaIntensity}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                  onUpdatePreferences({ nebulaIntensity: parseIntSafe(e.target.value) })
-                }
-                className="w-full bg-zinc-800 rounded-lg h-1"
-                style={{ accentColor }}
-              />
-            </div>
-
-            <div>
-              <div className="flex justify-between text-[11px] font-sans text-zinc-400 mb-1">
-                <span>Parallax Depth</span>
-                <span className="text-white font-mono">{preferences.parallaxDepth}%</span>
-              </div>
-              <input
-                type="range"
-                min={0}
-                max={100}
-                value={preferences.parallaxDepth}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                  onUpdatePreferences({ parallaxDepth: parseIntSafe(e.target.value) })
-                }
-                className="w-full bg-zinc-800 rounded-lg h-1"
-                style={{ accentColor }}
-              />
-            </div>
-          </div>
-
-          {/* Surface & UI */}
-          <div className="flex flex-col gap-4 bg-white/[0.02] border border-white/5 rounded-2xl p-4">
-            <span
-              className="text-[10px] font-mono tracking-wider font-bold uppercase"
-              style={{ color: accentColor }}
-            >
-              ✦ Surface & UI
-            </span>
-
-            <div>
-              <span className="text-[10px] text-zinc-400 block mb-1.5">UI Density</span>
-              <div className="grid grid-cols-3 gap-0.5 bg-black/40 p-1 rounded-xl border border-white/5">
-                {(['compact', 'comfortable', 'spacious'] as const).map((d) => (
-                  <button
-                    key={d}
-                    onClick={() => onUpdatePreferences({ uiDensity: d })}
-                    className="py-1 px-0.5 text-[8.5px] font-semibold rounded-lg capitalize transition-all truncate"
-                    style={
-                      preferences.uiDensity === d
-                        ? {
-                            backgroundColor: `${accentColor}25`,
-                            color: '#ffffff',
-                            border: `1px solid ${accentColor}40`,
-                          }
-                        : { color: '#a1a1aa' }
-                    }
-                  >
-                    {d}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div>
-              <div className="flex justify-between text-[11px] font-sans text-zinc-400 mb-1">
-                <span>Border Strength</span>
-                <span className="text-white font-mono">{preferences.borderStrength}%</span>
-              </div>
-              <input
-                type="range"
-                min={10}
-                max={100}
-                value={preferences.borderStrength}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                  onUpdatePreferences({ borderStrength: parseIntSafe(e.target.value) })
-                }
-                className="w-full bg-zinc-800 rounded-lg h-1"
-                style={{ accentColor }}
-              />
-            </div>
-
-            <div>
-              <span className="text-[10px] text-zinc-400 block mb-1.5">Corner Radius</span>
-              <div className="grid grid-cols-4 gap-1 bg-black/40 p-1 rounded-xl border border-white/5">
-                {(['sm', 'md', 'lg', 'full'] as const).map((r) => (
-                  <button
-                    key={r}
-                    onClick={() => onUpdatePreferences({ cornerRadius: r })}
-                    className="py-1 text-[10px] font-mono font-bold rounded-lg uppercase transition-all"
-                    style={
-                      preferences.cornerRadius === r
-                        ? {
-                            backgroundColor: `${accentColor}25`,
-                            color: '#ffffff',
-                            border: `1px solid ${accentColor}40`,
-                          }
-                        : { color: '#a1a1aa' }
-                    }
-                  >
-                    {r}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {/* Chat & Tabs */}
-          <div className="flex flex-col gap-4 bg-white/[0.02] border border-white/5 rounded-2xl p-4">
-            <span
-              className="text-[10px] font-mono tracking-wider font-bold uppercase"
-              style={{ color: accentColor }}
-            >
-              ✦ Chat & Tabs
-            </span>
-
-            <div>
-              <span className="text-[10px] text-zinc-400 block mb-1.5">Tab Style</span>
-              <div className="grid grid-cols-3 gap-0.5 bg-black/40 p-1 rounded-xl border border-white/5">
-                {(['pills', 'underline', 'cards'] as const).map((s) => (
-                  <button
-                    key={s}
-                    onClick={() => onUpdatePreferences({ tabStyle: s })}
-                    className="py-1 px-0.5 text-[8.5px] font-semibold rounded-lg capitalize transition-all truncate"
-                    style={
-                      preferences.tabStyle === s
-                        ? {
-                            backgroundColor: `${accentColor}25`,
-                            color: '#ffffff',
-                            border: `1px solid ${accentColor}40`,
-                          }
-                        : { color: '#a1a1aa' }
-                    }
-                  >
-                    {s}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div>
-              <div className="flex justify-between text-[11px] font-sans text-zinc-400 mb-1">
-                <span>Chat Transparency</span>
-                <span className="text-white font-mono">{preferences.chatTransparency}%</span>
-              </div>
-              <input
-                type="range"
-                min={10}
-                max={95}
-                value={preferences.chatTransparency}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                  onUpdatePreferences({ chatTransparency: parseIntSafe(e.target.value) })
-                }
-                className="w-full bg-zinc-800 rounded-lg h-1"
-                style={{ accentColor }}
-              />
-            </div>
-
-            <div className="flex items-center justify-between py-1 border-t border-white/5 mt-1">
-              <span className="text-[11px] text-zinc-300 font-sans">Show Avatars in Chat</span>
-              <button
-                onClick={() => onUpdatePreferences({ showAvatars: !preferences.showAvatars })}
-                className="w-9 h-5 rounded-full p-0.5 transition-colors duration-200 focus:outline-none"
-                style={{ backgroundColor: preferences.showAvatars ? accentColor : '#27272a' }}
-              >
-                <div
-                  className={`bg-white w-4 h-4 rounded-full shadow-md transform duration-200 ${
-                    preferences.showAvatars ? 'translate-x-4' : 'translate-x-0'
-                  }`}
-                />
-              </button>
-            </div>
-          </div>
-
-          {/* Motion & Effects */}
-          <div className="flex flex-col gap-4 bg-white/[0.02] border border-white/5 rounded-2xl p-4">
-            <span
-              className="text-[10px] font-mono tracking-wider font-bold uppercase"
-              style={{ color: accentColor }}
-            >
-              ✦ Motion & Effects
-            </span>
-
-            {(
-              [
-                ['uiAnimations', 'UI Animations'],
-                ['particleEffects', 'Particle Stars'],
-                ['shootingStars', 'Shooting Stars'],
-                ['smoothTransitions', 'Smooth Transitions'],
-                ['pushToTalk', 'Push To Talk'],
-              ] as const
-            ).map(([key, label]) => {
-              const value = preferences[key];
-              return (
-                <div key={key} className="flex items-center justify-between text-xs py-1 border-t border-white/5">
-                  <span className="text-zinc-300">{label}</span>
-                  <button
-                    onClick={() => onUpdatePreferences({ [key]: !value } as Partial<UserPreferences>)}
-                    className="w-9 h-5 rounded-full p-0.5 transition-colors duration-200 focus:outline-none"
-                    style={{ backgroundColor: value ? accentColor : '#27272a' }}
-                  >
-                    <div
-                      className={`bg-white w-4 h-4 rounded-full shadow-md transform duration-200 ${
-                        value ? 'translate-x-4' : 'translate-x-0'
-                      }`}
-                    />
-                  </button>
-                </div>
-              );
-            })}
-
-            <div className="border-t border-white/5 pt-2">
-              <div className="flex justify-between text-[11px] font-sans text-zinc-400 mb-1">
-                <span>Animation Speed</span>
-                <span className="text-white font-mono">{(preferences.animationSpeed || 85) / 100}x</span>
-              </div>
-              <input
-                type="range"
-                min={20}
-                max={200}
-                value={preferences.animationSpeed || 85}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                  onUpdatePreferences({ animationSpeed: parseIntSafe(e.target.value) })
-                }
-                className="w-full bg-zinc-800 rounded-lg h-1"
-                style={{ accentColor }}
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* Right preview */}
-        <div className="lg:col-span-3 flex flex-col gap-4">
-          <span
-            className="text-[10px] font-mono tracking-wider font-bold uppercase"
-            style={{ color: accentColor }}
-          >
-            ✦ Live Preview
-          </span>
-
-          <div className="w-full rounded-2xl bg-black/60 border border-white/10 p-4 relative overflow-hidden flex flex-col justify-between h-[230px] shadow-inner">
-            <div className="absolute inset-0 pointer-events-none opacity-40">
-              <div className="absolute top-4 left-6 w-1 h-1 bg-white rounded-full animate-pulse" />
-              <div className="absolute top-16 right-10 w-1 h-1 bg-white rounded-full" />
-              <div className="absolute bottom-8 left-12 w-1.5 h-1.5 bg-yellow-400 rounded-full animate-ping" />
-            </div>
-
-            <div className="flex items-center justify-between border-b border-white/5 pb-2 text-[8px] font-mono">
-              <div className="flex items-center gap-1">
-                <div className="w-2 h-2 rounded-full" style={{ backgroundColor: accentColor }} />
-                <span className="text-zinc-400 text-[7px] font-bold">SpaceMountain.live</span>
-              </div>
-              <span className="font-bold animate-pulse" style={{ color: accentColor }}>
-                ● ACTIVE
-              </span>
-            </div>
-
-            <div className="flex flex-col items-center justify-center my-auto relative">
-              <div
-                className="w-14 h-14 rounded-full flex items-center justify-center transition-all duration-300 relative border border-white/20"
-                style={{
-                  backgroundColor: `${activePreset.accent}${Math.round(
-                    Math.max(20, Math.min(160, preferences.glassOpacity * 1.6))
-                  )
-                    .toString(16)
-                    .padStart(2, '0')}`,
-                  backdropFilter: `blur(${preferences.blurStrength / 2}px)`,
-                  boxShadow: `0 0 ${preferences.glowIntensity / 3}px ${accentColor}80`,
-                }}
-              >
-                <span className="text-xl">🚀</span>
-                <div
-                  className="absolute inset-0 rounded-full border animate-spin"
-                  style={{
-                    borderColor: `${accentColor}40`,
-                    animationDuration: `${6 / animationFactor}s`,
-                  }}
-                />
-              </div>
-              <span className="text-[9px] font-bold text-white mt-2 font-mono">Mini HUD View</span>
-              <span className="text-[7px] text-zinc-500 font-mono mt-0.5">Previewing your layout options</span>
-            </div>
-
-            <div className="flex items-center justify-between border-t border-white/5 pt-2 text-[7px] font-mono text-zinc-500">
-              <span>OPACITY: {preferences.glassOpacity}%</span>
-              <span>BLUR: {preferences.blurStrength}px</span>
-            </div>
-          </div>
-
-          <div className="rounded-2xl border border-white/5 bg-white/[0.01] p-3.5">
-            <span className="text-[9px] font-mono font-bold text-zinc-400 block mb-2 uppercase">
-              ✦ Current Active Theme
-            </span>
-            <div className="flex items-center gap-3">
-              <div
-                className={`w-8 h-8 rounded-xl bg-gradient-to-br ${activePreset.color} flex items-center justify-center text-xs font-bold text-white`}
-              />
-              <div className="flex flex-col">
-                <span className="text-xs font-bold text-white">{activePreset.name}</span>
-                <span className="text-[9px] text-zinc-500 font-mono">Accent color synced across apps</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {workspaceProfile && onUpdateWorkspaceProfile && (
-        <div className="mt-6 rounded-2xl border border-white/5 bg-white/[0.02] p-4">
-          <div className="mb-4">
-            <span className="text-[10px] font-mono tracking-wider font-bold uppercase" style={{ color: accentColor }}>
-              ✦ App Consumers
-            </span>
-            <p className="mt-1 text-xs text-zinc-400">
-              These fields are stored in the SPMT workspace profile and read by connected apps.
-            </p>
-          </div>
-
-          <div className="grid gap-4 lg:grid-cols-2">
-            <div className="rounded-xl border border-white/5 bg-black/30 p-3">
-              <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-zinc-400">TTS subscriptions</span>
-              <div className="mt-2 flex flex-col gap-2">
-                {['streamweaver', 'hearmeout', 'discord-stream-hub', 'chat-tag'].map((subscription) => {
-                  const checked = ttsSubscriptions.includes(subscription);
-                  return (
-                    <label key={subscription} className="flex items-center justify-between gap-3 text-xs text-zinc-200">
-                      <span>{subscription}</span>
-                      <input
-                        type="checkbox"
-                        checked={checked}
-                        onChange={(event) => updateTtsSubscription(subscription, event.target.checked)}
-                        className="h-4 w-4"
-                        style={{ accentColor }}
-                      />
-                    </label>
-                  );
-                })}
-              </div>
-            </div>
-
-            <div className="rounded-xl border border-white/5 bg-black/30 p-3">
-              <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-zinc-400">App theme mapping</span>
-              <div className="mt-2 flex flex-col gap-2">
-                {appIds.map((appId) => (
-                  <label key={appId} className="grid grid-cols-[1fr_150px] items-center gap-2 text-xs text-zinc-200">
-                    <span>{appId}</span>
-                    <select
-                      value={appThemeMappings[appId] || 'follow-workspace'}
-                      onChange={(event) => updateAppThemeMapping(appId, event.target.value)}
-                      className="rounded-lg border border-white/10 bg-black/40 px-2 py-1.5 text-xs text-white outline-none"
-                    >
-                      {appThemeOptions.map((option) => <option key={option} value={option}>{option}</option>)}
-                    </select>
-                  </label>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Bottom preset cards */}
-      <div className="mt-6 pt-5 border-t border-white/5">
-        <span
-          className="text-[10px] font-mono tracking-wider font-bold uppercase block mb-3.5"
-          style={{ color: accentColor }}
-        >
-          ✦ Choose Theme Preset
-        </span>
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          {PRESETS.map((p) => {
-            const isActive = currentThemeId === p.id;
+      <div className="grid gap-5 lg:grid-cols-[220px_minmax(0,1fr)_250px]">
+        <nav className="flex gap-1 overflow-x-auto lg:flex-col" aria-label="Settings sections">
+          {SECTIONS.map(({ id, label, icon: Icon }) => {
+            const active = activeSection === id;
             return (
-              <motion.div
-                key={p.id}
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                onClick={() => onApplyThemePreset(p.id)}
-                className={`cursor-pointer rounded-2xl border p-3 flex items-center justify-between transition-all bg-black/40 ${
-                  isActive ? 'shadow-lg bg-white/[0.02]' : 'border-white/5 hover:border-white/10'
-                }`}
-                style={
-                  isActive
-                    ? {
-                        borderColor: accentColor,
-                        boxShadow: `0 0 15px ${accentColor}25`,
-                      }
-                    : undefined
-                }
-              >
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <div
-                    className={`w-7 h-7 rounded-lg bg-gradient-to-br ${p.color} flex-shrink-0 shadow-sm`}
-                  />
-                  <div className="flex flex-col min-w-0">
-                    <span className="text-xs font-bold text-white leading-none truncate">{p.name}</span>
-                    <span className="text-[9px] text-zinc-500 font-sans mt-1 leading-none truncate">
-                      {p.desc}
-                    </span>
-                  </div>
-                </div>
-                {isActive && (
-                  <span className="text-xs font-bold flex-shrink-0 ml-2" style={{ color: accentColor }}>
-                    ● ACTIVE
-                  </span>
-                )}
-              </motion.div>
+              <button key={id} type="button" onClick={() => setActiveSection(id)} className="flex shrink-0 items-center gap-2 rounded-xl border px-3 py-2.5 text-left text-[11px] font-bold transition lg:w-full" style={active ? { borderColor: `${accentColor}55`, backgroundColor: `${accentColor}18`, color: '#fff' } : { borderColor: 'transparent', color: '#a1a1aa' }}>
+                <Icon size={14} style={active ? { color: accentColor } : undefined} /> {label}
+              </button>
             );
           })}
-        </div>
+        </nav>
+
+        <motion.div key={activeSection} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} className="min-w-0">
+          {renderSection()}
+        </motion.div>
+
+        <aside className="space-y-3">
+          <div className="rounded-2xl border border-white/10 bg-black/55 p-4">
+            <div className="flex items-center justify-between text-[9px] font-black uppercase tracking-wider text-zinc-500"><span>Live preview</span><span style={{ color: accentColor }}>● Synced</span></div>
+            <div className="mt-4 overflow-hidden rounded-xl border border-white/10 bg-black/50" style={{ borderRadius: preferences.cornerRadius === 'full' ? 28 : preferences.cornerRadius === 'lg' ? 20 : preferences.cornerRadius === 'sm' ? 8 : 14 }}>
+              <div className="flex items-center gap-1.5 border-b border-white/10 p-2">
+                <span className="h-2 w-2 rounded-full" style={{ backgroundColor: accentColor }} />
+                <span className="h-1.5 w-14 rounded-full bg-white/10" />
+              </div>
+              <div className="grid grid-cols-[45px_1fr] gap-2 p-2">
+                <div className="space-y-2 rounded-lg border border-white/5 bg-white/[0.03] p-1.5">{[1, 2, 3, 4].map((item) => <span key={item} className="block h-2 rounded bg-white/10" />)}</div>
+                <div className="space-y-2">
+                  <div className="h-16 rounded-lg border p-2" style={{ borderColor: `${accentColor}45`, backgroundColor: `${accentColor}12`, boxShadow: preferences.borderGlow ? `0 0 ${preferences.glowIntensity / 5}px ${accentColor}28` : 'none' }}><span className="block h-2 w-2/3 rounded bg-white/20" /><span className="mt-2 block h-2 w-1/2 rounded bg-white/10" /></div>
+                  <div className="grid grid-cols-2 gap-2"><span className="h-10 rounded-lg bg-white/[0.04]" /><span className="h-10 rounded-lg bg-white/[0.04]" /></div>
+                </div>
+              </div>
+            </div>
+            <div className="mt-3 grid grid-cols-2 gap-2 text-[9px] text-zinc-500"><span>Density <b className="text-zinc-300">{preferences.uiDensity}</b></span><span>Text <b className="text-zinc-300">{preferences.textScale}</b></span><span>Motion <b className="text-zinc-300">{preferences.reduceMotion ? 'reduced' : 'active'}</b></span><span>Apps <b className="text-zinc-300">follow UI</b></span></div>
+          </div>
+          <div className="rounded-2xl border border-white/8 bg-white/[0.02] p-4">
+            <div className="flex items-center gap-2 text-xs font-black text-white"><MonitorCog size={15} style={{ color: accentColor }} /> Universal scope</div>
+            <p className="mt-2 text-[10px] leading-4 text-zinc-500">Global controls affect every app. Chat and voice controls remain stored everywhere and activate only where supported.</p>
+          </div>
+        </aside>
       </div>
     </div>
   );
