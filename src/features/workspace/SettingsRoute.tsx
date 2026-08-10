@@ -1,5 +1,5 @@
+import { useEffect } from 'react';
 import { motion } from 'motion/react';
-import SettingsPanel from '../../components/SettingsPanel';
 import type { UserPreferences } from '../../types';
 import type { usePortableWorkspace } from '../../hooks/usePortableWorkspace';
 
@@ -15,29 +15,29 @@ type SettingsRouteProps = {
 };
 
 function workspaceMessage(workspace: PortableWorkspaceController) {
-  if (workspace.status === 'signed-out') return 'Sign in with SPMT to sync themes and all three dock slots across devices.';
-  if (workspace.status === 'loading') return 'Loading the account-backed workspace…';
-  if (workspace.status === 'saving') return 'Saving this workspace to SPMT…';
-  if (workspace.status === 'unsaved') return 'Changes are waiting to save.';
-  if (workspace.status === 'saved') {
-    const savedAt = workspace.lastSavedAt
-      ? ` at ${new Date(workspace.lastSavedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`
-      : '';
-    return `Saved to SPMT${savedAt}.`;
-  }
-  if (workspace.status === 'offline') return 'Offline: changes are cached on this device and need a retry.';
-  if (workspace.status === 'conflict') return 'Another device saved a newer revision. Choose retry or reload.';
-  return 'The workspace could not be synchronized.';
+  if (workspace.status === 'signed-out') return 'Sign in with SPMT to edit the universal workspace.';
+  if (workspace.status === 'loading') return 'Loading the canonical SPMT workspace…';
+  if (workspace.status === 'saving') return 'Synchronizing with SPMT…';
+  if (workspace.status === 'saved') return 'SPMT is the source of truth. This SpaceMountain view is a consumer.';
+  if (workspace.status === 'offline') return 'SPMT is temporarily unavailable; the last loaded workspace remains visible.';
+  if (workspace.status === 'conflict') return 'A newer SPMT workspace revision exists. Reloading the canonical surface will resolve it.';
+  return 'The canonical workspace could not be synchronized.';
 }
 
 export default function SettingsRoute({
   identityPresent,
-  preferences,
-  accentColor,
   portableWorkspace,
-  onUpdatePreferences,
-  onApplyThemePreset,
 }: SettingsRouteProps) {
+  useEffect(() => {
+    const handleSurfaceUpdate = (event: MessageEvent) => {
+      if (event.origin !== 'https://spmt.live') return;
+      if (event.data?.type !== 'spmt.surface.updated' || event.data?.surface !== 'settings') return;
+      void portableWorkspace.reload();
+    };
+    window.addEventListener('message', handleSurfaceUpdate);
+    return () => window.removeEventListener('message', handleSurfaceUpdate);
+  }, [portableWorkspace]);
+
   const indicator = portableWorkspace.status === 'saved'
     ? 'bg-emerald-400'
     : portableWorkspace.status === 'saving' || portableWorkspace.status === 'loading'
@@ -53,41 +53,43 @@ export default function SettingsRoute({
           <div>
             <div className="flex items-center gap-2">
               <span className={`h-2.5 w-2.5 rounded-full ${indicator}`} />
-              <h3 className="text-sm font-bold text-white">Portable SPMT workspace</h3>
+              <h3 className="text-sm font-bold text-white">Universal SPMT workspace</h3>
             </div>
             <p className="mt-1 text-xs text-zinc-400">{workspaceMessage(portableWorkspace)}</p>
             {portableWorkspace.error && <p className="mt-2 text-xs text-red-300">{portableWorkspace.error}</p>}
           </div>
           <div className="flex flex-wrap gap-2">
-            {['offline', 'conflict', 'error'].includes(portableWorkspace.status) && (
-              <button type="button" onClick={portableWorkspace.retry} className="rounded-xl border border-amber-300/30 bg-amber-300/10 px-3 py-2 text-xs font-bold text-amber-100">Retry save</button>
-            )}
-            {portableWorkspace.status === 'conflict' && (
-              <button type="button" onClick={portableWorkspace.reload} className="rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-xs font-bold text-zinc-200">Use other device version</button>
-            )}
-            {identityPresent && portableWorkspace.loaded && (
-              <button
-                type="button"
-                onClick={() => {
-                  if (window.confirm('Reset the account workspace theme and all three dock slots to their defaults?')) void portableWorkspace.reset();
-                }}
-                disabled={portableWorkspace.status === 'saving' || portableWorkspace.status === 'loading'}
-                className="rounded-xl border border-red-400/20 bg-red-400/[0.06] px-3 py-2 text-xs font-bold text-red-200 disabled:opacity-40"
+            {identityPresent && (
+              <a
+                href="https://spmt.live/embed/settings?mode=full&app=spacemountain-live"
+                target="_blank"
+                rel="noreferrer"
+                className="rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-xs font-bold text-zinc-200 no-underline hover:text-white"
               >
-                Reset workspace
-              </button>
+                Open in SPMT
+              </a>
+            )}
+            {['offline', 'conflict', 'error'].includes(portableWorkspace.status) && (
+              <button type="button" onClick={portableWorkspace.reload} className="rounded-xl border border-amber-300/30 bg-amber-300/10 px-3 py-2 text-xs font-bold text-amber-100">Reload from SPMT</button>
             )}
           </div>
         </div>
       </div>
-      <SettingsPanel
-        preferences={preferences}
-        onUpdatePreferences={onUpdatePreferences}
-        onApplyThemePreset={onApplyThemePreset}
-        accentColor={accentColor}
-        workspaceProfile={portableWorkspace.profile}
-        onUpdateWorkspaceProfile={portableWorkspace.updateProfileFields}
-      />
+
+      {identityPresent ? (
+        <div className="overflow-hidden rounded-2xl border border-white/10 bg-black/35 shadow-2xl">
+          <iframe
+            src="https://spmt.live/embed/settings?mode=full&app=spacemountain-live"
+            title="Universal SPMT settings"
+            className="h-[min(74vh,900px)] min-h-[620px] w-full border-0 bg-black"
+            allow="clipboard-write"
+          />
+        </div>
+      ) : (
+        <div className="rounded-2xl border border-white/10 bg-black/35 p-8 text-center text-sm text-zinc-400">
+          Sign in with SPMT to load the universal workspace editor.
+        </div>
+      )}
     </motion.div>
   );
 }
