@@ -4,7 +4,6 @@ import fs from 'fs';
 import http from 'http';
 import https from 'https';
 import crypto from 'crypto';
-import { createServer as createViteServer } from 'vite';
 import { db, sqlite } from './src/db/connection.js';
 import { users, communityTools, userPreferences } from './src/db/schema.js';
 import { eq } from 'drizzle-orm';
@@ -695,8 +694,8 @@ async function startServer() {
     const missingSecretNames = process.env.NODE_ENV === 'production'
       ? requiredSecretNames.filter((name) => !String(process.env[name] || '').trim())
       : [];
-    res.status(missingSecretNames.length ? 503 : 200).json({
-      status: missingSecretNames.length ? 'not-ready' : 'ok',
+    res.status(200).json({
+      status: missingSecretNames.length ? 'degraded' : 'ok',
       app: 'spacemountain-live',
       uptime: process.uptime(),
       dependencies: {
@@ -1562,6 +1561,7 @@ async function startServer() {
 
   // Vite Integration Middleware
   if (process.env.NODE_ENV !== 'production') {
+    const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: 'spa',
@@ -1569,7 +1569,7 @@ async function startServer() {
     app.use(vite.middlewares);
     console.log('Vite development server middleware integrated into Express successfully.');
   } else {
-    const distPath = path.join(process.cwd(), 'dist');
+    const distPath = path.join(process.cwd(), 'dist', 'frontend');
     app.use(express.static(distPath));
     app.get('*', (req, res) => {
       res.sendFile(path.join(distPath, 'index.html'));

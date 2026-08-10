@@ -858,9 +858,10 @@ export default function App() {
   });
 
   const mergeSpmtAppsIntoTools = React.useCallback((localTools: CommunityTool[], apps: any[]) => {
-    if (!apps.length) return localTools;
+    const safeLocalTools = Array.isArray(localTools) ? localTools : [];
+    if (!apps.length) return safeLocalTools;
     const appMap = new Map(apps.map((app) => [normalizeSpmtAppId(String(app.id)), app]));
-    const merged = localTools.map((tool) => {
+    const merged = safeLocalTools.map((tool) => {
       const app = appMap.get(tool.id);
       if (!app) return tool;
       return {
@@ -1027,6 +1028,10 @@ export default function App() {
   };
 
   const refreshPlatformEvents = useCallback(async () => {
+    if (!identity) {
+      setPlatformEventsListening(false);
+      return;
+    }
     const token = getStoredSpmtToken();
     if (!token) {
       setPlatformEventsListening(false);
@@ -1043,7 +1048,7 @@ export default function App() {
     setPlatformEvents(Array.isArray(data?.events) ? data.events : []);
     setPlatformEventsCheckedAt(new Date().toISOString());
     setPlatformEventsListening(true);
-  }, []);
+  }, [identity]);
 
   useEffect(() => {
     let stopped = false;
@@ -1078,6 +1083,12 @@ export default function App() {
   }, [refreshPlatformEvents]);
 
   const refreshSpmtInbox = async () => {
+    if (!identity) {
+      setMails([]);
+      setCommlinkNotifications([]);
+      setPlatformEvents([]);
+      return;
+    }
     const token = getStoredSpmtToken();
     if (token) {
       const [conversationResponse, notificationResponse, eventResponse] = await Promise.all([
@@ -1702,9 +1713,10 @@ export default function App() {
 
     // 2. Fetch live app registry/tools
     fetch('/api/tools')
-      .then(res => res.json())
-      .then((data: CommunityTool[]) => {
-        setTools(mergeSpmtAppsIntoTools(data, spmtApps));
+      .then(async res => res.ok ? res.json() : [])
+      .then((data: unknown) => {
+        const nextTools = Array.isArray(data) ? data : [];
+        setTools(mergeSpmtAppsIntoTools(nextTools, spmtApps));
       })
       .catch(err => console.error('Tools fetch failed:', err));
 
