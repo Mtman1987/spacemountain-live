@@ -162,6 +162,8 @@ export interface UserProfile {
 export interface UserPreferences {
   userId: string;
   theme: string;
+  accentColor: string | null;
+  accentSaturation: number;
   glowIntensity: number;
   starDensity: number;
   shootingStars: boolean;
@@ -172,6 +174,8 @@ export interface UserPreferences {
   parallaxDepth: number;
   uiDensity: 'compact' | 'comfortable' | 'spacious';
   borderStrength: number;
+  borderGlow: boolean;
+  hoverGlow: boolean;
   cornerRadius: 'sm' | 'md' | 'lg' | 'full';
   sidebarStyle: 'docked' | 'floating' | 'hidden';
   sidebarPosition: 'left' | 'right';
@@ -185,6 +189,14 @@ export interface UserPreferences {
   smoothTransitions: boolean;
   animationSpeed: number;
   pushToTalk: boolean;
+  pushToTalkKey: string;
+  micButtonStyle: 'filled' | 'outline' | 'minimal';
+  voiceWaveStyle: 'bars' | 'wave' | 'pulse';
+  highContrast: boolean;
+  colorVisionMode: 'default' | 'deuteranopia' | 'protanopia' | 'tritanopia';
+  textScale: 'sm' | 'md' | 'lg';
+  reduceMotion: boolean;
+  focusHighlight: boolean;
 }
 
 export type EmbeddedAppTarget = {
@@ -200,8 +212,10 @@ export type EmbedSlot = EmbeddedAppTarget & {
   muted: boolean;
 };
 
-export type WorkspaceAppearanceV1 = {
+export type WorkspaceAppearanceV2 = {
   themeId: string;
+  accentColor?: string | null;
+  accentSaturation?: number;
   glowIntensity: number;
   starDensity: number;
   glassOpacity: number;
@@ -209,6 +223,8 @@ export type WorkspaceAppearanceV1 = {
   nebulaIntensity: number;
   parallaxDepth: number;
   borderStrength: number;
+  borderGlow?: boolean;
+  hoverGlow?: boolean;
   cornerRadius: UserPreferences['cornerRadius'];
   density: UserPreferences['uiDensity'];
   sidebarCollapsed: boolean;
@@ -221,12 +237,33 @@ export type WorkspaceAppearanceV1 = {
   showAvatars: boolean;
   smoothTransitions: boolean;
   pushToTalk: boolean;
+  pushToTalkKey?: string;
+  micButtonStyle?: UserPreferences['micButtonStyle'];
+  voiceWaveStyle?: UserPreferences['voiceWaveStyle'];
+  accessibility?: {
+    highContrast: boolean;
+    colorVisionMode: UserPreferences['colorVisionMode'];
+    textScale: UserPreferences['textScale'];
+    reduceMotion: boolean;
+    focusHighlight: boolean;
+  };
   animation: {
     enabled: boolean;
     speed: number;
     particles: boolean;
     shootingStars: boolean;
   };
+};
+
+// V1 profiles remain readable; missing V2 fields are hydrated from defaults.
+export type WorkspaceAppearanceV1 = WorkspaceAppearanceV2;
+
+export type SavedWorkspaceTheme = {
+  id: string;
+  name: string;
+  appearance: WorkspaceAppearanceV1;
+  createdAt: string;
+  updatedAt: string;
 };
 
 export type WorkspaceDockSlotV1 = {
@@ -241,10 +278,11 @@ export type WorkspaceDockSlotV1 = {
 export type WorkspaceProfileV1 = {
   schemaVersion: 1;
   revision: number;
-  appearance: WorkspaceAppearanceV1;
+  appearance: WorkspaceAppearanceV2;
   dockSlots: WorkspaceDockSlotV1[];
   activeOverlaySceneId: string | null;
   ttsSubscriptions: string[];
   appThemeMappings: Record<string, string>;
+  savedThemes?: SavedWorkspaceTheme[];
   updatedAt: string;
 };
