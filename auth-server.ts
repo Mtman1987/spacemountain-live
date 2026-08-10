@@ -146,7 +146,14 @@ gateway.on('upgrade', (request, socket, head) => {
 });
 
 process.env.PORT = String(INTERNAL_PORT);
-await import('./server.js');
-gateway.listen(PUBLIC_PORT, '0.0.0.0', () => {
-  console.log(`SpaceMountain SPMT auth gateway listening on ${PUBLIC_PORT}; app on ${INTERNAL_PORT}`);
+async function startGateway() {
+  await import('./server.js');
+  gateway.listen(PUBLIC_PORT, '0.0.0.0', () => {
+    console.log(`SpaceMountain SPMT auth gateway listening on ${PUBLIC_PORT}; app on ${INTERNAL_PORT}`);
+  });
+}
+
+void startGateway().catch((error) => {
+  console.error('SpaceMountain SPMT auth gateway failed to start', error);
+  process.exitCode = 1;
 });

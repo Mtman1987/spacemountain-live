@@ -9,7 +9,7 @@ import {
 } from '../src/lib/workspace-profile';
 import type { EmbedSlot, UserPreferences, WorkspaceProfileV1 } from '../src/types';
 import { buildSpmtProxyHeaders } from '../src/lib/spmt-proxy';
-import { appSurfaces, normalizeAppSurface } from '../src/lib/app-surfaces';
+import { appSurfaces, buildAppSurfaceUrl, normalizeAppSurface } from '../src/lib/app-surfaces';
 import { parseCanonicalXpBalance } from '../src/lib/canonical-xp';
 
 const preferences: UserPreferences = {
@@ -81,18 +81,29 @@ assert.equal(proxyHeaders.cookie, undefined);
 
 assert.deepEqual(
   normalizeAppSurface('StreamWeaver Commands', 'https://streamweaver-new.fly.dev/login?next=%2Fcommands'),
-  { title: 'StreamWeaver Commands', url: appSurfaces.streamweaver.commands },
+  { title: 'StreamWeaver Commands', url: appSurfaces.streamweaver.commands, valid: true, error: null },
 );
 assert.deepEqual(
   normalizeAppSurface('Quackverse Game', 'https://spacemountain.live/chat-tag/quackverse'),
-  { title: 'Quackverse Game', url: appSurfaces.chatTag.quackverse },
+  { title: 'Quackverse Game', url: appSurfaces.chatTag.quackverse, valid: true, error: null },
 );
 assert.deepEqual(
   normalizeAppSurface('ChatTag Overlay', 'https://streamweaver-new.fly.dev/tts-player?tenant=94371378'),
-  { title: 'All-Tenant TTS Studio', url: `${appSurfaces.streamweaver.ttsMixer}?streams=94371378` },
+  { title: 'All-Tenant TTS Studio', url: `${appSurfaces.streamweaver.ttsMixer}?streams=94371378`, valid: true, error: null },
 );
+
+const scopedSurface = buildAppSurfaceUrl('http://0.0.0.0:3000/shared-chat', 'Commlink Live Chat', {
+  tenantId: 'tenant-42',
+  scopes: ['workspace:read', 'identity:read'],
+  embed: true,
+});
+assert.equal(scopedSurface.valid, true);
+assert.equal(new URL(scopedSurface.url).origin, 'https://streamweaver-new.fly.dev');
+assert.equal(new URL(scopedSurface.url).searchParams.get('tenant'), 'tenant-42');
+assert.equal(new URL(scopedSurface.url).searchParams.get('scopes'), 'identity:read,workspace:read');
+assert.equal(buildAppSurfaceUrl('http://localhost:9999/unknown', 'Unknown').valid, false);
 
 assert.deepEqual(parseCanonicalXpBalance({ xp: 625, level: 3 }), { xp: 625, level: 3 });
 assert.equal(parseCanonicalXpBalance({ xp: 'not-a-number', level: 3 }), null);
 
-console.log(JSON.stringify({ status: 'passed', checks: 18 }));
+console.log(JSON.stringify({ status: 'passed', checks: 23 }));
