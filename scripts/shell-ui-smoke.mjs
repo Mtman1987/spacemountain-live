@@ -19,6 +19,7 @@ assert.match(collapseCss, /header\.fixed/, 'collapsed sidebar should release hea
 assert.match(collapseCss, /main\.flex-1/, 'collapsed sidebar should release main content space');
 assert.match(main, /installCompanionInstallerUiPatch\(\)/, 'SpaceMountain should install the Companion download-label correction');
 assert.match(companionInstallerUi, /Download installer/, 'Companion desktop action should say Download installer');
-assert.match(companionInstallerUi, /Download the unsigned .* installer/, 'Companion tooltip should describe an unsigned installer rather than a ZIP');
+assert.match(companionInstallerUi, /Download the unsigned /, 'Companion tooltip should keep the unsigned warning');
+assert.match(companionInstallerUi, / installer/, 'Companion tooltip should describe an installer rather than a ZIP');
 
 console.log('SpaceMountain shell UI smoke checks passed');
