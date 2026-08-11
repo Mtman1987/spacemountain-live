@@ -46,6 +46,11 @@ export default function HomeRoute({
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_15%_15%,var(--theme-glow-color-quarter),transparent_34%)]" />
         <div className="relative grid items-center gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(360px,0.72fr)]">
           <div>
+            <img
+              src="/assets/space-logo-main.png"
+              alt="SpaceMountain.live"
+              className="mb-5 h-16 w-auto max-w-[80vw] object-contain drop-shadow-[0_0_24px_var(--theme-glow-color-alpha)] md:h-20"
+            />
             <div className="inline-flex items-center gap-2 rounded-full border border-[color:var(--theme-surface-border)] bg-black/35 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.18em] text-zinc-200">
               <Sparkles size={13} style={{ color: theme.secondaryHex }} />
               {identity ? `${theme.name} workspace` : 'The universe online'}
