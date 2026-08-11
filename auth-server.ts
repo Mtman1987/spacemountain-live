@@ -1,3 +1,4 @@
+import crypto from 'node:crypto';
 import http from 'node:http';
 import net from 'node:net';
 
@@ -23,6 +24,19 @@ function cookieValue(header: string | undefined, name: string) {
   return '';
 }
 
+function safeLocalReturnPath(value: unknown) {
+  const raw = String(value || '').trim();
+  if (!raw.startsWith('/') || raw.startsWith('//')) return '/';
+  try {
+    const parsed = new URL(raw, 'https://spacemountain.live');
+    return parsed.origin === 'https://spacemountain.live'
+      ? `${parsed.pathname}${parsed.search}${parsed.hash}`
+      : '/';
+  } catch {
+    return '/';
+  }
+}
+
 function identityIsAdmin(identity: any) {
   if (identity?.isAdmin === true || identity?.is_admin === true || identity?.is_admin === 1) return true;
   const role = String(identity?.role || '').toLowerCase();
@@ -38,6 +52,46 @@ function appendSetCookie(response: http.ServerResponse, value: string) {
 
 function setSessionCookie(response: http.ServerResponse, name: string, value: string, maxAge: number) {
   appendSetCookie(response, `${name}=${encodeURIComponent(value)}; Max-Age=${Math.max(0, Math.floor(maxAge))}; Path=/; HttpOnly; Secure; SameSite=Lax`);
+}
+
+function sendLoginPage(response: http.ServerResponse, returnPath: string) {
+  const continueUrl = `/auth/continue?return=${encodeURIComponent(returnPath)}`;
+  const html = `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Welcome to SpaceMountain.live</title>
+  <style>
+    *{box-sizing:border-box}html{color-scheme:dark}body{margin:0;min-height:100vh;color:#f8fafc;font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#03050b;overflow-x:hidden}body:before{content:"";position:fixed;inset:-3%;z-index:-2;background-image:linear-gradient(180deg,rgba(2,6,18,.24),rgba(2,6,18,.72)),url('/assets/theme-solar-flare-background.webp');background-size:cover;background-position:center;filter:saturate(1.05) brightness(.9)}body:after{content:"";position:fixed;inset:0;z-index:-1;background:radial-gradient(circle at 22% 18%,rgba(249,115,22,.18),transparent 30rem),radial-gradient(circle at 80% 72%,rgba(251,191,36,.1),transparent 28rem)}a{text-decoration:none}.page{width:min(1160px,calc(100% - 32px));margin:0 auto;padding:6vh 0}.hero{position:relative;overflow:hidden;display:grid;grid-template-columns:minmax(0,1fr) minmax(260px,.72fr);gap:34px;align-items:center;border:1px solid rgba(249,115,22,.28);border-radius:26px;padding:clamp(28px,5vw,54px);background:linear-gradient(135deg,rgba(249,115,22,.12),rgba(0,0,0,.12)),rgba(6,8,20,.46);backdrop-filter:blur(24px);box-shadow:0 28px 90px rgba(0,0,0,.42),0 0 34px rgba(249,115,22,.12)}.hero:before{content:"";position:absolute;inset:0;background:radial-gradient(circle at 15% 15%,rgba(249,115,22,.2),transparent 36%);pointer-events:none}.copy,.art{position:relative;z-index:1}.logo{width:min(340px,78vw);max-height:150px;object-fit:contain;filter:drop-shadow(0 0 24px rgba(249,115,22,.34))}.kicker{display:inline-flex;align-items:center;gap:8px;margin-top:20px;border:1px solid rgba(249,115,22,.25);border-radius:999px;background:rgba(0,0,0,.28);padding:7px 11px;color:#e8edf5;font-size:10px;font-weight:900;letter-spacing:.17em;text-transform:uppercase}.kicker:before{content:"";width:7px;height:7px;border-radius:50%;background:#f97316;box-shadow:0 0 12px #f97316}h1{margin:16px 0 0;max-width:720px;font-size:clamp(36px,6vw,68px);line-height:.98;letter-spacing:-.05em}p{max-width:680px;margin:18px 0 0;color:#b2bccd;font-size:clamp(14px,2vw,17px);line-height:1.7}.actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:24px}.button{display:inline-flex;align-items:center;justify-content:center;min-height:44px;border:1px solid rgba(255,255,255,.12);border-radius:13px;padding:10px 16px;background:rgba(255,255,255,.04);color:#f8fafc;font-size:13px;font-weight:900}.button.primary{border-color:transparent;background:linear-gradient(135deg,#f97316,#fbbf24);color:#090b10;box-shadow:0 10px 28px rgba(249,115,22,.2)}.art{display:grid;place-items:center}.rocket-wrap{width:min(280px,68vw);aspect-ratio:1;border:1px solid rgba(249,115,22,.2);border-radius:50%;display:grid;place-items:center;background:radial-gradient(circle,rgba(249,115,22,.14),rgba(0,0,0,.12) 58%,rgba(0,0,0,.28));box-shadow:inset 0 0 70px rgba(0,0,0,.55),0 0 44px rgba(249,115,22,.1)}.rocket{width:64%;height:64%;object-fit:contain;filter:drop-shadow(0 0 24px rgba(249,115,22,.55))}.note{margin-top:18px;text-align:center;color:#798296;font-size:11px}.note a{color:#c7ceda}.note a:hover{color:white}@media(max-width:800px){.page{padding:20px 0}.hero{grid-template-columns:1fr;padding:26px}.art{order:-1}.rocket-wrap{width:150px}.logo{max-height:92px}}
+  </style>
+</head>
+<body>
+  <main class="page">
+    <section class="hero" aria-labelledby="welcome-title">
+      <div class="copy">
+        <img class="logo" src="/assets/space-logo-main.png" alt="SpaceMountain.live">
+        <span class="kicker">One SPMT identity · every SpaceMountain app</span>
+        <h1 id="welcome-title">Welcome to your SpaceMountain.</h1>
+        <p>Sign in once through SPMT and your identity, workspace appearance, Worktray, overlays, messages, and connected creator apps come with you.</p>
+        <div class="actions">
+          <a class="button primary" href="${continueUrl}">Continue with SPMT</a>
+          <a class="button" href="/docs.html">Open Docs</a>
+          <a class="button" href="https://spmt.live">Open SPMT</a>
+        </div>
+      </div>
+      <div class="art" aria-hidden="true"><div class="rocket-wrap"><img class="rocket" src="/assets/model-rocket.png" alt=""></div></div>
+    </section>
+    <div class="note">SPMT is the account and workspace source of truth for SpaceMountain.live.</div>
+  </main>
+</body>
+</html>`;
+  response.writeHead(200, {
+    'content-type': 'text/html; charset=utf-8',
+    'cache-control': 'no-store',
+    'content-security-policy': "default-src 'self' https://spmt.live; img-src 'self' data: https:; style-src 'unsafe-inline'; frame-ancestors 'self'",
+  });
+  response.end(html);
 }
 
 async function fetchIdentity(token: string) {
@@ -111,6 +165,25 @@ function forward(request: http.IncomingMessage, response: http.ServerResponse, i
 const gateway = http.createServer(async (request, response) => {
   const url = new URL(request.url || '/', `http://${request.headers.host || 'localhost'}`);
   const pathname = url.pathname;
+
+  if (pathname === '/auth/login') {
+    return sendLoginPage(response, safeLocalReturnPath(url.searchParams.get('return')));
+  }
+
+  if (pathname === '/auth/continue') {
+    const state = crypto.randomBytes(24).toString('base64url');
+    const returnPath = safeLocalReturnPath(url.searchParams.get('return'));
+    setSessionCookie(response, 'spacemountain_oauth_state', state, 10 * 60);
+    setSessionCookie(response, 'spacemountain_oauth_return', returnPath, 10 * 60);
+    const callbackUrl = 'https://spacemountain.live/auth/callback';
+    const authorizePath = `/api/oauth/authorize?client_id=${encodeURIComponent(SPMT_CLIENT_ID)}&redirect_uri=${encodeURIComponent(callbackUrl)}&state=${encodeURIComponent(state)}`;
+    response.writeHead(302, {
+      location: `${SPMT_BASE_URL}/?return=${encodeURIComponent(authorizePath)}`,
+      'cache-control': 'no-store',
+    });
+    return response.end();
+  }
+
   if (PUBLIC_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(prefix)) || MACHINE_PREFIXES.some((prefix) => pathname.startsWith(prefix)) || isStatic(pathname)) {
     return forward(request, response, null);
   }

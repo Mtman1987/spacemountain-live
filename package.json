@@ -12,7 +12,8 @@
     "start": "node dist/server.cjs",
     "lint": "tsc --noEmit",
     "test:workspace": "tsx scripts/workspace-profile-smoke.ts",
-    "test": "npm run lint && npm run test:workspace && npm run build"
+    "test:shell": "node scripts/shell-ui-smoke.mjs",
+    "test": "npm run lint && npm run test:workspace && npm run test:shell && npm run build"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",

@@ -1,0 +1,99 @@
+body.sm-sidebar-collapsed .dock-panel.static-dock {
+  width: 76px !important;
+  padding-inline: 0.3rem !important;
+  border-radius: 40px !important;
+}
+
+body.sm-sidebar-collapsed .dock-panel.static-dock .dock-top-circle {
+  width: 56px !important;
+  height: 56px !important;
+}
+
+body.sm-sidebar-collapsed .dock-panel.static-dock .dock-top-circle img {
+  width: 48px !important;
+  height: 48px !important;
+}
+
+body.sm-sidebar-collapsed .dock-panel.static-dock nav button {
+  justify-content: center !important;
+  gap: 0 !important;
+  padding-inline: 0.5rem !important;
+}
+
+body.sm-sidebar-collapsed .dock-panel.static-dock .dock-nav-label,
+body.sm-sidebar-collapsed .dock-panel.static-dock .dock-profile-details,
+body.sm-sidebar-collapsed .dock-panel.static-dock .dock-profile-chevron,
+body.sm-sidebar-collapsed .dock-panel.static-dock .dock-guest-copy {
+  display: none !important;
+}
+
+body.sm-sidebar-collapsed .dock-panel.static-dock .dock-profile-button {
+  padding-inline: 0 !important;
+}
+
+body.sm-sidebar-collapsed .dock-panel.static-dock .dock-profile-avatar {
+  width: 52px !important;
+  height: 52px !important;
+}
+
+.dock-collapse-toggle {
+  position: absolute;
+  top: 96px;
+  right: -13px;
+  z-index: 8;
+  width: 27px;
+  height: 27px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  border: 1px solid var(--theme-surface-border, rgba(255,255,255,.12)) !important;
+  background: rgba(5, 8, 18, 0.9) !important;
+  color: #d4d4d8 !important;
+  box-shadow: 0 8px 24px rgba(0,0,0,.35), 0 0 14px var(--theme-glow-color-quarter, rgba(249,115,22,.15));
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  transition: transform 160ms ease, color 160ms ease, border-color 160ms ease;
+}
+
+.dock-panel.dock-right .dock-collapse-toggle {
+  right: auto;
+  left: -13px;
+}
+
+.dock-collapse-toggle:hover {
+  color: #fff !important;
+  border-color: var(--theme-glow-color-half, rgba(249,115,22,.45)) !important;
+  transform: scale(1.05);
+}
+
+body.sm-sidebar-collapsed:not(.sm-sidebar-right) header.fixed {
+  left: 96px !important;
+}
+
+body.sm-sidebar-collapsed:not(.sm-sidebar-right) main.flex-1 {
+  padding-left: 96px !important;
+}
+
+body.sm-sidebar-collapsed.sm-sidebar-right header.fixed {
+  right: 96px !important;
+}
+
+body.sm-sidebar-collapsed.sm-sidebar-right main.flex-1 {
+  padding-right: 96px !important;
+}
+
+@media (max-width: 900px) {
+  .dock-collapse-toggle {
+    display: none !important;
+  }
+
+  body.sm-sidebar-collapsed header.fixed {
+    left: 24px !important;
+    right: 24px !important;
+  }
+
+  body.sm-sidebar-collapsed main.flex-1 {
+    padding-left: 24px !important;
+    padding-right: 24px !important;
+  }
+}

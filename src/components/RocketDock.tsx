@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
-  Home, Mail, MessageSquare, Settings, HelpCircle, ChevronDown, ChevronUp, Users, Workflow, Compass, Award, ChevronRight, Check, ShoppingCart
+  Home, Mail, MessageSquare, Settings, HelpCircle, ChevronDown, ChevronUp, Users, Workflow, Compass, Award, ChevronRight, ChevronLeft, Check, ShoppingCart
 } from 'lucide-react';
 import { UserProfile, UserPreferences } from '../types';
 import { THEME_PRESET_LIST } from '../lib/theme-presets';
@@ -31,8 +31,8 @@ export default function RocketDock({
   instanceId,
   onApplyThemePreset
 }: RocketDockProps) {
-  // Profile dropdown state
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(Boolean(preferences?.sidebarCollapsed));
 
   const currentXp = identity?.xp || 0;
   const currentLevel = identity?.level || 1;
@@ -40,6 +40,59 @@ export default function RocketDock({
   const dockSide = preferences?.sidebarPosition || 'left';
   const sidebarStyle = preferences?.sidebarStyle || 'docked';
   const hideStaticDock = !isFloating && sidebarStyle === 'hidden';
+
+  useEffect(() => {
+    setSidebarCollapsed(Boolean(preferences?.sidebarCollapsed));
+  }, [preferences?.sidebarCollapsed]);
+
+  useEffect(() => {
+    if (isFloating) return;
+    document.body.classList.toggle('sm-sidebar-collapsed', sidebarCollapsed && sidebarStyle !== 'hidden');
+    document.body.classList.toggle('sm-sidebar-right', dockSide === 'right');
+    return () => {
+      document.body.classList.remove('sm-sidebar-collapsed', 'sm-sidebar-right');
+    };
+  }, [dockSide, isFloating, sidebarCollapsed, sidebarStyle]);
+
+  const persistSidebarCollapsed = async (nextCollapsed: boolean) => {
+    if (!identity) return;
+    try {
+      const profileResponse = await fetch('/api/spmt/api/workspace-profile', {
+        credentials: 'include',
+        headers: { Accept: 'application/json' },
+        cache: 'no-store',
+      });
+      if (!profileResponse.ok) return;
+      const data = await profileResponse.json();
+      const profile = data?.profile;
+      if (!profile) return;
+      const draft = {
+        appearance: { ...profile.appearance, sidebarCollapsed: nextCollapsed },
+        dockSlots: profile.dockSlots || [],
+        activeOverlaySceneId: profile.activeOverlaySceneId ?? null,
+        ttsSubscriptions: profile.ttsSubscriptions || [],
+        appThemeMappings: profile.appThemeMappings || {},
+        savedThemes: profile.savedThemes || [],
+      };
+      const response = await fetch('/api/spmt/api/workspace-profile', {
+        method: 'PATCH',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+          'If-Match': profileResponse.headers.get('etag') || `"workspace-${profile.revision}"`,
+        },
+        body: JSON.stringify({ profile: draft }),
+      });
+      if (response.ok) window.dispatchEvent(new CustomEvent('spmt:workspace-refresh'));
+    } catch {}
+  };
+
+  const toggleSidebarCollapsed = () => {
+    const next = !sidebarCollapsed;
+    setSidebarCollapsed(next);
+    void persistSidebarCollapsed(next);
+  };
 
   const tabs = [
     { id: 'dashboard', label: 'Home', icon: <Home size={15} /> },
@@ -53,9 +106,8 @@ export default function RocketDock({
     { id: 'help', label: 'Help', icon: <HelpCircle size={15} /> },
   ];
 
-const realAvatar = '/assets/astronaut-avatar.jpg';
+  const realAvatar = '/assets/astronaut-avatar.jpg';
 
-  // 2. Full Active Sidebar (Docked Static Left Sidebar OR Flying Floating Sidebar)
   return (
     <aside 
       className={`dock-panel glass-card flex flex-col gap-2 ${
@@ -68,6 +120,8 @@ const realAvatar = '/assets/astronaut-avatar.jpg';
         !isFloating && sidebarStyle === 'floating' ? 'dock-style-floating' : ''
       } ${
         hideStaticDock ? 'dock-hidden' : ''
+      } ${
+        !isFloating && sidebarCollapsed ? 'dock-collapsed' : ''
       }`}
       style={{
         left: !isFloating && dockSide === 'right' ? 'auto' : undefined,
@@ -76,7 +130,6 @@ const realAvatar = '/assets/astronaut-avatar.jpg';
       id={instanceId || (isFloating ? 'floatingDockPanel' : 'staticDockPanel')}
       aria-label="Movable station dock"
     >
-      {/* A. Top Area: Drag Handle (Floating Mode) */}
       {isFloating && (
         <div className="flex items-center justify-between px-1.5 pb-1.5 border-b border-white/10 cursor-move shrink-0" id="dockHandle">
           <span className="text-[8px] font-mono font-black tracking-widest text-zinc-400 uppercase">DRAG</span>
@@ -90,7 +143,21 @@ const realAvatar = '/assets/astronaut-avatar.jpg';
         </div>
       )}
 
-      {/* B. Top Circle: landing pad while docked, profile pod while rocket is flying */}
+      {!isFloating && !hideStaticDock && (
+        <button
+          type="button"
+          className="dock-collapse-toggle"
+          onClick={toggleSidebarCollapsed}
+          title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          aria-pressed={sidebarCollapsed}
+        >
+          {sidebarCollapsed
+            ? (dockSide === 'right' ? <ChevronLeft size={14} /> : <ChevronRight size={14} />)
+            : (dockSide === 'right' ? <ChevronRight size={14} /> : <ChevronLeft size={14} />)}
+        </button>
+      )}
+
       {!isFloating && (
         <div 
           className={`dock-top-circle relative w-full h-[88px] flex flex-col items-center justify-center overflow-visible mb-1 shrink-0 ${showTopProfilePod ? 'profile-mode' : 'landing-mode'}`}
@@ -113,7 +180,6 @@ const realAvatar = '/assets/astronaut-avatar.jpg';
         </div>
       )}
 
-      {/* C. Navigation Links (Fills the remaining height) */}
       <div className="flex-1 flex flex-col gap-1 overflow-hidden pr-0.5 scrollbar-none">
         <nav className="flex flex-col gap-0.5 w-full">
           {tabs.map((tab) => {
@@ -142,7 +208,7 @@ const realAvatar = '/assets/astronaut-avatar.jpg';
                 >
                   {tab.icon}
                 </div>
-                <span className="tracking-tight truncate">
+                <span className="dock-nav-label tracking-tight truncate">
                   {tab.label}
                 </span>
               </button>
@@ -151,17 +217,15 @@ const realAvatar = '/assets/astronaut-avatar.jpg';
         </nav>
       </div>
 
-      {/* D. Compact Profile & Internal Pop-up Cockpit (Placed at the bottom) */}
       {identity ? (
       <div className="relative mt-auto shrink-0 flex flex-col items-center justify-center pb-2 pt-1 z-50">
         <button
           onClick={() => setIsProfileOpen(!isProfileOpen)}
-          className="flex flex-col items-center gap-1.5 p-1.5 w-full justify-center rounded-2xl hover:bg-white/5 transition-all group shrink-0 text-center focus:outline-none cursor-pointer"
+          className="dock-profile-button flex flex-col items-center gap-1.5 p-1.5 w-full justify-center rounded-2xl hover:bg-white/5 transition-all group shrink-0 text-center focus:outline-none cursor-pointer"
           title="Profile & Quick Actions"
         >
-          {/* Circular avatar with glowing border */}
           <div 
-            className="w-[76px] h-[76px] rounded-full p-0.5 transition-all duration-300 relative shrink-0"
+            className="dock-profile-avatar w-[76px] h-[76px] rounded-full p-0.5 transition-all duration-300 relative shrink-0"
             style={{
               background: `linear-gradient(135deg, ${accentColor}, transparent)`
             }}
@@ -177,8 +241,7 @@ const realAvatar = '/assets/astronaut-avatar.jpg';
             <span className="absolute bottom-1 right-1 w-3 h-3 bg-emerald-500 rounded-full border border-[#090b14]" />
           </div>
 
-          {/* Pilot details vertically stacked below avatar */}
-          <div className="flex flex-col items-center leading-none min-w-0 select-none w-full">
+          <div className="dock-profile-details flex flex-col items-center leading-none min-w-0 select-none w-full">
             <span className="text-[10px] font-sans font-black text-white group-hover:text-amber-400 transition-colors truncate max-w-[100px] text-center">
               {identity?.displayName || 'Guest Captain'}
             </span>
@@ -201,7 +264,7 @@ const realAvatar = '/assets/astronaut-avatar.jpg';
               </span>
             </div>
           </div>
-          <div className="text-zinc-500 group-hover:text-white transition-colors shrink-0 mt-0">
+          <div className="dock-profile-chevron text-zinc-500 group-hover:text-white transition-colors shrink-0 mt-0">
             {isProfileOpen ? <ChevronUp size={10} /> : <ChevronDown size={10} />}
           </div>
         </button>
@@ -215,7 +278,6 @@ const realAvatar = '/assets/astronaut-avatar.jpg';
               transition={{ duration: 0.15, ease: 'easeOut' }}
               className="absolute bottom-[130px] left-0.5 right-0.5 z-50 overflow-hidden flex flex-col p-2 gap-2.5 bg-[#0a0c16]/95 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl w-[114px]"
             >
-              {/* Telemetry Analytics */}
               <div className="flex flex-col gap-0.5 w-full select-none text-[8px] font-mono leading-none">
                 <span className="text-[7px] font-mono tracking-widest text-zinc-500 font-bold block uppercase leading-none mb-1">
                   TELEMETRY
@@ -234,7 +296,6 @@ const realAvatar = '/assets/astronaut-avatar.jpg';
                 </div>
               </div>
 
-              {/* Quick Pick Theme/Travel Locations */}
               <div className="flex flex-col gap-1 border-t border-white/5 pt-1.5 w-full">
                 <span className="text-[7px] font-mono tracking-widest text-zinc-500 font-bold block uppercase leading-none mb-1">
                   LAUNCH TO
@@ -265,8 +326,8 @@ const realAvatar = '/assets/astronaut-avatar.jpg';
           <div className="w-[50px] h-[50px] rounded-full border border-white/10 flex items-center justify-center text-lg bg-zinc-900">
             🚀
           </div>
-          <span className="text-[9px] font-mono font-bold tracking-wider" style={{ color: accentColor }}>SIGN IN</span>
-          <span className="text-[8px] text-zinc-500">with spmt.live</span>
+          <span className="dock-guest-copy text-[9px] font-mono font-bold tracking-wider" style={{ color: accentColor }}>SIGN IN</span>
+          <span className="dock-guest-copy text-[8px] text-zinc-500">with spmt.live</span>
         </a>
       </div>
       )}
