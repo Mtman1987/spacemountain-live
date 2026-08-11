@@ -8,6 +8,10 @@ if (new URLSearchParams(window.location.search).get('desktopOverlay') === '1') {
   document.documentElement.dataset.companionOverlay = 'true';
 }
 
+window.addEventListener('spmt:workspace-refresh', () => {
+  window.location.reload();
+});
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <App />
