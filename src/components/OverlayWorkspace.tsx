@@ -63,22 +63,28 @@ export default function OverlayWorkspace({
 
   useEffect(() => {
     let cancelled = false;
+    let retryTimer = 0;
     const load = async () => {
       try {
         const response = await fetch('/api/spmt/api/tenant-scene?output=personal', {
           credentials: 'include',
           headers: { Accept: 'application/json' },
         });
-        if (!response.ok) return;
-        const data = await response.json() as TenantSceneResponse;
-        if (!cancelled) setPersonalUrl(String(data?.urls?.personal || ''));
+        if (response.ok) {
+          const data = await response.json() as TenantSceneResponse;
+          if (!cancelled) setPersonalUrl(String(data?.urls?.personal || ''));
+          return;
+        }
       } catch {
-        // A missing session leaves the layer transparent instead of replacing the
-        // application with an auth/error surface.
+        // A missing/restoring session leaves the layer transparent while retrying.
       }
+      if (!cancelled) retryTimer = window.setTimeout(() => void load(), 3000);
     };
     void load();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+      if (retryTimer) window.clearTimeout(retryTimer);
+    };
   }, []);
 
   useEffect(() => {
