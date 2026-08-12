@@ -1,9 +1,14 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import vm from 'node:vm';
 
 const authServer = fs.readFileSync(new URL('../auth-server.ts', import.meta.url), 'utf8');
 const homeRoute = fs.readFileSync(new URL('../src/features/home/HomeRoute.tsx', import.meta.url), 'utf8');
 const rocketDock = fs.readFileSync(new URL('../src/components/RocketDock.tsx', import.meta.url), 'utf8');
+const workspaceTray = fs.readFileSync(new URL('../src/components/WorkspaceTray.tsx', import.meta.url), 'utf8');
+const overlayWorkspace = fs.readFileSync(new URL('../src/components/OverlayWorkspace.tsx', import.meta.url), 'utf8');
+const overlayCompat = fs.readFileSync(new URL('../public/canonical-overlay-compat.js', import.meta.url), 'utf8');
+const indexHtml = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
 const collapseCss = fs.readFileSync(new URL('../src/sidebar-collapse.css', import.meta.url), 'utf8');
 const main = fs.readFileSync(new URL('../src/main.tsx', import.meta.url), 'utf8');
 const companionInstallerUi = fs.readFileSync(new URL('../src/companion-installer-ui.ts', import.meta.url), 'utf8');
@@ -21,5 +26,20 @@ assert.match(main, /installCompanionInstallerUiPatch\(\)/, 'SpaceMountain should
 assert.match(companionInstallerUi, /Download installer/, 'Companion desktop action should say Download installer');
 assert.match(companionInstallerUi, /Download the unsigned /, 'Companion tooltip should keep the unsigned warning');
 assert.match(companionInstallerUi, / installer/, 'Companion tooltip should describe an installer rather than a ZIP');
+
+assert.match(indexHtml, /canonical-overlay-compat\.js[\s\S]*src="\/src\/main\.tsx"/, 'legacy overlay protection must load before React');
+assert.doesNotThrow(() => new vm.Script(overlayCompat), 'canonical overlay compatibility shim should parse');
+assert.match(overlayCompat, /tenant-scene\?output=public/, 'legacy SpaceMountain overlay reads should resolve through the canonical Public scene');
+assert.match(overlayCompat, /\.\.\.currentLayout,[\s\S]*workflows:/, 'legacy saves should preserve the current Public visual scene and only merge workflow rows');
+assert.doesNotMatch(overlayCompat, /widgets:\s*requestedLayout\.widgets/, 'legacy saves must not replace canonical Public widgets');
+assert.match(overlayWorkspace, /tenant-scene\?output=personal/, 'SpaceMountain should resolve the canonical Personal tenant URL');
+assert.match(overlayWorkspace, /data-canonical-personal-overlay="true"/, 'SpaceMountain should render one canonical Personal overlay surface');
+assert.doesNotMatch(overlayWorkspace, /orderedWidgets\.map/, 'SpaceMountain must not reconstruct the canonical scene widget by widget');
+assert.match(overlayWorkspace, /output=personal/, 'the in-app Overlay Bay editor should open the Personal branch');
+assert.match(workspaceTray, /Personal overlay \{personalOverlayVisible \? 'On' : 'Off'\}/, 'expanded Worktray should expose the Personal overlay toggle');
+assert.match(workspaceTray, /Copy Public URL/, 'expanded Worktray should expose the canonical Public URL for copy/paste');
+assert.match(workspaceTray, /Copy Personal URL/, 'expanded Worktray should expose the canonical Personal URL for copy/paste');
+assert.match(workspaceTray, /event\.altKey && event\.shiftKey && event\.key\.toLowerCase\(\) === 'f'/, 'footer must have an out-of-band hide/restore hotkey');
+assert.match(workspaceTray, /if \(!footerVisible\) return null;/, 'footer visibility must be independent from Personal overlay visibility');
 
 console.log('SpaceMountain shell UI smoke checks passed');
