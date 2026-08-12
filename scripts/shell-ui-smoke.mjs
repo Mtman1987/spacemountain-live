@@ -7,6 +7,7 @@ const homeRoute = fs.readFileSync(new URL('../src/features/home/HomeRoute.tsx', 
 const rocketDock = fs.readFileSync(new URL('../src/components/RocketDock.tsx', import.meta.url), 'utf8');
 const workspaceTray = fs.readFileSync(new URL('../src/components/WorkspaceTray.tsx', import.meta.url), 'utf8');
 const overlayWorkspace = fs.readFileSync(new URL('../src/components/OverlayWorkspace.tsx', import.meta.url), 'utf8');
+const settingsRoute = fs.readFileSync(new URL('../src/features/workspace/SettingsRoute.tsx', import.meta.url), 'utf8');
 const overlayCompat = fs.readFileSync(new URL('../public/canonical-overlay-compat.js', import.meta.url), 'utf8');
 const indexHtml = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
 const collapseCss = fs.readFileSync(new URL('../src/sidebar-collapse.css', import.meta.url), 'utf8');
@@ -32,7 +33,7 @@ assert.doesNotThrow(() => new vm.Script(overlayCompat), 'canonical overlay compa
 assert.match(overlayCompat, /tenant-scene\?output=public/, 'legacy SpaceMountain overlay reads should resolve through the canonical Public scene');
 assert.match(overlayCompat, /\.\.\.currentLayout,[\s\S]*workflows:/, 'legacy saves should preserve the current Public visual scene and only merge workflow rows');
 assert.doesNotMatch(overlayCompat, /widgets:\s*requestedLayout\.widgets/, 'legacy saves must not replace canonical Public widgets');
-assert.match(overlayWorkspace, /tenant-scene\?output=personal/, 'SpaceMountain should resolve the canonical Personal tenant URL');
+assert.match(overlayWorkspace, /\/api\/spmt\/api\/personal-overlay-launch/, 'SpaceMountain should request the authenticated canonical Personal launch URL');
 assert.match(overlayWorkspace, /data-canonical-personal-overlay="true"/, 'SpaceMountain should render one canonical Personal overlay surface');
 assert.doesNotMatch(overlayWorkspace, /orderedWidgets\.map/, 'SpaceMountain must not reconstruct the canonical scene widget by widget');
 assert.match(overlayWorkspace, /output=personal/, 'the in-app Overlay Bay editor should open the Personal branch');
@@ -41,5 +42,7 @@ assert.match(workspaceTray, /Copy Public URL/, 'expanded Worktray should expose 
 assert.match(workspaceTray, /Copy Personal URL/, 'expanded Worktray should expose the canonical Personal URL for copy/paste');
 assert.match(workspaceTray, /event\.altKey && event\.shiftKey && event\.key\.toLowerCase\(\) === 'f'/, 'footer must have an out-of-band hide/restore hotkey');
 assert.match(workspaceTray, /if \(!footerVisible\) return null;/, 'footer visibility must be independent from Personal overlay visibility');
+assert.match(settingsRoute, /window\.location\.replace\(CANONICAL_SETTINGS_URL\)/, 'SpaceMountain Universal Settings should route directly to the canonical SPMT surface');
+assert.match(settingsRoute, /https:\/\/spmt\.live\/embed\/settings\?mode=full&app=spacemountain-live/, 'SpaceMountain must use the same SPMT Universal Settings URL as the suite');
 
 console.log('SpaceMountain shell UI smoke checks passed');
