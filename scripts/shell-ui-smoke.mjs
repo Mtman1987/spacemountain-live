@@ -37,6 +37,10 @@ assert.match(overlayWorkspace, /\/api\/spmt\/api\/personal-overlay-launch/, 'Spa
 assert.match(overlayWorkspace, /data-canonical-personal-overlay="true"/, 'SpaceMountain should render one canonical Personal overlay surface');
 assert.doesNotMatch(overlayWorkspace, /orderedWidgets\.map/, 'SpaceMountain must not reconstruct the canonical scene widget by widget');
 assert.match(overlayWorkspace, /output=personal/, 'the in-app Overlay Bay editor should open the Personal branch');
+assert.match(overlayWorkspace, /spacemountain:personal-overlay-visible/, 'Personal visibility should use its own persistent switch');
+assert.match(overlayWorkspace, /if \(!personalVisible \|\| !personalUrl\) return null;/, 'Personal rendering should depend on Personal visibility, not Public workspace enabled state');
+assert.doesNotMatch(overlayWorkspace, /onSetEnabled\?\./, 'Personal visibility must not write through the legacy Public enabled setter');
+assert.doesNotMatch(overlayWorkspace, /if \(!enabled \|\| !personalUrl\)/, 'Public enabled state must not suppress Personal');
 assert.match(workspaceTray, /Personal overlay \{personalOverlayVisible \? 'On' : 'Off'\}/, 'expanded Worktray should expose the Personal overlay toggle');
 assert.match(workspaceTray, /Copy Public URL/, 'expanded Worktray should expose the canonical Public URL for copy/paste');
 assert.match(workspaceTray, /Copy Personal URL/, 'expanded Worktray should expose the canonical Personal URL for copy/paste');
