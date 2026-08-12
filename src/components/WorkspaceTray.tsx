@@ -1,5 +1,5 @@
 import { ExternalLink, Layout, Maximize2 } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { EmbedSlot } from '../types';
 
 type WorkspaceTrayProps = {
@@ -14,7 +14,20 @@ type WorkspaceTrayProps = {
   onFrameLoad: (frame: HTMLIFrameElement | null) => void | Promise<void>;
 };
 
+type TenantUrls = {
+  public: string;
+  personal: string;
+};
+
 const crewDeskUrl = 'https://spmt.live/embed/worktray?mode=dock&app=spacemountain-live';
+const personalVisibilityKey = 'spacemountain:personal-overlay-visible';
+const footerVisibilityKey = 'spacemountain:workspace-footer-visible';
+const personalVisibilityEvent = 'spmt:personal-overlay-visibility';
+const footerVisibilityEvent = 'spmt:workspace-footer-visibility';
+
+function storedVisible(key: string) {
+  return localStorage.getItem(key) !== '0';
+}
 
 export default function WorkspaceTray({
   open,
@@ -28,10 +41,63 @@ export default function WorkspaceTray({
   onFrameLoad,
 }: WorkspaceTrayProps) {
   const [crewDeskOpen, setCrewDeskOpen] = useState(false);
+  const [personalOverlayVisible, setPersonalOverlayVisible] = useState(() => storedVisible(personalVisibilityKey));
+  const [footerVisible, setFooterVisible] = useState(() => storedVisible(footerVisibilityKey));
+  const [tenantUrls, setTenantUrls] = useState<TenantUrls | null>(null);
   const selectedSlot = slots.find((slot) => slot.id === activeSlotId);
   const activeSlot = (selectedSlot && !selectedSlot.collapsed)
     ? selectedSlot
     : slots.find((slot) => !slot.collapsed) || slots[0];
+
+  useEffect(() => {
+    const handlePersonalVisibility = (event: Event) => {
+      const customEvent = event as CustomEvent<{ visible?: boolean }>;
+      if (typeof customEvent.detail?.visible === 'boolean') setPersonalOverlayVisible(customEvent.detail.visible);
+    };
+    const handleFooterVisibility = (event: Event) => {
+      const customEvent = event as CustomEvent<{ visible?: boolean }>;
+      if (typeof customEvent.detail?.visible !== 'boolean') return;
+      localStorage.setItem(footerVisibilityKey, customEvent.detail.visible ? '1' : '0');
+      setFooterVisible(customEvent.detail.visible);
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (!(event.altKey && event.shiftKey && event.key.toLowerCase() === 'f')) return;
+      event.preventDefault();
+      setFooterVisible((current) => {
+        const next = !current;
+        localStorage.setItem(footerVisibilityKey, next ? '1' : '0');
+        return next;
+      });
+    };
+    window.addEventListener(personalVisibilityEvent, handlePersonalVisibility);
+    window.addEventListener(footerVisibilityEvent, handleFooterVisibility);
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener(personalVisibilityEvent, handlePersonalVisibility);
+      window.removeEventListener(footerVisibilityEvent, handleFooterVisibility);
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!open || tenantUrls) return;
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const response = await fetch('/api/spmt/api/tenant-scene?output=personal', {
+          credentials: 'include',
+          headers: { Accept: 'application/json' },
+        });
+        if (!response.ok) return;
+        const data = await response.json();
+        const publicUrl = String(data?.urls?.public || '');
+        const personalUrl = String(data?.urls?.personal || '');
+        if (!cancelled && publicUrl && personalUrl) setTenantUrls({ public: publicUrl, personal: personalUrl });
+      } catch {}
+    };
+    void load();
+    return () => { cancelled = true; };
+  }, [open, tenantUrls]);
 
   const openCrewDesk = () => {
     setCrewDeskOpen(true);
@@ -47,13 +113,29 @@ export default function WorkspaceTray({
 
   const hideActiveSlot = () => {
     if (!activeSlot) return;
-
     onSlotChange(activeSlot.id, { collapsed: true });
     const nextSlot = slots.find((slot) => slot.id !== activeSlot.id && !slot.collapsed);
-    if (nextSlot) {
-      onSelectSlot(nextSlot.id);
-    } else {
-      onOpenChange(false);
+    if (nextSlot) onSelectSlot(nextSlot.id);
+    else onOpenChange(false);
+  };
+
+  const togglePersonalOverlay = () => {
+    const next = !personalOverlayVisible;
+    localStorage.setItem(personalVisibilityKey, next ? '1' : '0');
+    setPersonalOverlayVisible(next);
+    window.dispatchEvent(new CustomEvent(personalVisibilityEvent, { detail: { visible: next } }));
+  };
+
+  const copyUrl = async (url: string) => {
+    if (!url) return;
+    try { await navigator.clipboard.writeText(url); } catch {
+      const input = document.createElement('textarea');
+      input.value = url;
+      input.style.position = 'fixed';
+      input.style.opacity = '0';
+      document.body.append(input);
+      input.select();
+      try { document.execCommand('copy'); } finally { input.remove(); }
     }
   };
 
@@ -61,11 +143,16 @@ export default function WorkspaceTray({
   const panelKind = crewDeskOpen ? 'SPMT shared worktray' : activeSlot?.kind;
   const popoutUrl = crewDeskOpen ? crewDeskUrl : (activeSlot ? resolveUrl(activeSlot) : '#');
 
+  // The footer intentionally has no self-hiding button. If hidden with the
+  // out-of-band hotkey, the same Alt+Shift+F hotkey always restores it.
+  if (!footerVisible) return null;
+
   return (
     <aside
       className="fixed inset-x-3 bottom-3 z-[80] overflow-hidden rounded-2xl border bg-zinc-950/90 shadow-[0_-16px_44px_rgba(0,0,0,0.48)] backdrop-blur-2xl transition-all md:left-1/2 md:max-w-5xl md:-translate-x-1/2"
       style={{ borderColor: `${accentColor}35` }}
       aria-label="Docked workspace"
+      data-workspace-footer="true"
     >
       <div className="flex min-h-14 items-center gap-2 px-2.5 py-2">
         <button
@@ -104,6 +191,28 @@ export default function WorkspaceTray({
       <div className={`grid transition-[grid-template-rows] duration-300 ${open ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}`}>
         <div className="min-h-0 overflow-hidden">
           <div className="border-t border-white/10 bg-black/35">
+            <div className="flex flex-wrap items-center gap-2 border-b border-white/10 px-3 py-2" data-workspace-overlay-controls="true">
+              <button
+                type="button"
+                onClick={togglePersonalOverlay}
+                className={`rounded-lg border px-2.5 py-1.5 text-[10px] font-black ${personalOverlayVisible ? 'border-emerald-400/30 bg-emerald-400/10 text-emerald-200' : 'border-white/10 bg-black/30 text-zinc-400'}`}
+                aria-pressed={personalOverlayVisible}
+              >
+                Personal overlay {personalOverlayVisible ? 'On' : 'Off'}
+              </button>
+              {tenantUrls?.public && (
+                <button type="button" onClick={() => void copyUrl(tenantUrls.public)} className="rounded-lg border border-white/10 px-2.5 py-1.5 text-[10px] font-bold text-zinc-300 hover:text-white">
+                  Copy Public URL
+                </button>
+              )}
+              {tenantUrls?.personal && (
+                <button type="button" onClick={() => void copyUrl(tenantUrls.personal)} className="rounded-lg border border-white/10 px-2.5 py-1.5 text-[10px] font-bold text-zinc-300 hover:text-white">
+                  Copy Personal URL
+                </button>
+              )}
+              <span className="ml-auto text-[8px] font-bold uppercase tracking-wide text-zinc-600">Alt+Shift+F hides/restores footer</span>
+            </div>
+
             {(crewDeskOpen || activeSlot) && (
               <div className="flex items-center justify-between gap-3 px-4 py-2.5">
                 <div className="min-w-0">
