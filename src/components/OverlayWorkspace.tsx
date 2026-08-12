@@ -1,7 +1,10 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 
 export type OverlayInteractionMode = 'click-through' | 'interactive' | 'hybrid';
 
+// Retained as a compatibility type while older workspace-profile data is phased
+// out. SpaceMountain no longer renders these records itself; SPMT Overlay Bay is
+// the only scene owner and the Personal tenant URL is the only runtime source.
 export type OverlayWidget = {
   id: string;
   title: string;
@@ -36,31 +39,53 @@ type OverlayWorkspaceProps = {
   onFrameLoad?: (frame: HTMLIFrameElement | null) => void | Promise<void>;
 };
 
-function interactionMode(widget: OverlayWidget): OverlayInteractionMode {
-  return widget.interactionMode || (widget.interactive ? 'interactive' : 'click-through');
-}
+type TenantSceneResponse = {
+  tenant?: string;
+  urls?: {
+    public?: string;
+    personal?: string;
+  };
+};
 
-function widgetLayer(widget: OverlayWidget, fallback: number) {
-  return Number.isFinite(widget.zIndex) ? Number(widget.zIndex) : fallback;
-}
+const personalEditorUrl = 'https://spmt.live/embed/overlays?mode=full&app=spacemountain-live&output=personal';
+const personalVisibilityEvent = 'spmt:personal-overlay-visibility';
 
 export default function OverlayWorkspace({
   enabled,
   editing,
-  widgets,
   accentColor,
   onFinishEditing,
   onSetEnabled,
   onFrameLoad,
 }: OverlayWorkspaceProps) {
   const [canonicalChanged, setCanonicalChanged] = useState(false);
-  const [revealedWidgetId, setRevealedWidgetId] = useState<string | null>(null);
-  const [hybridActive, setHybridActive] = useState<Record<string, boolean>>({});
-  const [parallax, setParallax] = useState({ x: 0, y: 0 });
+  const [personalUrl, setPersonalUrl] = useState('');
 
-  const orderedWidgets = useMemo(() => widgets
-    .map((widget, index) => ({ widget, layer: widgetLayer(widget, index + 1) }))
-    .sort((a, b) => a.layer - b.layer), [widgets]);
+  useEffect(() => {
+    let cancelled = false;
+    let retryTimer = 0;
+    const load = async () => {
+      try {
+        const response = await fetch('/api/spmt/api/tenant-scene?output=personal', {
+          credentials: 'include',
+          headers: { Accept: 'application/json' },
+        });
+        if (response.ok) {
+          const data = await response.json() as TenantSceneResponse;
+          if (!cancelled) setPersonalUrl(String(data?.urls?.personal || ''));
+          return;
+        }
+      } catch {
+        // A missing/restoring session leaves the layer transparent while retrying.
+      }
+      if (!cancelled) retryTimer = window.setTimeout(() => void load(), 3000);
+    };
+    void load();
+    return () => {
+      cancelled = true;
+      if (retryTimer) window.clearTimeout(retryTimer);
+    };
+  }, []);
 
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
@@ -74,19 +99,15 @@ export default function OverlayWorkspace({
   }, []);
 
   useEffect(() => {
-    if (!widgets.some((widget) => widget.parallaxEnabled)) {
-      setParallax({ x: 0, y: 0 });
-      return;
-    }
-    const handlePointerMove = (event: PointerEvent) => {
-      setParallax({
-        x: (event.clientX / Math.max(1, window.innerWidth) - 0.5) * 2,
-        y: (event.clientY / Math.max(1, window.innerHeight) - 0.5) * 2,
-      });
+    const handleVisibility = (event: Event) => {
+      const customEvent = event as CustomEvent<{ visible?: boolean }>;
+      if (typeof customEvent.detail?.visible === 'boolean') {
+        onSetEnabled?.(customEvent.detail.visible);
+      }
     };
-    window.addEventListener('pointermove', handlePointerMove, { passive: true });
-    return () => window.removeEventListener('pointermove', handlePointerMove);
-  }, [widgets]);
+    window.addEventListener(personalVisibilityEvent, handleVisibility);
+    return () => window.removeEventListener(personalVisibilityEvent, handleVisibility);
+  }, [onSetEnabled]);
 
   if (editing) {
     return (
@@ -95,11 +116,11 @@ export default function OverlayWorkspace({
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 px-4 py-3">
             <div>
               <h2 className="text-sm font-black text-white">SPMT Overlay Bay</h2>
-              <p className="mt-0.5 text-[10px] text-zinc-500">SPMT owns the overlay workspace. SpaceMountain renders the saved result.</p>
+              <p className="mt-0.5 text-[10px] text-zinc-500">Editing Personal. SPMT owns the scene; SpaceMountain consumes the saved Personal URL.</p>
             </div>
             <div className="flex items-center gap-2">
               {canonicalChanged && <span className="text-[10px] font-bold text-emerald-300">Saved in SPMT</span>}
-              <a href="https://spmt.live/embed/overlays?mode=full&app=spacemountain-live" target="_blank" rel="noreferrer" className="rounded-lg border border-white/10 px-3 py-2 text-[10px] font-bold text-zinc-300 no-underline">Pop out</a>
+              <a href={personalEditorUrl} target="_blank" rel="noreferrer" className="rounded-lg border border-white/10 px-3 py-2 text-[10px] font-bold text-zinc-300 no-underline">Pop out</a>
               <button
                 type="button"
                 onClick={() => {
@@ -113,8 +134,8 @@ export default function OverlayWorkspace({
             </div>
           </div>
           <iframe
-            src="https://spmt.live/embed/overlays?mode=full&app=spacemountain-live"
-            title="SPMT Overlay Bay"
+            src={personalEditorUrl}
+            title="SPMT Overlay Bay — Personal"
             className="min-h-0 flex-1 border-0 bg-black"
             allow="autoplay; microphone; camera; fullscreen; clipboard-write"
           />
@@ -123,81 +144,24 @@ export default function OverlayWorkspace({
     );
   }
 
-  if (!enabled) return null;
+  if (!enabled || !personalUrl) return null;
 
   return (
-    <div className="pointer-events-none fixed inset-0 z-[48] overflow-hidden" aria-label="SPMT overlay workspace consumer">
-      {orderedWidgets.map(({ widget, layer }) => {
-        const hidden = !widget.visible;
-        const hoverReveal = Boolean(widget.hoverReveal);
-        if (hidden && !hoverReveal) return null;
-        const revealed = revealedWidgetId === widget.id;
-        const mode = interactionMode(widget);
-        const hybridIsActive = Boolean(hybridActive[widget.id]);
-        const depth = widget.parallaxEnabled ? Math.max(0, Math.min(40, widget.parallaxDepth ?? 8)) : 0;
-        const acceptsPointer = (hidden && hoverReveal) || mode === 'interactive' || (mode === 'hybrid' && hybridIsActive);
-        return (
-          <section
-            key={widget.id}
-            className="absolute overflow-hidden rounded-xl transition-opacity duration-150"
-            style={{
-              left: `${widget.x}%`,
-              top: `${widget.y}%`,
-              width: `min(${widget.width}px, 100vw)`,
-              height: `min(${widget.height}px, 100vh)`,
-              opacity: hidden && !revealed ? 0 : widget.opacity,
-              pointerEvents: acceptsPointer ? 'auto' : 'none',
-              zIndex: layer,
-              transform: `translate3d(${parallax.x * depth}px, ${parallax.y * depth}px, 0) rotate(${widget.rotation ?? 0}deg)`,
-              transformOrigin: 'center',
-            }}
-            onPointerEnter={() => { if (hidden && hoverReveal) setRevealedWidgetId(widget.id); }}
-            onPointerLeave={() => { if (hidden && hoverReveal) setRevealedWidgetId((value) => value === widget.id ? null : value); }}
-          >
-            <iframe
-              key={`${widget.id}:${widget.url}`}
-              src={widget.url}
-              title={widget.title}
-              data-embed-slot-frame={`personal-overlay-${widget.id}`}
-              onLoad={(event) => void onFrameLoad?.(event.currentTarget)}
-              className="h-full w-full border-0 bg-transparent"
-              style={{ pointerEvents: mode === 'click-through' || (mode === 'hybrid' && !hybridIsActive) ? 'none' : 'auto' }}
-              allow="autoplay; microphone; camera; fullscreen; clipboard-write"
-            />
-            {mode === 'hybrid' && !hybridIsActive && (
-              <button
-                type="button"
-                className="absolute inset-0 z-[3] cursor-pointer bg-transparent text-transparent"
-                aria-label={`Activate interaction for ${widget.title}`}
-                onClick={() => setHybridActive((value) => ({ ...value, [widget.id]: true }))}
-              >
-                Activate {widget.title}
-              </button>
-            )}
-            {mode === 'hybrid' && hybridIsActive && (
-              <button
-                type="button"
-                className="absolute right-1 top-1 z-[4] rounded-full border border-cyan-200/35 bg-zinc-950/90 px-2 py-1 text-[8px] font-black text-cyan-100"
-                onDoubleClick={() => setHybridActive((value) => ({ ...value, [widget.id]: false }))}
-                title="Double-click to return this widget to click-through mode"
-              >
-                Double-click: pass through
-              </button>
-            )}
-          </section>
-        );
-      })}
-
-      {onSetEnabled && (
-        <button
-          type="button"
-          className="pointer-events-auto fixed bottom-20 right-3 z-[60] hidden rounded-full border border-white/10 bg-zinc-950/85 px-3 py-1.5 text-[9px] font-bold text-zinc-400 hover:text-white sm:block"
-          onClick={() => onSetEnabled(false)}
-          style={{ borderColor: `${accentColor}25` }}
-        >
-          Hide overlays
-        </button>
-      )}
+    <div
+      className="pointer-events-none fixed inset-0 z-[48] overflow-hidden"
+      aria-label="Canonical SPMT Personal overlay consumer"
+      data-canonical-personal-overlay="true"
+    >
+      <iframe
+        src={personalUrl}
+        title="SPMT Personal overlay"
+        data-embed-slot-frame="personal-overlay-canonical"
+        onLoad={(event) => void onFrameLoad?.(event.currentTarget)}
+        className="absolute inset-0 h-full w-full border-0 bg-transparent"
+        style={{ background: 'transparent', pointerEvents: 'none' }}
+        allow="autoplay; microphone; camera; fullscreen; clipboard-write"
+      />
+      <span className="sr-only" style={{ color: accentColor }}>Personal overlay active</span>
     </div>
   );
 }
