@@ -44,6 +44,9 @@ assert.doesNotMatch(overlayWorkspace, /if \(!enabled \|\| !personalUrl\)/, 'Publ
 assert.match(workspaceTray, /Personal overlay \{personalOverlayVisible \? 'On' : 'Off'\}/, 'expanded Worktray should expose the Personal overlay toggle');
 assert.match(workspaceTray, /Copy Public URL/, 'expanded Worktray should expose the canonical Public URL for copy/paste');
 assert.match(workspaceTray, /Copy Personal URL/, 'expanded Worktray should expose the canonical Personal URL for copy/paste');
+assert.match(workspaceTray, /\/api\/spmt\/api\/personal-overlay-launch/, 'SpaceMountain Copy Personal URL should use the scoped canonical launch route');
+assert.match(workspaceTray, /const personalUrl = String\(personalData\?\.url \|\| ''\)/, 'SpaceMountain should copy the launch URL returned by SPMT');
+assert.doesNotMatch(workspaceTray, /const personalUrl = String\(data\?\.urls\?\.personal/, 'SpaceMountain must not copy the clean unauthenticated Personal metadata URL');
 assert.match(workspaceTray, /event\.altKey && event\.shiftKey && event\.key\.toLowerCase\(\) === 'f'/, 'footer must have an out-of-band hide/restore hotkey');
 assert.match(workspaceTray, /if \(!footerVisible\) return null;/, 'footer visibility must be independent from Personal overlay visibility');
 assert.match(settingsRoute, /window\.location\.replace\(CANONICAL_SETTINGS_URL\)/, 'SpaceMountain Universal Settings should route directly to the canonical SPMT surface');
