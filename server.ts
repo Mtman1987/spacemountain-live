@@ -18,6 +18,37 @@ const SPMT_BASE_URL = 'https://spmt.live';
 const SPMT_SESSION_COOKIE = 'spacemountain_spmt_session';
 const SPMT_REFRESH_COOKIE = 'spacemountain_spmt_refresh';
 
+let spmtXpClientToken = '';
+let spmtXpClientTokenExpiresAt = 0;
+
+async function getSpmtXpClientToken() {
+  const now = Date.now();
+  if (spmtXpClientToken && now < spmtXpClientTokenExpiresAt - 30_000) return spmtXpClientToken;
+
+  const clientSecret = String(process.env.SPACEMOUNTAIN_CLIENT_SECRET || '').trim();
+  if (!clientSecret) return '';
+
+  try {
+    const response = await fetch(`${SPMT_BASE_URL}/api/oauth/token`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify({
+        grant_type: 'client_credentials',
+        client_id: 'spacemountain-live',
+        client_secret: clientSecret,
+        scope: 'xp:write',
+      }),
+    });
+    const data = await response.json() as any;
+    if (!response.ok || !data?.access_token) return '';
+    spmtXpClientToken = String(data.access_token);
+    spmtXpClientTokenExpiresAt = now + Math.max(60, Number(data.expires_in || 900)) * 1000;
+    return spmtXpClientToken;
+  } catch {
+    return '';
+  }
+}
+
 function readCookie(header: string | undefined, name: string) {
   for (const part of String(header || '').split(';')) {
     const [key, ...rest] = part.trim().split('=');
@@ -267,13 +298,13 @@ async function getSpmtSessionUser(cookieHeader: string | undefined) {
 
 async function awardSpmtXp(input: {
   userId: string;
-  accessToken: string;
   eventType: Extract<XpMappedEventTypeV1, 'spacemountain.tool.trigger' | 'spacemountain.arena.kill'>;
   upstreamEventId: string;
   delta: number;
   metadata?: Record<string, unknown>;
 }) {
-  if (!input.accessToken) return { skipped: true, reason: 'SPMT OAuth session not available' };
+  const serviceToken = await getSpmtXpClientToken();
+  if (!serviceToken) return { skipped: true, reason: 'SPMT OAuth client credentials unavailable' };
 
   const award = mappedXpAwardV1({
     userId: input.userId,
@@ -288,7 +319,7 @@ async function awardSpmtXp(input: {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${input.accessToken}`,
+        Authorization: `Bearer ${serviceToken}`,
       },
       body: JSON.stringify({
         ...award,
@@ -703,7 +734,7 @@ async function startServer() {
           ? { status: 'unavailable', missingSecretNames }
           : { status: 'configured' },
         spmtXpProducer: String(process.env.SPACEMOUNTAIN_CLIENT_SECRET || '').trim()
-          ? { status: 'configured', auth: 'spmt-oauth-session' }
+          ? { status: 'configured', auth: 'spmt-oauth-client-credentials' }
           : { status: 'unavailable', reason: 'SPMT OAuth client is not configured' },
       },
     });
@@ -938,7 +969,6 @@ async function startServer() {
       if (spmtUser?.id) {
         xp = await awardSpmtXp({
           userId: spmtUser.id,
-          accessToken: readCookie(req.headers.cookie, SPMT_SESSION_COOKIE),
           eventType: 'spacemountain.tool.trigger',
           upstreamEventId: `tool-${id}-${Date.now()}-${crypto.randomUUID()}`,
           delta: increment,
@@ -963,7 +993,6 @@ async function startServer() {
       const targetLabel = String(req.body?.targetLabel || req.body?.target || 'arena-target').slice(0, 120);
       const xp = await awardSpmtXp({
         userId: spmtUser.id,
-        accessToken: readCookie(req.headers.cookie, SPMT_SESSION_COOKIE),
         eventType: 'spacemountain.arena.kill',
         upstreamEventId: `arena-kill-${spmtUser.id}-${Date.now()}-${crypto.randomUUID()}`,
         delta: 1,
