@@ -7,6 +7,7 @@ const homeRoute = fs.readFileSync(new URL('../src/features/home/HomeRoute.tsx', 
 const rocketDock = fs.readFileSync(new URL('../src/components/RocketDock.tsx', import.meta.url), 'utf8');
 const workspaceTray = fs.readFileSync(new URL('../src/components/WorkspaceTray.tsx', import.meta.url), 'utf8');
 const overlayWorkspace = fs.readFileSync(new URL('../src/components/OverlayWorkspace.tsx', import.meta.url), 'utf8');
+const app = fs.readFileSync(new URL('../src/App.tsx', import.meta.url), 'utf8');
 const overlayCompat = fs.readFileSync(new URL('../public/canonical-overlay-compat.js', import.meta.url), 'utf8');
 const indexHtml = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
 const collapseCss = fs.readFileSync(new URL('../src/sidebar-collapse.css', import.meta.url), 'utf8');
@@ -36,6 +37,9 @@ assert.match(overlayWorkspace, /tenant-scene\?output=personal/, 'SpaceMountain s
 assert.match(overlayWorkspace, /data-canonical-personal-overlay="true"/, 'SpaceMountain should render one canonical Personal overlay surface');
 assert.doesNotMatch(overlayWorkspace, /orderedWidgets\.map/, 'SpaceMountain must not reconstruct the canonical scene widget by widget');
 assert.match(overlayWorkspace, /output=personal/, 'the in-app Overlay Bay editor should open the Personal branch');
+assert.match(app, /Universal Personal overlay/, 'Crew Desk should identify the canonical Personal overlay');
+assert.match(app, /old SpaceMountain-only widget settings have been retired/, 'Crew Desk should retire its duplicate overlay controls');
+assert.match(app, /\{false && <div[^>]+>[\s\S]*overlayWidgets\.map/, 'legacy SpaceMountain widget controls must stay hidden');
 assert.match(workspaceTray, /Personal overlay \{personalOverlayVisible \? 'On' : 'Off'\}/, 'expanded Worktray should expose the Personal overlay toggle');
 assert.match(workspaceTray, /Copy Public URL/, 'expanded Worktray should expose the canonical Public URL for copy/paste');
 assert.match(workspaceTray, /Copy Personal URL/, 'expanded Worktray should expose the canonical Personal URL for copy/paste');

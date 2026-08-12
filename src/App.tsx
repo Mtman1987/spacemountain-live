@@ -4638,9 +4638,9 @@ export default function App() {
                   <div className="xl:col-span-3 rounded-2xl border border-cyan-400/15 bg-cyan-400/[0.035] p-4">
                     <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/5 pb-3">
                       <div>
-                        <h3 className="text-sm font-bold text-white">Personal overlay canvas</h3>
-                        <p className="mt-1 text-xs text-zinc-500">One account-saved canvas for widgets and all three embeds. Mobile drag handles are enlarged; numeric controls below provide exact placement.</p>
-                        <p className="mt-1 text-[9px] font-mono text-zinc-600">Alt+Shift+O canvas · Alt+Shift+E edit · Alt+Shift+L layers · Alt+Shift+H emergency hide/restore</p>
+                        <h3 className="text-sm font-bold text-white">Universal Personal overlay</h3>
+                        <p className="mt-1 text-xs text-zinc-500">SpaceMountain uses the same canonical SPMT Personal scene, alert relay, and output URL as every connected app.</p>
+                        <p className="mt-1 text-[9px] font-mono text-zinc-600">Edit once in Overlay Bay · changes follow your SPMT account everywhere</p>
                       </div>
                       <div className="flex flex-wrap gap-2">
                         <button
@@ -4648,7 +4648,7 @@ export default function App() {
                           onClick={() => setOverlayWorkspaceEnabled((value) => !value)}
                           className={`rounded-xl border px-3 py-2 text-xs font-bold ${overlayWorkspaceEnabled ? 'border-emerald-400/30 bg-emerald-400/10 text-emerald-200' : 'border-white/10 bg-black/30 text-zinc-400'}`}
                         >
-                          Canvas {overlayWorkspaceEnabled ? 'On' : 'Off'}
+                          Personal overlay {overlayWorkspaceEnabled ? 'On' : 'Off'}
                         </button>
                         <button
                           type="button"
@@ -4658,15 +4658,15 @@ export default function App() {
                           }}
                           className="rounded-xl border border-cyan-400/30 bg-cyan-400/10 px-3 py-2 text-xs font-bold text-cyan-200"
                         >
-                          Arrange on screen
-                        </button>
-                        <button type="button" onClick={() => addOverlayWidget()} className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-bold text-zinc-200">
-                          Add URL widget
+                          Open canonical Overlay Bay
                         </button>
                       </div>
                     </div>
 
-                    <div className="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-2">
+                    <div className="mt-4 rounded-xl border border-white/10 bg-black/30 p-4 text-xs leading-5 text-zinc-400">
+                      The old SpaceMountain-only widget settings have been retired. Use the canonical Overlay Bay so follow tests, sources, visibility, geometry, opacity, layers, and output URLs stay identical across the ecosystem.
+                    </div>
+                    {false && <div className="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-2">
                       {overlayWidgets.map((widget) => (
                         <div key={widget.id} className="rounded-xl border border-white/10 bg-black/30 p-3">
                           <div className="flex items-center justify-between gap-3">
@@ -4721,14 +4721,14 @@ export default function App() {
                           </div>
                         </div>
                       ))}
-                    </div>
+                    </div>}
                   </div>
 
                   <div className="xl:col-span-2 rounded-2xl border border-white/5 bg-white/[0.02] p-4">
                     <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/5 pb-3">
                       <div>
                         <h3 className="text-sm font-bold text-white">Embed control dashboard</h3>
-                        <p className="text-xs text-zinc-500 mt-1">Choose each embed URL here; its independent overlay position, visibility, opacity, interaction, and layer are controlled above.</p>
+                        <p className="text-xs text-zinc-500 mt-1">These are SpaceMountain workspace dock slots. Stream overlay sources and positioning now live in the canonical Overlay Bay.</p>
                       </div>
                       <div className="flex gap-2">
                         {embedSlots.map((slot) => (
