@@ -84,14 +84,25 @@ export default function WorkspaceTray({
     let cancelled = false;
     const load = async () => {
       try {
-        const response = await fetch('/api/spmt/api/tenant-scene?output=personal', {
-          credentials: 'include',
-          headers: { Accept: 'application/json' },
-        });
-        if (!response.ok) return;
-        const data = await response.json();
-        const publicUrl = String(data?.urls?.public || '');
-        const personalUrl = String(data?.urls?.personal || '');
+        const [tenantResponse, personalResponse] = await Promise.all([
+          fetch('/api/spmt/api/tenant-scene?output=public', {
+            credentials: 'include',
+            cache: 'no-store',
+            headers: { Accept: 'application/json' },
+          }),
+          fetch('/api/spmt/api/personal-overlay-launch', {
+            credentials: 'include',
+            cache: 'no-store',
+            headers: { Accept: 'application/json' },
+          }),
+        ]);
+        if (!tenantResponse.ok || !personalResponse.ok) return;
+        const [tenantData, personalData] = await Promise.all([
+          tenantResponse.json(),
+          personalResponse.json(),
+        ]);
+        const publicUrl = String(tenantData?.urls?.public || '');
+        const personalUrl = String(personalData?.url || '');
         if (!cancelled && publicUrl && personalUrl) setTenantUrls({ public: publicUrl, personal: personalUrl });
       } catch {}
     };
