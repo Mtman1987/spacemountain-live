@@ -17,7 +17,6 @@ const DSH_COMMUNITY_ONLINE_URL = process.env.DSH_COMMUNITY_ONLINE_URL || 'https:
 const SPMT_BASE_URL = 'https://spmt.live';
 const SPMT_SESSION_COOKIE = 'spacemountain_spmt_session';
 const SPMT_REFRESH_COOKIE = 'spacemountain_spmt_refresh';
-const SPMT_API_KEY = String(process.env.SPMT_API_KEY || '').trim();
 
 function readCookie(header: string | undefined, name: string) {
   for (const part of String(header || '').split(';')) {
@@ -268,12 +267,13 @@ async function getSpmtSessionUser(cookieHeader: string | undefined) {
 
 async function awardSpmtXp(input: {
   userId: string;
+  accessToken: string;
   eventType: Extract<XpMappedEventTypeV1, 'spacemountain.tool.trigger' | 'spacemountain.arena.kill'>;
   upstreamEventId: string;
   delta: number;
   metadata?: Record<string, unknown>;
 }) {
-  if (!SPMT_API_KEY) return { skipped: true, reason: 'SPMT_API_KEY not configured' };
+  if (!input.accessToken) return { skipped: true, reason: 'SPMT OAuth session not available' };
 
   const award = mappedXpAwardV1({
     userId: input.userId,
@@ -288,11 +288,11 @@ async function awardSpmtXp(input: {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${SPMT_API_KEY}`,
+        Authorization: `Bearer ${input.accessToken}`,
       },
       body: JSON.stringify({
-        sourceApp: 'spacemountain',
         ...award,
+        sourceApp: 'spacemountain-live',
       }),
     });
 
@@ -702,7 +702,9 @@ async function startServer() {
         serviceCredentials: missingSecretNames.length
           ? { status: 'unavailable', missingSecretNames }
           : { status: 'configured' },
-        spmtXpProducer: SPMT_API_KEY ? { status: 'configured' } : { status: 'degraded', reason: 'SPMT_API_KEY not configured' },
+        spmtXpProducer: String(process.env.SPACEMOUNTAIN_CLIENT_SECRET || '').trim()
+          ? { status: 'configured', auth: 'spmt-oauth-session' }
+          : { status: 'unavailable', reason: 'SPMT OAuth client is not configured' },
       },
     });
   });
@@ -936,6 +938,7 @@ async function startServer() {
       if (spmtUser?.id) {
         xp = await awardSpmtXp({
           userId: spmtUser.id,
+          accessToken: readCookie(req.headers.cookie, SPMT_SESSION_COOKIE),
           eventType: 'spacemountain.tool.trigger',
           upstreamEventId: `tool-${id}-${Date.now()}-${crypto.randomUUID()}`,
           delta: increment,
@@ -960,6 +963,7 @@ async function startServer() {
       const targetLabel = String(req.body?.targetLabel || req.body?.target || 'arena-target').slice(0, 120);
       const xp = await awardSpmtXp({
         userId: spmtUser.id,
+        accessToken: readCookie(req.headers.cookie, SPMT_SESSION_COOKIE),
         eventType: 'spacemountain.arena.kill',
         upstreamEventId: `arena-kill-${spmtUser.id}-${Date.now()}-${crypto.randomUUID()}`,
         delta: 1,
