@@ -28,6 +28,8 @@ export type OverlayWidget = {
 };
 
 type OverlayWorkspaceProps = {
+  // Legacy Public-workspace props remain in the call contract until the old
+  // builder state is removed from App.tsx. They must never control Personal.
   enabled: boolean;
   editing: boolean;
   widgets: OverlayWidget[];
@@ -39,44 +41,49 @@ type OverlayWorkspaceProps = {
   onFrameLoad?: (frame: HTMLIFrameElement | null) => void | Promise<void>;
 };
 
-type TenantSceneResponse = {
+type PersonalLaunchResponse = {
   tenant?: string;
-  urls?: {
-    public?: string;
-    personal?: string;
-  };
+  output?: 'personal';
+  url?: string;
+  canonicalUrl?: string;
 };
 
 const personalEditorUrl = 'https://spmt.live/embed/overlays?mode=full&app=spacemountain-live&output=personal';
 const personalVisibilityEvent = 'spmt:personal-overlay-visibility';
+const personalVisibilityKey = 'spacemountain:personal-overlay-visible';
+
+function storedPersonalVisible() {
+  if (typeof window === 'undefined') return true;
+  try { return localStorage.getItem(personalVisibilityKey) !== '0'; } catch { return true; }
+}
 
 export default function OverlayWorkspace({
-  enabled,
   editing,
   accentColor,
   onFinishEditing,
-  onSetEnabled,
   onFrameLoad,
 }: OverlayWorkspaceProps) {
   const [canonicalChanged, setCanonicalChanged] = useState(false);
   const [personalUrl, setPersonalUrl] = useState('');
+  const [personalVisible, setPersonalVisible] = useState(storedPersonalVisible);
 
   useEffect(() => {
     let cancelled = false;
     let retryTimer = 0;
     const load = async () => {
       try {
-        const response = await fetch('/api/spmt/api/tenant-scene?output=personal', {
+        const response = await fetch('/api/spmt/api/personal-overlay-launch', {
           credentials: 'include',
+          cache: 'no-store',
           headers: { Accept: 'application/json' },
         });
         if (response.ok) {
-          const data = await response.json() as TenantSceneResponse;
-          if (!cancelled) setPersonalUrl(String(data?.urls?.personal || ''));
+          const data = await response.json() as PersonalLaunchResponse;
+          if (!cancelled) setPersonalUrl(String(data?.url || ''));
           return;
         }
       } catch {
-        // A missing/restoring session leaves the layer transparent while retrying.
+        // A missing/restoring SPMT connection leaves the layer transparent while retrying.
       }
       if (!cancelled) retryTimer = window.setTimeout(() => void load(), 3000);
     };
@@ -99,15 +106,24 @@ export default function OverlayWorkspace({
   }, []);
 
   useEffect(() => {
+    const setVisible = (visible: boolean) => {
+      try { localStorage.setItem(personalVisibilityKey, visible ? '1' : '0'); } catch {}
+      setPersonalVisible(visible);
+    };
     const handleVisibility = (event: Event) => {
       const customEvent = event as CustomEvent<{ visible?: boolean }>;
-      if (typeof customEvent.detail?.visible === 'boolean') {
-        onSetEnabled?.(customEvent.detail.visible);
-      }
+      if (typeof customEvent.detail?.visible === 'boolean') setVisible(customEvent.detail.visible);
+    };
+    const handleStorage = (event: StorageEvent) => {
+      if (event.key === personalVisibilityKey) setPersonalVisible(event.newValue !== '0');
     };
     window.addEventListener(personalVisibilityEvent, handleVisibility);
-    return () => window.removeEventListener(personalVisibilityEvent, handleVisibility);
-  }, [onSetEnabled]);
+    window.addEventListener('storage', handleStorage);
+    return () => {
+      window.removeEventListener(personalVisibilityEvent, handleVisibility);
+      window.removeEventListener('storage', handleStorage);
+    };
+  }, []);
 
   if (editing) {
     return (
@@ -144,7 +160,7 @@ export default function OverlayWorkspace({
     );
   }
 
-  if (!enabled || !personalUrl) return null;
+  if (!personalVisible || !personalUrl) return null;
 
   return (
     <div
