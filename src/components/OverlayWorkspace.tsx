@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { resolveCanonicalSurface } from '../lib/canonical-surfaces';
 
 export type OverlayInteractionMode = 'click-through' | 'interactive' | 'hybrid';
 
@@ -48,7 +49,6 @@ type PersonalLaunchResponse = {
   canonicalUrl?: string;
 };
 
-const personalEditorUrl = 'https://spmt.live/embed/overlays?mode=full&app=spacemountain-live&output=personal';
 const personalVisibilityEvent = 'spmt:personal-overlay-visibility';
 const personalVisibilityKey = 'spacemountain:personal-overlay-visible';
 
@@ -65,6 +65,7 @@ export default function OverlayWorkspace({
 }: OverlayWorkspaceProps) {
   const [canonicalChanged, setCanonicalChanged] = useState(false);
   const [personalUrl, setPersonalUrl] = useState('');
+  const [personalEditorUrl, setPersonalEditorUrl] = useState('');
   const [personalVisible, setPersonalVisible] = useState(storedPersonalVisible);
 
   useEffect(() => {
@@ -95,8 +96,16 @@ export default function OverlayWorkspace({
   }, []);
 
   useEffect(() => {
+    if (!editing || personalEditorUrl) return;
+    let cancelled = false;
+    void resolveCanonicalSurface('overlays', { mode: 'full', output: 'personal' }).then((url) => {
+      if (!cancelled) setPersonalEditorUrl(url);
+    });
+    return () => { cancelled = true; };
+  }, [editing, personalEditorUrl]);
+
+  useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
-      if (event.origin !== 'https://spmt.live') return;
       if (event.data?.type === 'spmt.surface.updated' && event.data?.surface === 'overlays') {
         setCanonicalChanged(true);
       }
@@ -132,11 +141,11 @@ export default function OverlayWorkspace({
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 px-4 py-3">
             <div>
               <h2 className="text-sm font-black text-white">SPMT Overlay Bay</h2>
-              <p className="mt-0.5 text-[10px] text-zinc-500">Editing Personal. SPMT owns the scene; SpaceMountain consumes the saved Personal URL.</p>
+              <p className="mt-0.5 text-[10px] text-zinc-500">Editing Personal. The canonical registry decides which editor owns the scene.</p>
             </div>
             <div className="flex items-center gap-2">
               {canonicalChanged && <span className="text-[10px] font-bold text-emerald-300">Saved in SPMT</span>}
-              <a href={personalEditorUrl} target="_blank" rel="noreferrer" className="rounded-lg border border-white/10 px-3 py-2 text-[10px] font-bold text-zinc-300 no-underline">Pop out</a>
+              {personalEditorUrl && <a href={personalEditorUrl} target="_blank" rel="noreferrer" className="rounded-lg border border-white/10 px-3 py-2 text-[10px] font-bold text-zinc-300 no-underline">Pop out</a>}
               <button
                 type="button"
                 onClick={() => {
@@ -149,12 +158,18 @@ export default function OverlayWorkspace({
               </button>
             </div>
           </div>
-          <iframe
-            src={personalEditorUrl}
-            title="SPMT Overlay Bay — Personal"
-            className="min-h-0 flex-1 border-0 bg-black"
-            allow="autoplay; microphone; camera; fullscreen; clipboard-write"
-          />
+          {personalEditorUrl ? (
+            <iframe
+              src={personalEditorUrl}
+              title="Canonical Overlay Bay — Personal"
+              className="min-h-0 flex-1 border-0 bg-black"
+              allow="autoplay; microphone; camera; fullscreen; clipboard-write"
+            />
+          ) : (
+            <div className="grid flex-1 place-items-center p-8 text-center text-sm text-zinc-400">
+              Resolving the canonical Overlay Bay from SPMT…
+            </div>
+          )}
         </div>
       </div>
     );
