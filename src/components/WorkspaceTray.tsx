@@ -1,6 +1,7 @@
 import { ExternalLink, Layout, Maximize2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import type { EmbedSlot } from '../types';
+import { resolveCanonicalSurface } from '../lib/canonical-surfaces';
 
 type WorkspaceTrayProps = {
   open: boolean;
@@ -19,7 +20,6 @@ type TenantUrls = {
   personal: string;
 };
 
-const crewDeskUrl = 'https://spmt.live/embed/worktray?mode=dock&app=spacemountain-live';
 const personalVisibilityKey = 'spacemountain:personal-overlay-visible';
 const footerVisibilityKey = 'spacemountain:workspace-footer-visible';
 const personalVisibilityEvent = 'spmt:personal-overlay-visibility';
@@ -41,6 +41,7 @@ export default function WorkspaceTray({
   onFrameLoad,
 }: WorkspaceTrayProps) {
   const [crewDeskOpen, setCrewDeskOpen] = useState(false);
+  const [crewDeskUrl, setCrewDeskUrl] = useState('');
   const [personalOverlayVisible, setPersonalOverlayVisible] = useState(() => storedVisible(personalVisibilityKey));
   const [footerVisible, setFooterVisible] = useState(() => storedVisible(footerVisibilityKey));
   const [tenantUrls, setTenantUrls] = useState<TenantUrls | null>(null);
@@ -78,6 +79,15 @@ export default function WorkspaceTray({
       window.removeEventListener('keydown', handleKeyDown);
     };
   }, []);
+
+  useEffect(() => {
+    if (!crewDeskOpen || crewDeskUrl) return;
+    let cancelled = false;
+    void resolveCanonicalSurface('worktray', { mode: 'dock' }).then((url) => {
+      if (!cancelled) setCrewDeskUrl(url);
+    });
+    return () => { cancelled = true; };
+  }, [crewDeskOpen, crewDeskUrl]);
 
   useEffect(() => {
     if (!open || tenantUrls) return;
@@ -150,8 +160,8 @@ export default function WorkspaceTray({
     }
   };
 
-  const panelTitle = crewDeskOpen ? 'Crew Desk' : activeSlot?.title;
-  const panelKind = crewDeskOpen ? 'SPMT shared worktray' : activeSlot?.kind;
+  const panelTitle = crewDeskOpen ? 'Workspace' : activeSlot?.title;
+  const panelKind = crewDeskOpen ? 'Canonical shared worktray' : activeSlot?.kind;
   const popoutUrl = crewDeskOpen ? crewDeskUrl : (activeSlot ? resolveUrl(activeSlot) : '#');
 
   // The footer intentionally has no self-hiding button. If hidden with the
@@ -171,7 +181,7 @@ export default function WorkspaceTray({
           onClick={openCrewDesk}
           className="inline-flex shrink-0 items-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-black text-white"
           aria-expanded={open && crewDeskOpen}
-          aria-label="Open Crew Desk"
+          aria-label="Open Workspace"
         >
           <Layout size={15} style={{ color: accentColor }} />
           <span className="hidden sm:inline">Workspace</span>
@@ -231,9 +241,9 @@ export default function WorkspaceTray({
                   <span className="block text-[9px] font-bold uppercase tracking-wider text-zinc-500">{panelKind}</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <a href={popoutUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 rounded-lg border border-white/10 px-2.5 py-1.5 text-[10px] font-bold text-zinc-300 no-underline hover:text-white">
+                  {popoutUrl && popoutUrl !== '#' && <a href={popoutUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 rounded-lg border border-white/10 px-2.5 py-1.5 text-[10px] font-bold text-zinc-300 no-underline hover:text-white">
                     <ExternalLink size={11} /> Pop out
-                  </a>
+                  </a>}
                   {!crewDeskOpen && activeSlot && (
                     <button type="button" onClick={hideActiveSlot} className="rounded-lg border border-white/10 px-2.5 py-1.5 text-[10px] font-bold text-zinc-400 hover:text-white">
                       Hide
@@ -248,14 +258,20 @@ export default function WorkspaceTray({
 
             <div className="relative h-[min(52vh,460px)] border-t border-white/10 bg-black">
               {crewDeskOpen ? (
-                <iframe
-                  src={crewDeskUrl}
-                  title="SPMT Crew Desk"
-                  data-embed-slot-frame="crew-desk"
-                  onLoad={(event) => void onFrameLoad(event.currentTarget)}
-                  className="absolute inset-0 h-full w-full border-0 bg-black"
-                  allow="autoplay; microphone; camera; fullscreen; clipboard-write"
-                />
+                crewDeskUrl ? (
+                  <iframe
+                    src={crewDeskUrl}
+                    title="Canonical Workspace"
+                    data-embed-slot-frame="crew-desk"
+                    onLoad={(event) => void onFrameLoad(event.currentTarget)}
+                    className="absolute inset-0 h-full w-full border-0 bg-black"
+                    allow="autoplay; microphone; camera; fullscreen; clipboard-write"
+                  />
+                ) : (
+                  <div className="flex h-full items-center justify-center px-6 text-center text-sm text-zinc-500">
+                    Resolving the canonical Workspace from SPMT…
+                  </div>
+                )
               ) : (
                 <>
                   {slots.map((slot) => !slot.collapsed && (
