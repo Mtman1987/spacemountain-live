@@ -8,6 +8,7 @@ const rocketDock = fs.readFileSync(new URL('../src/components/RocketDock.tsx', i
 const workspaceTray = fs.readFileSync(new URL('../src/components/WorkspaceTray.tsx', import.meta.url), 'utf8');
 const overlayWorkspace = fs.readFileSync(new URL('../src/components/OverlayWorkspace.tsx', import.meta.url), 'utf8');
 const settingsRoute = fs.readFileSync(new URL('../src/features/workspace/SettingsRoute.tsx', import.meta.url), 'utf8');
+const app = fs.readFileSync(new URL('../src/App.tsx', import.meta.url), 'utf8');
 const overlayCompat = fs.readFileSync(new URL('../public/canonical-overlay-compat.js', import.meta.url), 'utf8');
 const indexHtml = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
 const collapseCss = fs.readFileSync(new URL('../src/sidebar-collapse.css', import.meta.url), 'utf8');
@@ -51,5 +52,8 @@ assert.match(workspaceTray, /event\.altKey && event\.shiftKey && event\.key\.toL
 assert.match(workspaceTray, /if \(!footerVisible\) return null;/, 'footer visibility must be independent from Personal overlay visibility');
 assert.match(settingsRoute, /window\.location\.replace\(CANONICAL_SETTINGS_URL\)/, 'SpaceMountain Universal Settings should route directly to the canonical SPMT surface');
 assert.match(settingsRoute, /https:\/\/spmt\.live\/embed\/settings\?mode=full&app=spacemountain-live/, 'SpaceMountain must use the same SPMT Universal Settings URL as the suite');
+assert.match(app, /Universal Personal overlay/, 'Crew Desk should identify the canonical Personal overlay');
+assert.match(app, /old SpaceMountain-only widget settings have been retired/, 'Crew Desk should retire its duplicate overlay controls');
+assert.match(app, /\{false && <div[^>]+>[\s\S]*overlayWidgets\.map/, 'legacy SpaceMountain widget controls must stay hidden');
 
 console.log('SpaceMountain shell UI smoke checks passed');
