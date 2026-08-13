@@ -1,6 +1,7 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import type { UserPreferences } from '../../types';
 import type { usePortableWorkspace } from '../../hooks/usePortableWorkspace';
+import { resolveCanonicalSurface } from '../../lib/canonical-surfaces';
 
 type PortableWorkspaceController = ReturnType<typeof usePortableWorkspace>;
 
@@ -13,11 +14,18 @@ type SettingsRouteProps = {
   onApplyThemePreset: (preset: 'solar-flare' | 'nebula-purple' | 'oceanic-blue' | 'aurora-green') => void;
 };
 
-const CANONICAL_SETTINGS_URL = 'https://spmt.live/embed/settings?mode=full&app=spacemountain-live';
-
 export default function SettingsRoute({ identityPresent }: SettingsRouteProps) {
+  const [settingsUrl, setSettingsUrl] = useState('');
+
   useEffect(() => {
-    if (identityPresent) window.location.replace(CANONICAL_SETTINGS_URL);
+    if (!identityPresent) return;
+    let cancelled = false;
+    void resolveCanonicalSurface('settings', { mode: 'full' }).then((url) => {
+      if (cancelled || !url) return;
+      setSettingsUrl(url);
+      window.location.replace(url);
+    });
+    return () => { cancelled = true; };
   }, [identityPresent]);
 
   if (!identityPresent) {
@@ -30,8 +38,8 @@ export default function SettingsRoute({ identityPresent }: SettingsRouteProps) {
 
   return (
     <div className="rounded-2xl border border-white/10 bg-black/35 p-8 text-center text-sm text-zinc-300">
-      Opening the canonical SPMT Universal Settings…{' '}
-      <a className="font-bold text-cyan-300 underline" href={CANONICAL_SETTINGS_URL}>Open now</a>
+      {settingsUrl ? 'Opening the canonical Universal Settings…' : 'Resolving the canonical Universal Settings from SPMT…'}{' '}
+      {settingsUrl && <a className="font-bold text-cyan-300 underline" href={settingsUrl}>Open now</a>}
     </div>
   );
 }
