@@ -1,5 +1,6 @@
 'use strict';
 
+// Runtime OAuth guard: signed state survives mobile/cross-host redirects without weakening CSRF checks.
 const crypto = require('node:crypto');
 
 const SPMT_BASE_URL = String(process.env.SPMT_BASE_URL || 'https://spmt.live').replace(/\/$/, '');
