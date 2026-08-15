@@ -18,7 +18,8 @@ COPY package.json package-lock.json ./
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/dist ./dist
 COPY public ./public
+COPY oauth-state-bootstrap.cjs ./oauth-state-bootstrap.cjs
 ENV NODE_ENV=production
 ENV DATABASE_PATH=/data/database.db
 EXPOSE 3000
-CMD ["node", "dist/server.cjs"]
+CMD ["node", "oauth-state-bootstrap.cjs"]
