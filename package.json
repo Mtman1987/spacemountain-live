@@ -7,12 +7,16 @@
     "node": ">=22.5.0"
   },
   "scripts": {
+    "patch:session-cache": "node scripts/patch-session-cache.mjs",
+    "predev": "npm run patch:session-cache",
     "dev": "tsx server.ts",
+    "prebuild": "npm run patch:session-cache",
     "build": "vite build && esbuild server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs",
     "start": "node dist/server.cjs",
     "lint": "tsc --noEmit",
     "test:workspace": "tsx scripts/workspace-profile-smoke.ts",
     "test:shell": "node scripts/shell-ui-smoke.mjs",
+    "pretest": "npm run patch:session-cache",
     "test": "npm run lint && npm run test:workspace && npm run test:shell && npm run build"
   },
   "dependencies": {
