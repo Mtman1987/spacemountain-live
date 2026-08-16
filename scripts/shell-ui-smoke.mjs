@@ -29,6 +29,9 @@ assert.match(main, /installCompanionInstallerUiPatch\(\)/, 'SpaceMountain should
 assert.match(companionInstallerUi, /Download installer/, 'Companion desktop action should say Download installer');
 assert.match(companionInstallerUi, /Download the unsigned /, 'Companion tooltip should keep the unsigned warning');
 assert.match(companionInstallerUi, / installer/, 'Companion tooltip should describe an installer rather than a ZIP');
+assert.match(companionInstallerUi, /\/api\/spmt\/api\/companion\/bootstrap/, 'SpaceMountain download should mint an authenticated one-time tenant link');
+assert.match(companionInstallerUi, /Connect installed Companion/, 'SpaceMountain should finish tenant linking through the registered app protocol');
+assert.match(companionInstallerUi, /stopImmediatePropagation/, 'tenant-linked download should replace the legacy direct download handler');
 
 assert.match(indexHtml, /canonical-overlay-compat\.js[\s\S]*src="\/src\/main\.tsx"/, 'legacy overlay protection must load before React');
 assert.doesNotThrow(() => new vm.Script(overlayCompat), 'canonical overlay compatibility shim should parse');
