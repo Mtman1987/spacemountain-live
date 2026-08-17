@@ -1,6 +1,7 @@
 import type { EmbeddedAppTarget } from '../types';
 
 export const appOrigins = {
+  spmt: 'https://spmt.live',
   streamweaver: 'https://streamweaver-new.fly.dev',
   hearmeout: 'https://hearmeout-main.fly.dev',
   discordHub: 'https://discord-stream-hub-new.fly.dev',
@@ -8,6 +9,10 @@ export const appOrigins = {
 } as const;
 
 export const appSurfaces = {
+  commlink: {
+    home: `${appOrigins.spmt}/commlink/`,
+    embed: `${appOrigins.spmt}/commlink/?embedded=1`,
+  },
   streamweaver: {
     home: `${appOrigins.streamweaver}/dashboard`,
     embed: `${appOrigins.streamweaver}/tts-mixer`,
@@ -17,7 +22,9 @@ export const appSurfaces = {
     integrations: `${appOrigins.streamweaver}/integrations`,
     workflows: `${appOrigins.streamweaver}/active-commands`,
     ttsMixer: `${appOrigins.streamweaver}/tts-mixer`,
-    liveChat: `${appOrigins.streamweaver}/shared-chat`,
+    // Compatibility key for saved SpaceMountain widgets. Commlink itself is owned
+    // and rendered by SPMT; StreamWeaver remains one upstream provider/adapter.
+    liveChat: `${appOrigins.spmt}/commlink/?embedded=1`,
   },
   hearmeout: {
     home: `${appOrigins.hearmeout}/`,
@@ -40,7 +47,7 @@ export const appSurfaces = {
 
 export const canonicalEmbedPresets: EmbeddedAppTarget[] = [
   { title: 'All-Tenant TTS Studio', url: appSurfaces.streamweaver.ttsMixer, kind: 'overlay' },
-  { title: 'Commlink Live Chat', url: appSurfaces.streamweaver.liveChat, kind: 'app' },
+  { title: 'Commlink Live Chat', url: appSurfaces.commlink.embed, kind: 'app' },
   { title: 'Quackverse Game', url: appSurfaces.chatTag.quackverse, kind: 'game' },
   { title: 'ChatTag Overlay', url: appSurfaces.chatTag.overlay, kind: 'overlay' },
   { title: 'DSH Dashboard', url: appSurfaces.discordHub.embed, kind: 'dashboard' },
@@ -66,7 +73,8 @@ const localHosts = new Set(['0.0.0.0', '127.0.0.1', 'localhost', '[::1]']);
 
 function deployedOriginFor(title: string, pathname: string) {
   const hint = `${title} ${pathname}`.toLowerCase();
-  if (hint.includes('streamweaver') || hint.includes('tts') || hint.includes('shared-chat') || hint.includes('commlink')) return appOrigins.streamweaver;
+  if (hint.includes('commlink') || hint.includes('shared-chat')) return appOrigins.spmt;
+  if (hint.includes('streamweaver') || hint.includes('tts')) return appOrigins.streamweaver;
   if (hint.includes('chat-tag') || hint.includes('chattag') || hint.includes('quackverse')) return appOrigins.chatTag;
   if (hint.includes('discord') || hint.includes('dsh')) return appOrigins.discordHub;
   if (hint.includes('hearmeout') || hint.includes('now-playing') || hint.includes('music')) return appOrigins.hearmeout;
@@ -104,6 +112,9 @@ export function normalizeAppSurface(title: string, value: string): NormalizedApp
     const parsed = new URL(url, 'https://spacemountain.live');
     if (parsed.hostname === 'spacemountain.live' && parsed.pathname.startsWith('/chat-tag/')) {
       url = `${appOrigins.chatTag}${parsed.pathname.slice('/chat-tag'.length)}${parsed.search}${parsed.hash}`;
+    } else if (parsed.origin === appOrigins.streamweaver && parsed.pathname === '/shared-chat') {
+      url = appSurfaces.commlink.embed;
+      nextTitle = 'Commlink Live Chat';
     } else if (parsed.origin === appOrigins.streamweaver && parsed.pathname === '/login') {
       const next = parsed.searchParams.get('next');
       url = next && next.startsWith('/') && !next.startsWith('//')
