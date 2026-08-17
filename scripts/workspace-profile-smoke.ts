@@ -126,7 +126,9 @@ const scopedSurface = buildAppSurfaceUrl('http://0.0.0.0:3000/shared-chat', 'Com
   embed: true,
 });
 assert.equal(scopedSurface.valid, true);
-assert.equal(new URL(scopedSurface.url).origin, 'https://streamweaver-new.fly.dev');
+assert.equal(new URL(scopedSurface.url).origin, 'https://spmt.live');
+assert.equal(new URL(scopedSurface.url).pathname, '/commlink/');
+assert.equal(new URL(scopedSurface.url).searchParams.get('embedded'), '1');
 assert.equal(new URL(scopedSurface.url).searchParams.get('tenant'), 'tenant-42');
 assert.equal(new URL(scopedSurface.url).searchParams.get('scopes'), 'identity:read,workspace:read');
 assert.equal(buildAppSurfaceUrl('http://localhost:9999/unknown', 'Unknown').valid, false);
@@ -134,4 +136,4 @@ assert.equal(buildAppSurfaceUrl('http://localhost:9999/unknown', 'Unknown').vali
 assert.deepEqual(parseCanonicalXpBalance({ xp: 625, level: 3 }), { xp: 625, level: 3 });
 assert.equal(parseCanonicalXpBalance({ xp: 'not-a-number', level: 3 }), null);
 
-console.log(JSON.stringify({ status: 'passed', checks: 28 }));
+console.log(JSON.stringify({ status: 'passed', checks: 30 }));
