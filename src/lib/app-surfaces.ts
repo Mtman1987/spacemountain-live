@@ -86,6 +86,13 @@ function legacyCommlinkSurface(parsed: URL, title: string) {
   return parsed.pathname === '/shared-chat' || hint.includes('commlink');
 }
 
+function copyLegacyLocation(source: URL) {
+  const canonical = new URL(appSurfaces.commlink.embed);
+  source.searchParams.forEach((entryValue, key) => canonical.searchParams.set(key, entryValue));
+  canonical.hash = source.hash;
+  return canonical;
+}
+
 export function buildAppSurfaceUrl(value: string, title = '', context: AppSurfaceContext = {}): NormalizedAppSurface {
   const input = String(value || '').trim();
   if (!input || input === 'about:blank') return { title, url: input || 'about:blank', valid: true, error: null };
@@ -96,20 +103,16 @@ export function buildAppSurfaceUrl(value: string, title = '', context: AppSurfac
       if (!deployedOrigin) {
         return { title, url: input, valid: false, error: 'Localhost and 0.0.0.0 URLs cannot be used by deployed overlays.' };
       }
-      if (deployedOrigin === appOrigins.spmt && legacyCommlinkSurface(parsed, title)) {
-        const canonical = new URL(appSurfaces.commlink.embed);
-        parsed.searchParams.forEach((entryValue, key) => canonical.searchParams.set(key, entryValue));
-        canonical.hash = parsed.hash;
-        parsed = canonical;
-      } else {
-        parsed = new URL(`${deployedOrigin}${parsed.pathname}${parsed.search}${parsed.hash}`);
-      }
+      parsed = deployedOrigin === appOrigins.spmt && legacyCommlinkSurface(parsed, title)
+        ? copyLegacyLocation(parsed)
+        : new URL(`${deployedOrigin}${parsed.pathname}${parsed.search}${parsed.hash}`);
     }
 
     const knownOrigin = Object.values(appOrigins).includes(parsed.origin as (typeof appOrigins)[keyof typeof appOrigins]);
-    if (knownOrigin && context.embed) parsed.searchParams.set('embed', '1');
-    if (knownOrigin && context.tenantId) parsed.searchParams.set('tenant', context.tenantId);
-    if (knownOrigin && context.scopes?.length) parsed.searchParams.set('scopes', [...new Set(context.scopes)].sort().join(','));
+    const acceptsWorkspaceContext = knownOrigin && (parsed.origin !== appOrigins.spmt || parsed.pathname.startsWith('/commlink/'));
+    if (acceptsWorkspaceContext && context.embed) parsed.searchParams.set('embed', '1');
+    if (acceptsWorkspaceContext && context.tenantId) parsed.searchParams.set('tenant', context.tenantId);
+    if (acceptsWorkspaceContext && context.scopes?.length) parsed.searchParams.set('scopes', [...new Set(context.scopes)].sort().join(','));
     return { title, url: parsed.toString(), valid: true, error: null };
   } catch {
     return { title, url: input, valid: false, error: 'Enter a complete https:// URL.' };
@@ -125,7 +128,7 @@ export function normalizeAppSurface(title: string, value: string): NormalizedApp
     if (parsed.hostname === 'spacemountain.live' && parsed.pathname.startsWith('/chat-tag/')) {
       url = `${appOrigins.chatTag}${parsed.pathname.slice('/chat-tag'.length)}${parsed.search}${parsed.hash}`;
     } else if (parsed.pathname === '/shared-chat' && (parsed.origin === appOrigins.streamweaver || localHosts.has(parsed.hostname))) {
-      url = appSurfaces.commlink.embed;
+      url = copyLegacyLocation(parsed).toString();
       nextTitle = 'Commlink Live Chat';
     } else if (parsed.origin === appOrigins.streamweaver && parsed.pathname === '/login') {
       const next = parsed.searchParams.get('next');
