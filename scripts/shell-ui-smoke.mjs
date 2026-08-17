@@ -54,10 +54,14 @@ assert.match(workspaceTray, /Copy Personal URL/, 'expanded Worktray should expos
 assert.match(workspaceTray, /\/api\/spmt\/api\/personal-overlay-launch/, 'SpaceMountain Copy Personal URL should use the scoped canonical launch route');
 assert.match(workspaceTray, /const personalUrl = String\(personalData\?\.url \|\| ''\)/, 'SpaceMountain should copy the launch URL returned by SPMT');
 assert.doesNotMatch(workspaceTray, /const personalUrl = String\(data\?\.urls\?\.personal/, 'SpaceMountain must not copy the clean unauthenticated Personal metadata URL');
-assert.match(workspaceTray, /resolveCanonicalSurface\('worktray'/, 'Workspace footer should resolve Worktray from the canonical SPMT surface registry');
+assert.match(workspaceTray, /resolveCanonicalSurface\('worktray'/, 'Workspace should resolve Worktray from the canonical SPMT surface registry');
 assert.doesNotMatch(workspaceTray, /https:\/\/spmt\.live\/embed\/worktray/, 'SpaceMountain must not hard-code the Worktray route');
-assert.match(workspaceTray, /event\.altKey && event\.shiftKey && event\.key\.toLowerCase\(\) === 'f'/, 'footer must have an out-of-band hide/restore hotkey');
-assert.match(workspaceTray, /if \(!footerVisible\) return null;/, 'footer visibility must be independent from Personal overlay visibility');
+assert.match(workspaceTray, /window\.addEventListener\('spmt:workspace-toggle'/, 'Workspace should open and collapse from the shared ecosystem header');
+assert.match(workspaceTray, /window\.addEventListener\('spmt:workspace-open-app'/, 'ecosystem app clicks should route into Workspace slots');
+assert.match(workspaceTray, /window\.dispatchEvent\(new CustomEvent\('spmt:workspace-state'/, 'Workspace should report open state for the shared umbrella presence count');
+assert.match(workspaceTray, /if \(!open\) return null;/, 'closed Workspace must leave no persistent bottom slab');
+assert.match(workspaceTray, /Collapse workspace into ecosystem header/, 'expanded Workspace should expose an explicit collapse-to-header control');
+assert.doesNotMatch(workspaceTray, /event\.altKey && event\.shiftKey && event\.key\.toLowerCase\(\) === 'f'/, 'legacy Alt+Shift+F footer visibility hotkey should be retired');
 assert.match(settingsRoute, /resolveCanonicalSurface\('settings'/, 'SpaceMountain Universal Settings should resolve from the canonical SPMT surface registry');
 assert.doesNotMatch(settingsRoute, /https:\/\/spmt\.live\/embed\/settings/, 'SpaceMountain must not hard-code the Universal Settings route');
 assert.match(canonicalSurfaces, /\/api\/spmt\/api\/platform\/surfaces/, 'SpaceMountain should use its authenticated SPMT proxy to read the surface registry');
