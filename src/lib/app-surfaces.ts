@@ -81,6 +81,11 @@ function deployedOriginFor(title: string, pathname: string) {
   return null;
 }
 
+function legacyCommlinkSurface(parsed: URL, title: string) {
+  const hint = `${title} ${parsed.pathname}`.toLowerCase();
+  return parsed.pathname === '/shared-chat' || hint.includes('commlink');
+}
+
 export function buildAppSurfaceUrl(value: string, title = '', context: AppSurfaceContext = {}): NormalizedAppSurface {
   const input = String(value || '').trim();
   if (!input || input === 'about:blank') return { title, url: input || 'about:blank', valid: true, error: null };
@@ -91,7 +96,14 @@ export function buildAppSurfaceUrl(value: string, title = '', context: AppSurfac
       if (!deployedOrigin) {
         return { title, url: input, valid: false, error: 'Localhost and 0.0.0.0 URLs cannot be used by deployed overlays.' };
       }
-      parsed = new URL(`${deployedOrigin}${parsed.pathname}${parsed.search}${parsed.hash}`);
+      if (deployedOrigin === appOrigins.spmt && legacyCommlinkSurface(parsed, title)) {
+        const canonical = new URL(appSurfaces.commlink.embed);
+        parsed.searchParams.forEach((entryValue, key) => canonical.searchParams.set(key, entryValue));
+        canonical.hash = parsed.hash;
+        parsed = canonical;
+      } else {
+        parsed = new URL(`${deployedOrigin}${parsed.pathname}${parsed.search}${parsed.hash}`);
+      }
     }
 
     const knownOrigin = Object.values(appOrigins).includes(parsed.origin as (typeof appOrigins)[keyof typeof appOrigins]);
@@ -112,7 +124,7 @@ export function normalizeAppSurface(title: string, value: string): NormalizedApp
     const parsed = new URL(url, 'https://spacemountain.live');
     if (parsed.hostname === 'spacemountain.live' && parsed.pathname.startsWith('/chat-tag/')) {
       url = `${appOrigins.chatTag}${parsed.pathname.slice('/chat-tag'.length)}${parsed.search}${parsed.hash}`;
-    } else if (parsed.origin === appOrigins.streamweaver && parsed.pathname === '/shared-chat') {
+    } else if (parsed.pathname === '/shared-chat' && (parsed.origin === appOrigins.streamweaver || localHosts.has(parsed.hostname))) {
       url = appSurfaces.commlink.embed;
       nextTitle = 'Commlink Live Chat';
     } else if (parsed.origin === appOrigins.streamweaver && parsed.pathname === '/login') {
