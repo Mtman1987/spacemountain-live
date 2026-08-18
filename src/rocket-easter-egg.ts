@@ -2,6 +2,7 @@ const EGG_APP_ID = 'spacemountain-live';
 const EGG_NAMESPACE = 'easter-eggs';
 const PORTAL_ID = 'rocketArenaBlackHole';
 const PORTAL_HINT = 'ENTER HERE';
+const DISCOVERY_TIMEOUT_MS = 6000;
 
 type EggStateRecord = {
   schemaVersion?: number;
@@ -14,11 +15,11 @@ type EggStateRecord = {
 
 let installed = false;
 let portalVisible = false;
-let completing = false;
 let eggRevision: number | null = null;
 let eggData: Record<string, unknown> = {};
 let frameId = 0;
 let legacyTriggerObserver: MutationObserver | null = null;
+let discoveryInFlight: Promise<boolean> | null = null;
 
 async function loadEggState() {
   try {
@@ -57,7 +58,7 @@ function buildRocketDiscoveryData() {
   };
 }
 
-async function persistRocketDiscovery(retryOnConflict = true): Promise<boolean> {
+async function persistRocketDiscovery(retryOnConflict = true, signal?: AbortSignal): Promise<boolean> {
   const nextData = buildRocketDiscoveryData();
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
   if (eggRevision !== null) {
@@ -67,6 +68,7 @@ async function persistRocketDiscovery(retryOnConflict = true): Promise<boolean> 
     method: 'PUT',
     credentials: 'include',
     headers,
+    signal,
     body: JSON.stringify({
       schemaVersion: 1,
       ...(eggRevision !== null ? { revision: eggRevision } : {}),
@@ -75,7 +77,7 @@ async function persistRocketDiscovery(retryOnConflict = true): Promise<boolean> 
   });
   if (response.status === 409 && retryOnConflict) {
     await loadEggState();
-    return persistRocketDiscovery(false);
+    return persistRocketDiscovery(false, signal);
   }
   if (!response.ok) return false;
   const record = await response.json() as EggStateRecord;
@@ -87,16 +89,53 @@ async function persistRocketDiscovery(retryOnConflict = true): Promise<boolean> 
   return true;
 }
 
-async function recordRocketDiscovery() {
-  if (completing) return;
-  completing = true;
-  try {
-    await persistRocketDiscovery();
-  } catch {
-    // Discovery should never block Arena access if account sync is temporarily unavailable.
-  } finally {
-    completing = false;
-  }
+function showRocketPersistenceNotice(retained: boolean) {
+  const id = 'rocketDiscoveryPersistenceNotice';
+  document.getElementById(id)?.remove();
+  const notice = document.createElement('div');
+  notice.id = id;
+  notice.setAttribute('role', retained ? 'status' : 'alert');
+  notice.textContent = retained
+    ? 'ROCKET DISCOVERY RETAINED'
+    : 'ROCKET DISCOVERY NOT RETAINED · SIGN IN TO SPMT AND RE-ENTER THE PORTAL';
+  Object.assign(notice.style, {
+    position: 'fixed',
+    left: '50%',
+    bottom: '24px',
+    transform: 'translateX(-50%)',
+    zIndex: '10000',
+    maxWidth: 'min(92vw, 680px)',
+    padding: '10px 14px',
+    borderRadius: '10px',
+    border: '1px solid rgba(125,211,252,.55)',
+    background: 'rgba(2,6,23,.94)',
+    color: '#e0f2fe',
+    boxShadow: '0 0 24px rgba(56,189,248,.22)',
+    font: '800 11px/1.35 ui-monospace,SFMono-Regular,Menlo,monospace',
+    letterSpacing: '.08em',
+    textAlign: 'center',
+    pointerEvents: 'none',
+  });
+  document.body.appendChild(notice);
+  window.setTimeout(() => notice.remove(), retained ? 2600 : 5200);
+}
+
+function recordRocketDiscovery(): Promise<boolean> {
+  if (discoveryInFlight) return discoveryInFlight;
+  discoveryInFlight = (async () => {
+    try {
+      const signal = typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function'
+        ? AbortSignal.timeout(DISCOVERY_TIMEOUT_MS)
+        : undefined;
+      return await persistRocketDiscovery(true, signal);
+    } catch {
+      // Arena access stays available, but a failed account sync is now visible.
+      return false;
+    } finally {
+      discoveryInFlight = null;
+    }
+  })();
+  return discoveryInFlight;
 }
 
 function removePortal() {
@@ -106,7 +145,7 @@ function removePortal() {
 }
 
 function enterArena() {
-  void recordRocketDiscovery();
+  void recordRocketDiscovery().then(showRocketPersistenceNotice);
   removePortal();
   if (window.location.pathname === '/arena') {
     window.dispatchEvent(new PopStateEvent('popstate'));
