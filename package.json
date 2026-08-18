@@ -8,17 +8,19 @@
   },
   "scripts": {
     "patch:session-cache": "node scripts/patch-session-cache.mjs",
-    "predev": "npm run patch:session-cache",
+    "patch:runtime-contracts": "npm run patch:session-cache && node scripts/patch-dsh-community-status-resilience.mjs",
+    "predev": "npm run patch:runtime-contracts",
     "dev": "tsx server.ts",
-    "prebuild": "npm run patch:session-cache",
+    "prebuild": "npm run patch:runtime-contracts",
     "build": "vite build && esbuild server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs",
     "start": "node dist/server.cjs",
     "lint": "tsc --noEmit",
     "test:workspace": "tsx scripts/workspace-profile-smoke.ts",
     "test:shell": "node scripts/shell-ui-smoke.mjs",
     "test:rocket-easter-egg": "node scripts/rocket-easter-egg-reliability-smoke.mjs",
-    "pretest": "npm run patch:session-cache",
-    "test": "npm run lint && npm run test:workspace && npm run test:shell && npm run test:rocket-easter-egg && npm run build"
+    "test:community-resilience": "node scripts/dsh-community-status-resilience-smoke.mjs",
+    "pretest": "npm run patch:runtime-contracts",
+    "test": "npm run lint && npm run test:workspace && npm run test:shell && npm run test:rocket-easter-egg && npm run test:community-resilience && npm run build"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",
