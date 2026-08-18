@@ -2,6 +2,7 @@ import {StrictMode} from 'react';
 import {createRoot} from 'react-dom/client';
 import App from './App.tsx';
 import { installCompanionInstallerUiPatch } from './companion-installer-ui';
+import { installRocketEasterEgg } from './rocket-easter-egg';
 import './index.css';
 import './sidebar-collapse.css';
 
@@ -14,6 +15,7 @@ window.addEventListener('spmt:workspace-refresh', () => {
 });
 
 installCompanionInstallerUiPatch();
+installRocketEasterEgg();
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
