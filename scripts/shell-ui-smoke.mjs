@@ -84,7 +84,8 @@ assert.match(appSurfaces, /spmt: 'https:\/\/spmt\.live'/, 'SpaceMountain should 
 assert.match(appSurfaces, /commlink:\s*\{[\s\S]*embed: `\$\{appOrigins\.spmt\}\/commlink\/\?embedded=1`/, 'Commlink embed should be owned by SPMT');
 assert.match(appSurfaces, /liveChat: `\$\{appOrigins\.spmt\}\/commlink\/\?embedded=1`/, 'legacy liveChat references should resolve to the SPMT Commlink surface');
 assert.doesNotMatch(appSurfaces, /liveChat:\s*`\$\{appOrigins\.streamweaver\}\/shared-chat`/, 'SpaceMountain must not route Commlink to StreamWeaver shared chat');
-assert.match(appSurfaces, /parsed\.origin === appOrigins\.streamweaver && parsed\.pathname === '\/shared-chat'[\s\S]*appSurfaces\.commlink\.embed/, 'saved legacy StreamWeaver chat widgets should migrate to SPMT Commlink');
+assert.match(appSurfaces, /parsed\.pathname === '\/shared-chat' && \(parsed\.origin === appOrigins\.streamweaver \|\| localHosts\.has\(parsed\.hostname\)\)[\s\S]*copyLegacyLocation\(parsed\)\.toString\(\)/, 'saved legacy StreamWeaver chat widgets should migrate to SPMT Commlink while preserving location details');
+assert.match(appSurfaces, /function copyLegacyLocation\(source: URL\)[\s\S]*new URL\(appSurfaces\.commlink\.embed\)/, 'legacy Commlink migration should target the canonical SPMT Commlink embed');
 
 assert.match(app, /Universal Personal overlay/, 'Crew Desk should identify the canonical Personal overlay');
 assert.match(app, /old SpaceMountain-only widget settings have been retired/, 'Crew Desk should retire its duplicate overlay controls');
