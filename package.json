@@ -20,7 +20,8 @@
     "test:rocket-easter-egg": "node scripts/rocket-easter-egg-reliability-smoke.mjs",
     "test:community-resilience": "node scripts/dsh-community-status-resilience-smoke.mjs",
     "pretest": "npm run patch:runtime-contracts",
-    "test": "npm run lint && npm run test:workspace && npm run test:shell && npm run test:rocket-easter-egg && npm run test:community-resilience && npm run build"
+    "test": "npm run lint && npm run test:workspace && npm run test:shell && npm run test:registry && npm run test:rocket-easter-egg && npm run test:community-resilience && npm run build",
+    "test:registry": "node scripts/flagship-app-registry-smoke.mjs"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",
