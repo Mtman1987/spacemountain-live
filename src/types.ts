@@ -13,6 +13,11 @@ export interface CommunityTool {
   popoutUrl?: string | null;
   authUrl?: string | null;
   healthUrl?: string | null;
+  manifestVersion?: 'spmt.app-manifest/v1';
+  registrySource?: 'first-party' | 'approved-partner';
+  capabilities?: string[];
+  surfaces?: string[];
+  integration?: Record<string, 'native' | 'connected' | 'declared' | 'unavailable' | 'not-applicable'>;
   lastCheckedAt?: string | null;
   responseMs?: number | null;
   installed?: boolean;
