@@ -866,8 +866,14 @@ export default function App() {
       if (!app) return tool;
       return {
         ...tool,
-        appUrl: app.url || tool.appUrl || app.authUrl,
-        authUrl: tool.authUrl || app.authUrl || app.url || tool.appUrl,
+        appUrl: app.launchUrl || app.url || tool.appUrl || app.authUrl,
+        authUrl: tool.authUrl || app.authUrl || app.launchUrl || app.url || tool.appUrl,
+        healthUrl: app.healthUrl || tool.healthUrl || null,
+        manifestVersion: app.manifestVersion,
+        registrySource: app.registrySource,
+        capabilities: Array.isArray(app.capabilities) ? app.capabilities : tool.capabilities,
+        surfaces: Array.isArray(app.surfaces) ? app.surfaces : tool.surfaces,
+        integration: app.integration || tool.integration,
         installed: app.installed,
         enabled: app.enabled,
         permissions: app.permissions,
@@ -894,9 +900,14 @@ export default function App() {
         statusType: app.status === 'connected' || app.status === 'bridge-ready' ? 'live' : 'default',
         route: '/apps',
         pointsFlow: 0,
-        appUrl: app.url || app.authUrl,
-        authUrl: app.authUrl || app.url,
-        healthUrl: null,
+        appUrl: app.launchUrl || app.url || app.authUrl,
+        authUrl: app.authUrl || app.launchUrl || app.url,
+        healthUrl: app.healthUrl || null,
+        manifestVersion: app.manifestVersion,
+        registrySource: app.registrySource,
+        capabilities: Array.isArray(app.capabilities) ? app.capabilities : [],
+        surfaces: Array.isArray(app.surfaces) ? app.surfaces : [],
+        integration: app.integration || {},
         installed: app.installed,
         enabled: app.enabled,
         permissions: app.permissions,
@@ -3463,8 +3474,39 @@ export default function App() {
                               <span className={`rounded-full border px-2 py-0.5 text-[9px] font-bold uppercase ${app.updateAvailable ? 'border-sky-300/30 bg-sky-300/10 text-sky-200' : 'border-white/10 bg-white/[0.04] text-zinc-400'}`}>
                                 {app.updateAvailable ? `Update ${app.latestVersion || ''}`.trim() : 'Current'}
                               </span>
+                              {app.registrySource && (
+                                <span className="rounded-full border border-fuchsia-300/20 bg-fuchsia-300/10 px-2 py-0.5 text-[9px] font-bold uppercase text-fuchsia-200">
+                                  {app.registrySource === 'first-party' ? 'SPMT flagship' : 'Approved partner'}
+                                </span>
+                              )}
+                              {app.healthUrl && (
+                                <span className="rounded-full border border-emerald-300/20 bg-emerald-300/10 px-2 py-0.5 text-[9px] font-bold uppercase text-emerald-200">
+                                  Health declared
+                                </span>
+                              )}
                             </div>
                             <p className="mt-1 text-xs leading-relaxed text-zinc-400">{app.description}</p>
+                            {Array.isArray(app.capabilities) && app.capabilities.length > 0 && (
+                              <div className="mt-2 flex flex-wrap gap-1">
+                                {app.capabilities.map((capability: string) => (
+                                  <span key={capability} className="rounded-full border border-violet-400/20 bg-violet-400/10 px-2 py-0.5 text-[9px] font-semibold text-violet-200">
+                                    {capability}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                            {app.integration && Object.keys(app.integration).length > 0 && (
+                              <div className="mt-2 grid grid-cols-2 gap-1">
+                                {Object.entries(app.integration).map(([surface, state]) => (
+                                  <div key={surface} className="flex items-center justify-between rounded-lg border border-white/5 bg-white/[0.025] px-2 py-1 text-[9px]">
+                                    <span className="text-zinc-500">{surface}</span>
+                                    <span className={state === 'native' || state === 'connected' ? 'text-emerald-300' : state === 'declared' ? 'text-cyan-300' : 'text-zinc-500'}>
+                                      {String(state)}
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
                             {(app.updatedAt || app.releaseNotes?.length) && (
                               <p className="mt-2 text-[11px] leading-relaxed text-zinc-500">
                                 {app.updatedAt ? `Updated ${app.updatedAt}` : 'Latest release'}
@@ -3509,7 +3551,7 @@ export default function App() {
                             </button>
                           )}
                           {app.distribution !== 'windows-desktop' && (
-                            <a href={app.url || app.authUrl} target="_blank" rel="noreferrer" className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-bold text-zinc-300 no-underline hover:text-white">
+                            <a href={app.launchUrl || app.url || app.authUrl} target="_blank" rel="noreferrer" className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-bold text-zinc-300 no-underline hover:text-white">
                               Launch
                             </a>
                           )}
