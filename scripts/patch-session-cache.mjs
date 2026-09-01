@@ -11,7 +11,7 @@ async function patchApp() {
   if (source.includes("spmt.cache.v1.spacemountain.session")) return;
 
   const oldHelpers = `function storeSpmtSession(_token: string, _profile: UserProfile) {\n  localStorage.removeItem('spmtToken');\n  localStorage.removeItem('spmt_token');\n  localStorage.removeItem('spmtIdentity');\n}\n\nfunction clearSpmtSession() {\n  localStorage.removeItem('spmtToken');\n  localStorage.removeItem('spmt_token');\n  localStorage.removeItem('spmtIdentity');\n}`;
-  const newHelpers = `const spmtSessionCacheKey = 'spmt.cache.v1.spacemountain.session';\n\nfunction readCachedSpmtIdentity(): UserProfile | null {\n  try {\n    const cached = JSON.parse(localStorage.getItem(spmtSessionCacheKey) || 'null');\n    return cached?.version === 1 && cached?.profile?.id ? cached.profile as UserProfile : null;\n  } catch {\n    return null;\n  }\n}\n\nfunction storeSpmtSession(_token: string, profile: UserProfile) {\n  localStorage.removeItem('spmtToken');\n  localStorage.removeItem('spmt_token');\n  localStorage.removeItem('spmtIdentity');\n  try {\n    localStorage.setItem(spmtSessionCacheKey, JSON.stringify({ version: 1, savedAt: new Date().toISOString(), profile }));\n  } catch {}\n}\n\nfunction clearSpmtSession() {\n  localStorage.removeItem('spmtToken');\n  localStorage.removeItem('spmt_token');\n  localStorage.removeItem('spmtIdentity');\n  localStorage.removeItem(spmtSessionCacheKey);\n}`;
+  const newHelpers = `const spmtSessionCacheKey = 'spmt.cache.v1.spacemountain.session';\nconst spmtSsoRecoveryKey = 'spmt.sso.v1.spacemountain.recovery';\nconst spmtSsoSuppressKey = 'spmt.sso.v1.spacemountain.suppressUntil';\n\nfunction readCachedSpmtIdentity(): UserProfile | null {\n  try {\n    const cached = JSON.parse(localStorage.getItem(spmtSessionCacheKey) || 'null');\n    return cached?.version === 1 && cached?.profile?.id ? cached.profile as UserProfile : null;\n  } catch {\n    return null;\n  }\n}\n\nfunction recoverSpmtSsoOnce() {\n  try {\n    const now = Date.now();\n    const suppressUntil = Number(localStorage.getItem(spmtSsoSuppressKey) || 0);\n    const previousAttempt = Number(sessionStorage.getItem(spmtSsoRecoveryKey) || 0);\n    if (suppressUntil > now || (previousAttempt > 0 && now - previousAttempt < 60_000)) return false;\n    sessionStorage.setItem(spmtSsoRecoveryKey, String(now));\n    const returnPath = window.location.pathname + window.location.search + window.location.hash;\n    window.location.assign('/auth/login?return=' + encodeURIComponent(returnPath || '/'));\n    return true;\n  } catch {\n    return false;\n  }\n}\n\nfunction storeSpmtSession(_token: string, profile: UserProfile) {\n  localStorage.removeItem('spmtToken');\n  localStorage.removeItem('spmt_token');\n  localStorage.removeItem('spmtIdentity');\n  localStorage.removeItem(spmtSsoSuppressKey);\n  try { sessionStorage.removeItem(spmtSsoRecoveryKey); } catch {}\n  try {\n    localStorage.setItem(spmtSessionCacheKey, JSON.stringify({ version: 1, savedAt: new Date().toISOString(), profile }));\n  } catch {}\n}\n\nfunction clearSpmtSession() {\n  localStorage.removeItem('spmtToken');\n  localStorage.removeItem('spmt_token');\n  localStorage.removeItem('spmtIdentity');\n  localStorage.removeItem(spmtSessionCacheKey);\n}`;
   source = replaceRequired(source, oldHelpers, newHelpers, 'SPMT identity cache helpers');
 
   source = replaceRequired(
@@ -22,7 +22,7 @@ async function patchApp() {
   );
 
   const oldFailure = `    if (!response.ok) {\n      clearSpmtSession();\n      setIdentity(null);\n      return null;\n    }`;
-  const newFailure = `    if (!response.ok) {\n      if (response.status === 401 || response.status === 403) {\n        clearSpmtSession();\n        setIdentity(null);\n        return null;\n      }\n      // Keep the restored shell on transient upstream failures.\n      return identity;\n    }`;
+  const newFailure = `    if (!response.ok) {\n      if (response.status === 401 || response.status === 403) {\n        clearSpmtSession();\n        setIdentity(null);\n        recoverSpmtSsoOnce();\n        return null;\n      }\n      // Keep the restored shell on transient upstream failures.\n      return identity;\n    }`;
   source = replaceRequired(source, oldFailure, newFailure, 'definitive auth failure handling');
 
   await writeFile(path, source);
@@ -46,5 +46,17 @@ async function patchWorkspace() {
   console.log('patched SpaceMountain workspace cache bootstrap');
 }
 
+async function patchLogoutSuppression() {
+  const path = 'src/components/CosmicHeader.tsx';
+  let source = await readFile(path, 'utf8');
+  if (source.includes("spmt.sso.v1.spacemountain.suppressUntil")) return;
+  const oldLogout = `  const logoutFromSpmt = async () => {\n    try {\n      await fetch('/api/session/logout', {`;
+  const newLogout = `  const logoutFromSpmt = async () => {\n    try {\n      localStorage.setItem('spmt.sso.v1.spacemountain.suppressUntil', String(Date.now() + 5 * 60 * 1000));\n    } catch {}\n    try {\n      await fetch('/api/session/logout', {`;
+  source = replaceRequired(source, oldLogout, newLogout, 'explicit logout SSO suppression');
+  await writeFile(path, source);
+  console.log('patched SpaceMountain explicit logout SSO suppression');
+}
+
 await patchApp();
 await patchWorkspace();
+await patchLogoutSuppression();
