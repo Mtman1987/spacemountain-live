@@ -8,7 +8,8 @@
   },
   "scripts": {
     "patch:session-cache": "node scripts/patch-session-cache.mjs",
-    "patch:runtime-contracts": "npm run patch:session-cache && node scripts/patch-dsh-community-status-resilience.mjs",
+    "patch:spmt-session-resilience": "node scripts/patch-spmt-session-outage-resilience.mjs",
+    "patch:runtime-contracts": "npm run patch:session-cache && npm run patch:spmt-session-resilience && node scripts/patch-dsh-community-status-resilience.mjs",
     "predev": "npm run patch:runtime-contracts",
     "dev": "tsx server.ts",
     "prebuild": "npm run patch:runtime-contracts",
@@ -19,8 +20,9 @@
     "test:shell": "node scripts/shell-ui-smoke.mjs",
     "test:rocket-easter-egg": "node scripts/rocket-easter-egg-reliability-smoke.mjs",
     "test:community-resilience": "node scripts/dsh-community-status-resilience-smoke.mjs",
+    "test:spmt-session-resilience": "node scripts/spmt-session-outage-resilience-smoke.mjs",
     "pretest": "npm run patch:runtime-contracts",
-    "test": "npm run lint && npm run test:workspace && npm run test:shell && npm run test:rocket-easter-egg && npm run test:community-resilience && npm run build"
+    "test": "npm run lint && npm run test:workspace && npm run test:shell && npm run test:rocket-easter-egg && npm run test:community-resilience && npm run test:spmt-session-resilience && npm run build"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",
@@ -43,7 +45,6 @@
     "@types/node": "^22.14.0",
     "autoprefixer": "^10.4.21",
     "esbuild": "^0.25.0",
-    "tailwindcss": "^4.1.14",
     "tsx": "^4.21.0",
     "typescript": "~5.8.2"
   }
