@@ -178,7 +178,7 @@ const gateway = http.createServer(async (request, response) => {
     const callbackUrl = 'https://spacemountain.live/auth/callback';
     const authorizePath = `/api/oauth/authorize?client_id=${encodeURIComponent(SPMT_CLIENT_ID)}&redirect_uri=${encodeURIComponent(callbackUrl)}&state=${encodeURIComponent(state)}`;
     response.writeHead(302, {
-      location: `${SPMT_BASE_URL}/?return=${encodeURIComponent(authorizePath)}`,
+      location: `${SPMT_BASE_URL}${authorizePath}`,
       'cache-control': 'no-store',
     });
     return response.end();
