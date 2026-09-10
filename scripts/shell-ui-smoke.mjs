@@ -34,7 +34,7 @@ assert.match(collapseCss, /header\.fixed/, 'collapsed sidebar should release hea
 assert.match(collapseCss, /main\.flex-1/, 'collapsed sidebar should release main content space');
 assert.match(main, /installCompanionInstallerUiPatch\(\)/, 'SpaceMountain should install the Companion download-label correction');
 assert.match(main, /installRocketEasterEgg\(\)/, 'SpaceMountain should install the Rocket Easter egg runtime');
-assert.match(rocketEasterEgg, /EGG_NAMESPACE = 'easter-eggs'/, 'Rocket discovery should use the shared Easter egg state namespace');
+assert.match(rocketEasterEgg, /createRocketDiscoveryRecorder/, 'Rocket discovery should use the account-bound recorder');
 assert.match(rocketEasterEgg, /closest\('#rocketLauncher'\)/, 'Rocket Easter egg should begin from the existing launcher');
 assert.match(rocketEasterEgg, /addEventListener\('dblclick'/, 'Rocket Easter egg should require the secret double-click gesture');
 assert.match(rocketEasterEgg, /PORTAL_ID = 'rocketArenaBlackHole'/, 'Rocket Easter egg should reveal the black-hole portal');
@@ -42,7 +42,7 @@ assert.match(rocketEasterEgg, /PORTAL_HINT = 'ENTER HERE'/, 'black-hole portal s
 assert.match(rocketEasterEgg, /pointerEvents: 'none'/, 'the black hole must be entered by flying the rocket, not clicking the portal');
 assert.match(rocketEasterEgg, /Math\.hypot\(rx - px, ry - py\)/, 'Rocket Easter egg should detect flight into the portal');
 assert.match(rocketEasterEgg, /completed: true/, 'Rocket discovery should persist completion');
-assert.match(rocketEasterEgg, /\/api\/spmt\/api\/app-state\/\$\{EGG_APP_ID\}\/\$\{EGG_NAMESPACE\}/, 'Rocket discovery should persist to authenticated SPMT app state');
+assert.match(rocketEasterEgg, /recorder.record\(\)/, 'Rocket portal entry should persist through the canonical recorder');
 assert.match(rocketEasterEgg, /activeTab: 'arena'/, 'successful portal entry should open the Arena');
 assert.match(rocketEasterEgg, /removeAttribute\('id'\)/, 'legacy accidental Arena collision target should be retired');
 assert.match(companionInstallerUi, /Download installer/, 'Companion desktop action should say Download installer');

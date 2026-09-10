@@ -1,95 +1,19 @@
-const EGG_APP_ID = 'spacemountain-live';
-const EGG_NAMESPACE = 'easter-eggs';
+import { createRocketDiscoveryRecorder, type DiscoveryResult } from './lib/rocket-discovery';
+
 const PORTAL_ID = 'rocketArenaBlackHole';
 const PORTAL_HINT = 'ENTER HERE';
-const DISCOVERY_TIMEOUT_MS = 6000;
-
-type EggStateRecord = {
-  schemaVersion?: number;
-  revision?: number;
-  data?: {
-    eggs?: Record<string, unknown>;
-    [key: string]: unknown;
-  };
-};
-
+const RETRY_DELAYS = [1500, 5000, 15000];
 let installed = false;
 let portalVisible = false;
-let eggRevision: number | null = null;
-let eggData: Record<string, unknown> = {};
 let frameId = 0;
 let legacyTriggerObserver: MutationObserver | null = null;
-let discoveryInFlight: Promise<boolean> | null = null;
+let recorder: ReturnType<typeof createRocketDiscoveryRecorder> | null = null;
+let retryTimer: number | undefined;
+let retryAttempt = 0;
 
-async function loadEggState() {
-  try {
-    const response = await fetch(`/api/spmt/api/app-state/${EGG_APP_ID}/${EGG_NAMESPACE}`, {
-      credentials: 'include',
-      cache: 'no-store',
-    });
-    if (!response.ok) return;
-    const record = await response.json() as EggStateRecord;
-    eggRevision = Number.isInteger(Number(record.revision)) ? Number(record.revision) : null;
-    eggData = record.data && typeof record.data === 'object' ? { ...record.data } : {};
-  } catch {
-    // Guests can still discover and play the Arena; signed-in state sync is best-effort.
-  }
-}
-
-function buildRocketDiscoveryData() {
-  const now = new Date().toISOString();
-  const currentEggs = eggData.eggs && typeof eggData.eggs === 'object' && !Array.isArray(eggData.eggs)
-    ? eggData.eggs as Record<string, unknown>
-    : {};
-  const existingRocket = currentEggs.rocket && typeof currentEggs.rocket === 'object'
-    ? currentEggs.rocket as Record<string, unknown>
-    : {};
-  return {
-    ...eggData,
-    eggs: {
-      ...currentEggs,
-      rocket: {
-        ...existingRocket,
-        completed: true,
-        discoveredAt: existingRocket.discoveredAt || now,
-        source: 'spacemountain-live',
-      },
-    },
-  };
-}
-
-async function persistRocketDiscovery(retryOnConflict = true, signal?: AbortSignal): Promise<boolean> {
-  const nextData = buildRocketDiscoveryData();
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-  if (eggRevision !== null) {
-    headers['If-Match'] = `\"app-state-${EGG_APP_ID}-${EGG_NAMESPACE}-${eggRevision}\"`;
-  }
-  const response = await fetch(`/api/spmt/api/app-state/${EGG_APP_ID}/${EGG_NAMESPACE}`, {
-    method: 'PUT',
-    credentials: 'include',
-    headers,
-    signal,
-    body: JSON.stringify({
-      schemaVersion: 1,
-      ...(eggRevision !== null ? { revision: eggRevision } : {}),
-      data: nextData,
-    }),
-  });
-  if (response.status === 409 && retryOnConflict) {
-    await loadEggState();
-    return persistRocketDiscovery(false, signal);
-  }
-  if (!response.ok) return false;
-  const record = await response.json() as EggStateRecord;
-  eggRevision = Number(record.revision) || eggRevision;
-  eggData = nextData;
-  window.dispatchEvent(new CustomEvent('spmt:easter-egg-complete', {
-    detail: { egg: 'rocket', data: nextData },
-  }));
-  return true;
-}
-
-function showRocketPersistenceNotice(retained: boolean) {
+function showRocketPersistenceNotice(result: DiscoveryResult) {
+  const retained = result.status === 'retained';
+  if (result.status === 'idle') return;
   const id = 'rocketDiscoveryPersistenceNotice';
   document.getElementById(id)?.remove();
   const notice = document.createElement('div');
@@ -97,7 +21,11 @@ function showRocketPersistenceNotice(retained: boolean) {
   notice.setAttribute('role', retained ? 'status' : 'alert');
   notice.textContent = retained
     ? 'ROCKET DISCOVERY RETAINED'
-    : 'ROCKET DISCOVERY NOT RETAINED · SIGN IN TO SPMT AND RE-ENTER THE PORTAL';
+    : result.status === 'pending' && recorder?.hasPending()
+      ? 'ROCKET DISCOVERY WAITING TO SYNC · RETRYING AUTOMATICALLY'
+      : recorder?.hasPending()
+        ? 'SIGN IN TO YOUR ORIGINAL SPMT ACCOUNT TO FINISH SAVING'
+        : 'ROCKET DISCOVERY NOT SAVED · SIGN IN AND RE-ENTER THE PORTAL';
   Object.assign(notice.style, {
     position: 'fixed',
     left: '50%',
@@ -120,22 +48,29 @@ function showRocketPersistenceNotice(retained: boolean) {
   window.setTimeout(() => notice.remove(), retained ? 2600 : 5200);
 }
 
-function recordRocketDiscovery(): Promise<boolean> {
-  if (discoveryInFlight) return discoveryInFlight;
-  discoveryInFlight = (async () => {
-    try {
-      const signal = typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function'
-        ? AbortSignal.timeout(DISCOVERY_TIMEOUT_MS)
-        : undefined;
-      return await persistRocketDiscovery(true, signal);
-    } catch {
-      // Arena access stays available, but a failed account sync is now visible.
-      return false;
-    } finally {
-      discoveryInFlight = null;
-    }
-  })();
-  return discoveryInFlight;
+function reportDiscovery(result: DiscoveryResult) {
+  if (result.status === 'retained') {
+    window.dispatchEvent(new CustomEvent('spmt:easter-egg-complete', {
+      detail: { egg: 'rocket', completed: true, data: result.data },
+    }));
+  }
+  showRocketPersistenceNotice(result);
+  if (result.status === 'pending' && recorder?.hasPending() && retryAttempt < RETRY_DELAYS.length) {
+    window.clearTimeout(retryTimer);
+    retryTimer = window.setTimeout(retryPendingDiscovery, RETRY_DELAYS[retryAttempt++]);
+  }
+}
+
+function retryPendingDiscovery() {
+  if (!recorder?.hasPending()) return;
+  void recorder.retry().then((result) => {
+    if (result.status === 'retained' || result.status === 'pending') reportDiscovery(result);
+  });
+}
+
+function recordRocketDiscovery() {
+  retryAttempt = 0;
+  if (recorder) void recorder.record().then(reportDiscovery);
 }
 
 function removePortal() {
@@ -145,7 +80,7 @@ function removePortal() {
 }
 
 function enterArena() {
-  void recordRocketDiscovery().then(showRocketPersistenceNotice);
+  recordRocketDiscovery();
   removePortal();
   if (window.location.pathname === '/arena') {
     window.dispatchEvent(new PopStateEvent('popstate'));
@@ -213,7 +148,14 @@ function retireLegacyArenaTrigger() {
 export function installRocketEasterEgg() {
   if (installed) return;
   installed = true;
-  void loadEggState();
+  let storage: Storage | undefined;
+  try { storage = window.sessionStorage; } catch { /* In-memory retries remain available. */ }
+  recorder = createRocketDiscoveryRecorder(window.fetch.bind(window), storage);
+  const resume = () => { retryAttempt = 0; retryPendingDiscovery(); };
+  window.addEventListener('online', resume);
+  window.addEventListener('focus', resume);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) resume(); });
+  resume();
   retireLegacyArenaTrigger();
   legacyTriggerObserver = new MutationObserver(retireLegacyArenaTrigger);
   legacyTriggerObserver.observe(document.documentElement, { childList: true, subtree: true });
