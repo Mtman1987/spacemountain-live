@@ -90,7 +90,10 @@ function installRoutes(app) {
     res.cookie('spacemountain_oauth_return', returnPath, cookieOptions(STATE_TTL_MS));
 
     const authorizePath = `/api/oauth/authorize?client_id=${encodeURIComponent(SPMT_CLIENT_ID)}&redirect_uri=${encodeURIComponent(CALLBACK_URL)}&state=${encodeURIComponent(state)}`;
-    return res.redirect(`${SPMT_BASE_URL}/?return=${encodeURIComponent(authorizePath)}`);
+    // Enter the OAuth endpoint directly. Sending an already-authenticated user
+    // through the SPMT homepage can strand the browser there before authorization
+    // reaches this app's callback, leaving SpaceMountain without its own session.
+    return res.redirect(`${SPMT_BASE_URL}${authorizePath}`);
   });
 
   app.get('/auth/callback', async (req, res) => {
