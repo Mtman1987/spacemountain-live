@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import vm from 'node:vm';
 
 const authServer = fs.readFileSync(new URL('../auth-server.ts', import.meta.url), 'utf8');
+const oauthBootstrap = fs.readFileSync(new URL('../oauth-state-bootstrap.cjs', import.meta.url), 'utf8');
 const homeRoute = fs.readFileSync(new URL('../src/features/home/HomeRoute.tsx', import.meta.url), 'utf8');
 const rocketDock = fs.readFileSync(new URL('../src/components/RocketDock.tsx', import.meta.url), 'utf8');
 const rocketEasterEgg = fs.readFileSync(new URL('../src/rocket-easter-egg.ts', import.meta.url), 'utf8');
@@ -22,6 +23,10 @@ assert.match(authServer, /pathname === '\/auth\/login'/, 'SpaceMountain should o
 assert.match(authServer, /pathname === '\/auth\/continue'/, 'login hero should continue into the SPMT OAuth flow');
 assert.match(authServer, /space-logo-main\.png/, 'login hero should show the canonical SpaceMountain logo');
 assert.match(authServer, /spacemountain_oauth_state/, 'login continuation must preserve OAuth state protection');
+for (const oauthRuntime of [authServer, oauthBootstrap]) {
+  assert.match(oauthRuntime, /SPMT_BASE_URL\}\$\{authorizePath\}/, 'login must enter the SPMT OAuth endpoint directly');
+  assert.doesNotMatch(oauthRuntime, /SPMT_BASE_URL\}\/\?return=/, 'login must not strand authenticated users on the SPMT homepage');
+}
 assert.match(homeRoute, /space-logo-main\.png/, 'home welcome hero should show the canonical logo');
 assert.match(rocketDock, /sm-sidebar-collapsed/, 'RocketDock should drive the collapsed shell state');
 assert.match(rocketDock, /\/api\/spmt\/api\/workspace-profile/, 'sidebar collapse should persist to the canonical SPMT workspace profile');
