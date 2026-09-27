@@ -2600,7 +2600,9 @@ export default function App() {
                   theme={currentTheme}
                   onNavigate={setActiveTab}
                   onLaunchTool={(tool) => {
-                    if (tool.embedUrl) {
+                    if (tool.id === 'chat-tag') {
+                      window.location.assign(tool.appUrl || appSurfaces.chatTag.home);
+                    } else if (tool.embedUrl) {
                       openEmbeddedApp(tool.name, tool.embedUrl, 'app');
                     } else if (tool.appUrl || tool.authUrl) {
                       window.open(tool.appUrl || tool.authUrl || '', '_blank', 'noopener,noreferrer');
