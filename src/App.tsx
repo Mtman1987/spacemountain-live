@@ -4941,6 +4941,7 @@ function AppRocketLogic({ rocketFlying, setRocketFlying, rocketStateRef, onArena
     }
 
     function setDocked() {
+      window.dispatchEvent(new CustomEvent('spmt:rocket-docked'));
       const state = rocketStateRef.current;
       state.mode = 'docked';
       setRocketFlying(false);
@@ -5157,6 +5158,12 @@ function AppRocketLogic({ rocketFlying, setRocketFlying, rocketStateRef, onArena
     rocket.addEventListener('pointermove', handlePointerMove);
     rocket.addEventListener('pointerup', handlePointerUp);
     rocket.addEventListener('dblclick', handleDblClick);
+    const handleDiscoveryRelease = () => {
+      if (rocketStateRef.current.mode !== 'docked') return;
+      if (clickTimeout) { clearTimeout(clickTimeout); clickTimeout = null; }
+      releaseRocket();
+    };
+    window.addEventListener('spmt:rocket-release', handleDiscoveryRelease);
 
     // Sidebar Close Click
     const handleCloseClick = () => {
@@ -5264,6 +5271,7 @@ function AppRocketLogic({ rocketFlying, setRocketFlying, rocketStateRef, onArena
       rocket.removeEventListener('pointermove', handlePointerMove);
       rocket.removeEventListener('pointerup', handlePointerUp);
       rocket.removeEventListener('dblclick', handleDblClick);
+      window.removeEventListener('spmt:rocket-release', handleDiscoveryRelease);
       const activeCBtn = document.getElementById('dockClose');
       if (activeCBtn) activeCBtn.removeEventListener('click', handleCloseClick);
       const activeHnd = document.getElementById('dockHandle');
