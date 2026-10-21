@@ -101,7 +101,6 @@ function getTwitchEmbedUrl(twitchLogin?: string | null) {
   const params = new URLSearchParams({
     channel: login,
     parent: hostname,
-    muted: 'true',
     autoplay: 'true',
   });
   return `https://player.twitch.tv/?${params.toString()}`;
