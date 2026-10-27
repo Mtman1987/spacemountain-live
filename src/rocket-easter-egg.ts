@@ -1,4 +1,5 @@
 import { createRocketDiscoveryRecorder, type DiscoveryResult } from './lib/rocket-discovery';
+import { rollDiscoveryChance, type DiscoveryChanceState } from './lib/egg-discovery-chance';
 
 const PORTAL_ID = 'rocketArenaBlackHole';
 const PORTAL_HINT = 'ENTER HERE';
@@ -10,6 +11,28 @@ let legacyTriggerObserver: MutationObserver | null = null;
 let recorder: ReturnType<typeof createRocketDiscoveryRecorder> | null = null;
 let retryTimer: number | undefined;
 let retryAttempt = 0;
+const DISCOVERY_STORAGE_KEY = 'spmt:rocket-discovery-chance:v1';
+let chanceState: DiscoveryChanceState = { attempts: 0, lastAttemptAt: 0, lastOpenedAt: 0 };
+let chanceTimer: number | undefined;
+
+function rememberChanceState() {
+  try { window.sessionStorage.setItem(DISCOVERY_STORAGE_KEY, JSON.stringify(chanceState)); } catch { /* This tab still has its cooldown. */ }
+}
+
+function tryAccidentalDiscovery(source: 'rocket' | 'navigation') {
+  const rocket = document.getElementById('rocketLauncher');
+  if (document.hidden || portalVisible || !rocket?.classList.contains('docked') || window.location.pathname === '/arena') return;
+  const result = rollDiscoveryChance(chanceState, source, Date.now());
+  chanceState = result.state;
+  rememberChanceState();
+  if (!result.open) return;
+  // Reuse the real flight controller; do not synthesize a double-click or
+  // interrupt the navigation action that created this discovery chance.
+  window.dispatchEvent(new CustomEvent('spmt:rocket-release'));
+  window.setTimeout(() => {
+    if (rocket.classList.contains('free')) showPortal();
+  }, 0);
+}
 
 function showRocketPersistenceNotice(result: DiscoveryResult) {
   const retained = result.status === 'retained';
@@ -117,6 +140,8 @@ function monitorPortalCollision() {
 function showPortal() {
   if (portalVisible || document.getElementById(PORTAL_ID)) return;
   portalVisible = true;
+  chanceState = { ...chanceState, attempts: 0, lastOpenedAt: Date.now() };
+  rememberChanceState();
   const portal = document.createElement('div');
   portal.id = PORTAL_ID;
   portal.setAttribute('aria-label', 'Black hole entrance to the Arena');
@@ -148,6 +173,12 @@ function retireLegacyArenaTrigger() {
 export function installRocketEasterEgg() {
   if (installed) return;
   installed = true;
+  try {
+    const saved = JSON.parse(window.sessionStorage.getItem(DISCOVERY_STORAGE_KEY) || '{}');
+    for (const key of ['attempts', 'lastAttemptAt', 'lastOpenedAt'] as const) {
+      if (Number.isFinite(saved[key]) && saved[key] >= 0) chanceState[key] = saved[key];
+    }
+  } catch { /* Discovery remains available without browser storage. */ }
   let storage: Storage | undefined;
   try { storage = window.sessionStorage; } catch { /* In-memory retries remain available. */ }
   recorder = createRocketDiscoveryRecorder(window.fetch.bind(window), storage);
@@ -161,12 +192,24 @@ export function installRocketEasterEgg() {
   legacyTriggerObserver.observe(document.documentElement, { childList: true, subtree: true });
 
   document.addEventListener('dblclick', (event) => {
+    window.clearTimeout(chanceTimer);
     const target = event.target as HTMLElement | null;
     const rocket = target?.closest('#rocketLauncher');
     if (!rocket?.classList.contains('docked')) return;
     // AppRocketLogic performs the release on the same double-click; the portal appears immediately after it does.
     window.setTimeout(showPortal, 0);
   }, true);
+
+  document.addEventListener('click', (event) => {
+    if (!event.isTrusted || event.detail > 1) return;
+    const target = event.target as Element | null;
+    const source = target?.closest('#rocketLauncher') ? 'rocket'
+      : target?.closest('.dock-panel nav button') ? 'navigation' : null;
+    if (!source) return;
+    window.clearTimeout(chanceTimer);
+    chanceTimer = window.setTimeout(() => tryAccidentalDiscovery(source), 450);
+  });
+  window.addEventListener('spmt:rocket-docked', removePortal);
 
   window.addEventListener('popstate', () => {
     if (window.location.pathname === '/arena') removePortal();
